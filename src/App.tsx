@@ -6,6 +6,7 @@ import { Block } from './types/Block';
 import { BlockPalette } from './components/BlockPalette';
 import { BluetoothConnector } from './components/BluetoothConnector';
 import { Workspace } from './components/Workspace';
+import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
 
 export const SoundContext = createContext(() => {});
 
@@ -20,6 +21,7 @@ const App = () => {
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
+    ensureBluetoothPermissions().catch(err => console.error(err));
     const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);

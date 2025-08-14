@@ -16,6 +16,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
   const [isConnected, setIsConnected] = useState<boolean>(!!controlledIsConnected);
   const [isScanning, setIsScanning] = useState(false);
   const [recentDevices, setRecentDevices] = useState<string[]>([]);
+  const [isChecking, setIsChecking] = useState<boolean>(false); // <-- preloader state
 
   // track whether we've already alerted that bluetooth is off (so we don't spam)
   const hasNotifiedBluetoothOffRef = useRef(false);
@@ -31,13 +32,15 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
     let cancelled = false;
 
     const check = async () => {
+      setIsChecking(true);
       try {
         const conn = await bluetoothService.isConnected();
         if (cancelled) return;
         setIsConnected(conn);
         onConnectionChange?.(conn);
       } catch (err) {
-        // swallow
+        // swallow errors from isConnected
+        console.warn('isConnected check failed', err);
       }
 
       // On Web we can check navigator.bluetooth.getAvailability()
@@ -46,7 +49,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
           const avail = await (navigator as any).bluetooth.getAvailability();
           // if bluetooth is not available/disabled, notify the user once
           if (!avail && !hasNotifiedBluetoothOffRef.current) {
-            // small user-friendly alert
             alert('Bluetooth appears to be turned off — please enable Bluetooth and try again.');
             hasNotifiedBluetoothOffRef.current = true;
           } else if (avail && hasNotifiedBluetoothOffRef.current) {
@@ -56,6 +58,8 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
         }
       } catch (e) {
         // ignore availability check errors
+      } finally {
+        setIsChecking(false);
       }
     };
 
@@ -102,12 +106,30 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         className={`
           w-12 h-12 rounded-full shadow-lg transition-all duration-300
-          flex items-center justify-center
+          flex items-center justify-center relative
           ${isConnected ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white hover:bg-gray-100 text-gray-600'}
         `}
         aria-label="Bluetooth connector"
       >
-        {isConnected ? <BluetoothConnected className="w-6 h-6" /> : <Bluetooth className="w-6 h-6" />}
+        {/* Spinner overlay while auto-check is running */}
+        {isChecking && (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <svg
+              className={`${isConnected ? 'text-white' : 'text-gray-600'} animate-spin h-5 w-5`}
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 100 8v4a8 8 0 01-8-8z"></path>
+            </svg>
+          </span>
+        )}
+
+        {/* Icon (hidden visually under spinner when checking) */}
+        <span className={isChecking ? 'opacity-0' : 'opacity-100'}>
+          {isConnected ? <BluetoothConnected className="w-6 h-6" /> : <Bluetooth className="w-6 h-6" />}
+        </span>
       </button>
 
       {isMenuOpen && (
@@ -140,7 +162,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
                 ))}
               </div>
 
-              {/* per request: remove the 'Scan for New Devices' button and instead keep status static */}
               <div className="border-t border-gray-100 pt-2 px-4">
                 <div className="text-sm text-blue-600">
                   {isScanning ? 'Scanning...' : 'Auto-refreshing device status'}
@@ -153,3 +174,5 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
     </div>
   );
 };
+
+export default BluetoothConnector;

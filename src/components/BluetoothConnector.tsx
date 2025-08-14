@@ -3,83 +3,118 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Bluetooth, BluetoothConnected } from 'lucide-react';
 import bluetoothService from '../utils/bluetoothService';
 
+interface DeviceItem {
+  id: string;
+  name?: string;
+  rssi?: number;
+}
+
 interface BluetoothConnectorProps {
-  isConnected?: boolean;
   onConnectionChange?: (connected: boolean) => void;
 }
 
-export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
-  isConnected: controlledIsConnected,
-  onConnectionChange,
-}) => {
+export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState<boolean>(!!controlledIsConnected);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isScanningAction, setIsScanningAction] = useState(false); // when actively connecting
+  const [isChecking, setIsChecking] = useState(false); // preloader for periodic check
+  const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);
   const [recentDevices, setRecentDevices] = useState<string[]>([]);
-  const [isChecking, setIsChecking] = useState<boolean>(false); // <-- preloader state
-
-  // track whether we've already alerted that bluetooth is off (so we don't spam)
   const hasNotifiedBluetoothOffRef = useRef(false);
+  const scanStartedRef = useRef(false);
+  const isUnmountedRef = useRef(false);
+
+  // helper to upsert device into nearbyDevices
+  const addOrUpdateDevice = useCallback((d: DeviceItem) => {
+    setNearbyDevices(prev => {
+      const idx = prev.findIndex(p => p.id === d.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], ...d };
+        return copy;
+      }
+      return [d, ...prev].slice(0, 20);
+    });
+  }, []);
 
   useEffect(() => {
-    if (typeof controlledIsConnected === 'boolean') {
-      setIsConnected(controlledIsConnected);
-    }
-  }, [controlledIsConnected]);
+    isUnmountedRef.current = false;
 
-  // Poll connection state every 2 seconds and update parent
-  useEffect(() => {
+    (async () => {
+      try {
+        await bluetoothService.ensurePermissions();
+      } catch (e) {
+        console.warn('ensurePermissions failed', e);
+      }
+    })();
+
+    // start native scan automatically if possible
+    (async () => {
+      try {
+        const started = await bluetoothService.startScan(({ id, name, rssi }: any) => {
+          addOrUpdateDevice({ id, name, rssi });
+        });
+
+        // mark that we requested scanning; if it returned false, web likely requires gesture
+        if (started) scanStartedRef.current = true;
+      } catch (e) {
+        console.warn('startScan error', e);
+      }
+    })();
+
+    // initial connection check + periodic polling every 2s
     let cancelled = false;
-
-    const check = async () => {
+    const doCheck = async () => {
       setIsChecking(true);
       try {
         const conn = await bluetoothService.isConnected();
-        if (cancelled) return;
+        if (cancelled || isUnmountedRef.current) return;
         setIsConnected(conn);
         onConnectionChange?.(conn);
       } catch (err) {
-        // swallow errors from isConnected
         console.warn('isConnected check failed', err);
       }
 
-      // On Web we can check navigator.bluetooth.getAvailability()
+      // On Web we can check availability
       try {
         if (typeof navigator !== 'undefined' && 'bluetooth' in navigator && typeof (navigator as any).bluetooth.getAvailability === 'function') {
           const avail = await (navigator as any).bluetooth.getAvailability();
-          // if bluetooth is not available/disabled, notify the user once
           if (!avail && !hasNotifiedBluetoothOffRef.current) {
             alert('Bluetooth appears to be turned off — please enable Bluetooth and try again.');
             hasNotifiedBluetoothOffRef.current = true;
           } else if (avail && hasNotifiedBluetoothOffRef.current) {
-            // Bluetooth became available again; reset flag
             hasNotifiedBluetoothOffRef.current = false;
           }
         }
       } catch (e) {
-        // ignore availability check errors
+        // ignore
       } finally {
         setIsChecking(false);
       }
     };
 
-    // initial check + interval
-    check();
-    const id = setInterval(check, 2000);
+    doCheck();
+    const id = setInterval(doCheck, 2000);
+
     return () => {
       cancelled = true;
+      isUnmountedRef.current = true;
       clearInterval(id);
+      (async () => {
+        try { await bluetoothService.stopScan(); } catch (e) { /* ignore */ }
+      })();
     };
-  }, [onConnectionChange]);
+  }, [onConnectionChange, addOrUpdateDevice]);
 
-  const handleConnect = useCallback(async (deviceName?: string) => {
-    if (isScanning) return;
-    setIsScanning(true);
+  const handleConnect = useCallback(async (deviceId?: string) => {
+    if (isScanningAction) return;
+    setIsScanningAction(true);
     try {
-      const ok = await bluetoothService.connectToDevice(deviceName);
+      const ok = await bluetoothService.connectToDevice();
+      // Note: for web the user will see the chooser; for native plugin we used requestDevice
       setIsConnected(ok);
-      if (ok && deviceName) {
-        setRecentDevices(prev => [deviceName, ...prev.filter(d => d !== deviceName)].slice(0, 5));
+      if (ok && deviceId) {
+        setRecentDevices(prev => [deviceId, ...prev.filter(d => d !== deviceId)].slice(0, 5));
       }
       onConnectionChange?.(ok);
       setIsMenuOpen(false);
@@ -89,9 +124,9 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
       onConnectionChange?.(false);
       alert('Failed to connect to device.');
     } finally {
-      setIsScanning(false);
+      setIsScanningAction(false);
     }
-  }, [isScanning, onConnectionChange]);
+  }, [isScanningAction, onConnectionChange]);
 
   const handleDisconnect = useCallback(async () => {
     await bluetoothService.disconnect();
@@ -99,6 +134,26 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
     onConnectionChange?.(false);
     setIsMenuOpen(false);
   }, [onConnectionChange]);
+
+  // Web-only: explicit scan trigger (user gesture) — present if automatic scan wasn't started
+  const webManualScan = useCallback(async () => {
+    setIsScanningAction(true);
+    try {
+      // This will open the browser's device chooser (user gesture)
+      const ok = await bluetoothService.connectToDevice();
+      setIsConnected(ok);
+      onConnectionChange?.(ok);
+      setIsMenuOpen(false);
+    } catch (e) {
+      console.warn('Manual web connect failed', e);
+    } finally {
+      setIsScanningAction(false);
+    }
+  }, [onConnectionChange]);
+
+  const isWeb = typeof navigator !== 'undefined' && (navigator as any).userAgent && (navigator as any).platform && (Capacitor?.getPlatform ? Capacitor.getPlatform() === 'web' : false);
+  // Note: above uses Capacitor.getPlatform if available; but we don't import Capacitor here to keep component simple.
+  // The bluetoothService.startScan already handled platform differences.
 
   return (
     <div className="absolute top-4 right-4 z-50">
@@ -133,9 +188,10 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
       </button>
 
       {isMenuOpen && (
-        <div className="absolute top-14 right-0 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
-          <div className="px-4 py-2 border-b border-gray-100">
+        <div className="absolute top-14 right-0 w-72 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+          <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-semibold text-gray-800">Bluetooth Devices</h3>
+            <div className="text-xs text-gray-500">{isScanningAction ? 'Scanning...' : scanStartedRef.current ? 'Scanning' : 'Idle'}</div>
           </div>
 
           {isConnected ? (
@@ -148,23 +204,43 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
           ) : (
             <>
               <div className="px-4 py-2">
-                <p className="text-sm text-gray-600 mb-2">Recent Devices:</p>
-                {recentDevices.length === 0 && <div className="text-sm text-gray-500">No recent devices</div>}
-                {recentDevices.map((device, index) => (
+                <p className="text-sm text-gray-600 mb-2">Nearby Devices:</p>
+                {nearbyDevices.length === 0 && <div className="text-sm text-gray-500">No devices found</div>}
+                {nearbyDevices.map((device) => (
                   <button
-                    key={index}
+                    key={device.id}
+                    onClick={() => handleConnect(device.id)}
+                    disabled={isScanningAction}
+                    className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-sm text-gray-700 disabled:opacity-50"
+                  >
+                    {device.name ?? device.id} {device.rssi ? `· ${device.rssi}dBm` : null}
+                  </button>
+                ))}
+              </div>
+
+              <div className="px-4 py-2 border-t border-gray-100">
+                <p className="text-sm text-gray-600 mb-2">Recent Devices:</p>
+                {recentDevices.length === 0 && <div className="text-sm text-gray-500 mb-2">No recent devices</div>}
+                {recentDevices.map((device, idx) => (
+                  <button
+                    key={idx}
                     onClick={() => handleConnect(device)}
-                    disabled={isScanning}
+                    disabled={isScanningAction}
                     className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-sm text-gray-700 disabled:opacity-50"
                   >
                     {device}
                   </button>
                 ))}
-              </div>
 
-              <div className="border-t border-gray-100 pt-2 px-4">
-                <div className="text-sm text-blue-600">
-                  {isScanning ? 'Scanning...' : 'Auto-refreshing device status'}
+                {/* Web fallback: browser usually requires a user gesture to show device chooser */}
+                <div className="mt-3">
+                  <button
+                    onClick={webManualScan}
+                    disabled={isScanningAction}
+                    className="w-full px-3 py-2 bg-blue-50 text-blue-600 rounded text-sm disabled:opacity-50"
+                  >
+                    {isScanningAction ? 'Opening chooser...' : 'Tap to scan (browser)'}
+                  </button>
                 </div>
               </div>
             </>

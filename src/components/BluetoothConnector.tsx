@@ -1,36 +1,71 @@
-import React, { useEffect, useState, useCallback } from 'react';
+// src/components/BluetoothConnector.tsx
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Bluetooth, BluetoothConnected } from 'lucide-react';
 import bluetoothService from '../utils/bluetoothService';
 
 interface BluetoothConnectorProps {
+  isConnected?: boolean;
   onConnectionChange?: (connected: boolean) => void;
 }
 
-export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange }) => {
+export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({
+  isConnected: controlledIsConnected,
+  onConnectionChange,
+}) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState<boolean>(!!controlledIsConnected);
   const [isScanning, setIsScanning] = useState(false);
   const [recentDevices, setRecentDevices] = useState<string[]>([]);
 
-  useEffect(() => {
-    // Try to warm up BLE client and request platform permission if possible
-    (async () => {
-      try {
-        await bluetoothService.ensurePermissions();
-      } catch (e) {
-        console.warn('ensurePermissions failed', e);
-      }
-    })();
+  // track whether we've already alerted that bluetooth is off (so we don't spam)
+  const hasNotifiedBluetoothOffRef = useRef(false);
 
-    // poll connection state once
-    (async () => {
+  useEffect(() => {
+    if (typeof controlledIsConnected === 'boolean') {
+      setIsConnected(controlledIsConnected);
+    }
+  }, [controlledIsConnected]);
+
+  // Poll connection state every 2 seconds and update parent
+  useEffect(() => {
+    let cancelled = false;
+
+    const check = async () => {
       try {
         const conn = await bluetoothService.isConnected();
+        if (cancelled) return;
         setIsConnected(conn);
         onConnectionChange?.(conn);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (_) { /* empty */ }
-    })();
+      } catch (err) {
+        // swallow
+      }
+
+      // On Web we can check navigator.bluetooth.getAvailability()
+      try {
+        if (typeof navigator !== 'undefined' && 'bluetooth' in navigator && typeof (navigator as any).bluetooth.getAvailability === 'function') {
+          const avail = await (navigator as any).bluetooth.getAvailability();
+          // if bluetooth is not available/disabled, notify the user once
+          if (!avail && !hasNotifiedBluetoothOffRef.current) {
+            // small user-friendly alert
+            alert('Bluetooth appears to be turned off — please enable Bluetooth and try again.');
+            hasNotifiedBluetoothOffRef.current = true;
+          } else if (avail && hasNotifiedBluetoothOffRef.current) {
+            // Bluetooth became available again; reset flag
+            hasNotifiedBluetoothOffRef.current = false;
+          }
+        }
+      } catch (e) {
+        // ignore availability check errors
+      }
+    };
+
+    // initial check + interval
+    check();
+    const id = setInterval(check, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [onConnectionChange]);
 
   const handleConnect = useCallback(async (deviceName?: string) => {
@@ -39,8 +74,8 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     try {
       const ok = await bluetoothService.connectToDevice(deviceName);
       setIsConnected(ok);
-      if (ok) {
-        setRecentDevices(prev => deviceName ? [deviceName, ...prev.filter(d => d !== deviceName)].slice(0,5) : prev);
+      if (ok && deviceName) {
+        setRecentDevices(prev => [deviceName, ...prev.filter(d => d !== deviceName)].slice(0, 5));
       }
       onConnectionChange?.(ok);
       setIsMenuOpen(false);
@@ -48,6 +83,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       console.error('Bluetooth connection failed:', err);
       setIsConnected(false);
       onConnectionChange?.(false);
+      alert('Failed to connect to device.');
     } finally {
       setIsScanning(false);
     }
@@ -104,14 +140,11 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
                 ))}
               </div>
 
-              <div className="border-t border-gray-100 pt-2">
-                <button
-                  onClick={() => handleConnect()}
-                  disabled={isScanning}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 text-blue-600 disabled:opacity-50"
-                >
-                  {isScanning ? 'Scanning...' : 'Scan for New Devices'}
-                </button>
+              {/* per request: remove the 'Scan for New Devices' button and instead keep status static */}
+              <div className="border-t border-gray-100 pt-2 px-4">
+                <div className="text-sm text-blue-600">
+                  {isScanning ? 'Scanning...' : 'Auto-refreshing device status'}
+                </div>
               </div>
             </>
           )}

@@ -169,7 +169,14 @@ const App = () => {
     onDragEnd: () => {},
   });
 
-  const handleGreenFlagClick = useCallback((blockId: string) => {
+  // inside App.tsx (replace existing handleGreenFlagClick)
+const handleGreenFlagClick = useCallback(async (blockId: string) => {
+    // If Bluetooth isn't connected, show alert and don't execute.
+    if (!isBluetoothConnected) {
+      alert('You must connect to a device');
+      return;
+    }
+
     const flag = blocksMap.get(blockId);
     if (flag && flag.childId) {
       const executionChain = getChain(flag.childId);
@@ -177,7 +184,8 @@ const App = () => {
     } else {
       console.log("No blocks connected to the Green Flag with ID:", blockId);
     }
-  }, [blocksMap, getChain]);
+  }, [blocksMap, getChain, isBluetoothConnected]);
+
 
   const handleDelayChange = useCallback((blockId: string, value: number) => {
     setBlocks(prev => prev.map(block => block.id === blockId ? { ...block, value } : block));

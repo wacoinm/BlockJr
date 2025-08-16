@@ -146,21 +146,29 @@ export const stopScan = async (): Promise<void> => {
   }
 };
 
-export const connectToDevice = async (nameHint?: string): Promise<boolean> => {
+export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
   if (isNative) {
     try {
       await BleClient.initialize();
-      const device = await BleClient.requestDevice({
-        services: [NUS_SERVICE],
-        allowDuplicates: false
-      });
-
-      if (!device || !device.deviceId) return false;
-      nativeDeviceId = device.deviceId;
-      await BleClient.connect(nativeDeviceId);
+      let devId: string;
+      if (deviceId) {
+        devId = deviceId;
+      } else {
+        const device = await BleClient.requestDevice({
+          services: [NUS_SERVICE],
+          allowDuplicates: false
+        });
+        if (!device || !device.deviceId) return false;
+        devId = device.deviceId;
+      }
+      await BleClient.connect(devId);
+      nativeDeviceId = devId;
 
       try {
-        await BleClient.subscribe(nativeDeviceId, NUS_SERVICE, NUS_RX_CHAR);
+        await BleClient.startNotifications(devId, NUS_SERVICE, NUS_RX_CHAR, (value) => {
+          const decoded = new TextDecoder().decode(value);
+          console.log('[BLE RX]', decoded);
+        });
       } catch (e) { /* not fatal */ }
 
       return true;

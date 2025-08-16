@@ -70,13 +70,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       }
     })();
 
-    // Listen for disconnect events (native/web via plugin)
-    const disconnectListener = BleClient.addListener('onDisconnected', () => {
-      setIsConnected(false);
-      onConnectionChange?.(false);
-      setStatusMessage('Device disconnected unexpectedly.');
-    });
-
     // initial connection check + periodic polling every 2s
     let cancelled = false;
     const doCheck = async () => {
@@ -130,19 +123,24 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       cancelled = true;
       isUnmountedRef.current = true;
       clearInterval(id);
-      disconnectListener.remove();
       (async () => {
         try { await bluetoothService.stopScan(); } catch (e) { /* ignore */ }
       })();
     };
   }, [onConnectionChange, addOrUpdateDevice, isNative, platform]);
 
+  const handleDisconnectCallback = useCallback((deviceId?: string) => {
+    setIsConnected(false);
+    onConnectionChange?.(false);
+    setStatusMessage('Device disconnected.');
+  }, [onConnectionChange]);
+
   const handleConnect = useCallback(async (deviceId?: string) => {
     if (isBusy) return;
     setIsBusy(true);
     setStatusMessage('Connecting...');
     try {
-      const ok = await bluetoothService.connectToDevice(deviceId);
+      const ok = await bluetoothService.connectToDevice(deviceId, handleDisconnectCallback);
       if (!ok) {
         setStatusMessage('Connection failed: Device may lack required service.');
       }
@@ -160,13 +158,14 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     } finally {
       setIsBusy(false);
     }
-  }, [isBusy, onConnectionChange]);
+  }, [isBusy, onConnectionChange, handleDisconnectCallback]);
 
   const handleDisconnect = useCallback(async () => {
     await bluetoothService.disconnect();
     setIsConnected(false);
     onConnectionChange?.(false);
     setIsMenuOpen(false);
+    setStatusMessage('Disconnected.');
   }, [onConnectionChange]);
 
   // Web-only: explicit scan trigger (user gesture) — present if automatic scan wasn't started
@@ -175,7 +174,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     setStatusMessage('Scanning...');
     try {
       // This will open the browser's device chooser (user gesture)
-      const ok = await bluetoothService.connectToDevice();
+      const ok = await bluetoothService.connectToDevice(undefined, handleDisconnectCallback);
       setIsConnected(ok);
       onConnectionChange?.(ok);
       setIsMenuOpen(false);
@@ -185,7 +184,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     } finally {
       setIsBusy(false);
     }
-  }, [onConnectionChange]);
+  }, [onConnectionChange, handleDisconnectCallback]);
 
   const handleOpenSettings = useCallback(async () => {
     if (!isNative) return;

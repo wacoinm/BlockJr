@@ -7,7 +7,6 @@ import { BlockPalette } from './components/BlockPalette';
 import { BluetoothConnector } from './components/BluetoothConnector';
 import { Workspace } from './components/Workspace';
 import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
-import { SplashScreen } from '@capacitor/splash-screen';
 
 export const SoundContext = createContext(() => {});
 
@@ -25,7 +24,6 @@ const App = () => {
     ensureBluetoothPermissions().catch(err => console.error(err));
     const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener('resize', onResize);
-    SplashScreen.hide();
     return () => window.removeEventListener('resize', onResize);
   }, []);
 

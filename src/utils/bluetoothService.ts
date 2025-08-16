@@ -13,7 +13,7 @@ const NUS_TX_CHAR = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // write
 const NUS_RX_CHAR = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notify
 
 let nativeDeviceId: string | null = null;
-let webCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+let webDevice: BluetoothDevice | null = null; // Store for web disconnect event
 const isNative = Capacitor.getPlatform() !== 'web';
 
 // Scan bookkeeping
@@ -25,7 +25,6 @@ function strToBase64(input: string) {
     return btoa(unescape(encodeURIComponent(input)));
   } catch (e) {
     // fallback if Buffer exists (node-like)
-    // @ts-ignore
     if (typeof Buffer !== 'undefined') return Buffer.from(input, 'utf8').toString('base64');
     return '';
   }
@@ -146,7 +145,7 @@ export const stopScan = async (): Promise<void> => {
   }
 };
 
-export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
+export const connectToDevice = async (deviceId?: string, onDisconnect?: (deviceId: string) => void): Promise<boolean> => {
   if (isNative) {
     try {
       await BleClient.initialize();
@@ -161,7 +160,7 @@ export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
         if (!device || !device.deviceId) return false;
         devId = device.deviceId;
       }
-      await BleClient.connect(devId);
+      await BleClient.connect(devId, onDisconnect);
       nativeDeviceId = devId;
 
       // Make RX subscription mandatory; fail connection if char/service missing
@@ -196,6 +195,11 @@ export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
     const service = await gatt.getPrimaryService(NUS_SERVICE);
     const tx = await service.getCharacteristic(NUS_TX_CHAR);
     webCharacteristic = tx;
+    webDevice = device; // Store for event listener
+
+    if (onDisconnect) {
+      device.addEventListener('gattserverdisconnected', () => onDisconnect(device.id));
+    }
 
     // enable notifications on RX char if available (mandatory; fail if not)
     try {
@@ -231,10 +235,13 @@ export const disconnect = async (): Promise<void> => {
   }
 
   try {
-    if (webCharacteristic && webCharacteristic.service && webCharacteristic.service.device.gatt?.connected) {
-      webCharacteristic.service.device.gatt?.disconnect();
+    if (webDevice && webDevice.gatt?.connected) {
+      webDevice.gatt.disconnect();
     }
-  } catch (e) { /* ignore */ } finally { webCharacteristic = null; }
+  } catch (e) { /* ignore */ } finally { 
+    webCharacteristic = null; 
+    webDevice = null; 
+  }
 };
 
 export const isConnected = async (): Promise<boolean> => {
@@ -247,7 +254,7 @@ export const isConnected = async (): Promise<boolean> => {
     }
   }
 
-  return !!(webCharacteristic && webCharacteristic.service && webCharacteristic.service.device.gatt?.connected);
+  return !!(webDevice && webDevice.gatt?.connected);
 };
 
 export const sendString = async (text: string): Promise<void> => {

@@ -215,11 +215,6 @@
   dependencies:
     tslib "^2.1.0"
 
-"@capacitor/splash-screen@^7.0.2":
-  version "7.0.2"
-  resolved "https://registry.yarnpkg.com/@capacitor/splash-screen/-/splash-screen-7.0.2.tgz#bca893c78e93b3ff8c01c336e0da726492c55f7b"
-  integrity sha512-bchh4F73CnVONm6XFEgXKEhbSEDQh2CQ0rNSoasIeJ5pf9JqHkkPS3t0Fnm33qHkLVFcaPoKPW69Y9zMpT5Vxg==
-
 "@esbuild/aix-ppc64@0.21.5":
   version "0.21.5"
   resolved "https://registry.yarnpkg.com/@esbuild/aix-ppc64/-/aix-ppc64-0.21.5.tgz#c7184a326533fcdf1b8ee0733e21c713b975575f"

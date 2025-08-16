@@ -1,281 +1,235 @@
 // src/utils/bluetoothService.ts
-/* cross-platform Bluetooth helper (web + Capacitor BLE)
-   - Uses @capacitor-community/bluetooth-le on native platforms
-   - Uses Web Bluetooth API on web
-   - Uses Nordic UART Service (NUS) UUIDs by default for a UART-style link
-*/
-
 import { Capacitor } from '@capacitor/core';
-import { BleClient } from '@capacitor-community/bluetooth-le';
+import { BleClient, ScanResult } from '@capacitor-community/bluetooth-le';
 
+// Standard Bluetooth Service UUIDs for Nordic UART Service (NUS)
+// This is a common service for serial communication over BLE.
 const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const NUS_TX_CHAR = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // write
-const NUS_RX_CHAR = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notify
+const NUS_TX_CHAR = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // Client writes to this (RX on the peripheral)
+const NUS_RX_CHAR = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // Client receives notifications from this (TX on the peripheral)
 
-let nativeDeviceId: string | null = null;
-let webDevice: BluetoothDevice | null = null; // Store for web disconnect event
+// Keep track of the currently connected device
+let connectedDeviceId: string | null = null;
+let webGatt: BluetoothRemoteGATTServer | null = null;
+let webTxCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+
 const isNative = Capacitor.getPlatform() !== 'web';
 
-// Scan bookkeeping
-let nativeScanListener: any = null;
-let webScanActive: any = null; // store the returned LE scan object if available
+/**
+ * Converts a string to a Base64 string, required for the native BLE plugin.
+ * @param input The string to convert.
+ * @returns The Base64 encoded string.
+ */
+function strToBase64(input: string): string {
+  return btoa(unescape(encodeURIComponent(input)));
+}
 
-function strToBase64(input: string) {
-  try {
-    return btoa(unescape(encodeURIComponent(input)));
-  } catch (e) {
-    // fallback if Buffer exists (node-like)
-    if (typeof Buffer !== 'undefined') return Buffer.from(input, 'utf8').toString('base64');
-    return '';
+/**
+ * Initializes the Bluetooth client. Required on native platforms.
+ */
+async function initialize(): Promise<void> {
+  if (isNative) {
+    await BleClient.initialize();
+  }
+  // No-op for web, availability is checked in the component
+}
+
+/**
+ * Starts scanning for BLE devices with the NUS service.
+ * @param onDeviceFound A callback that will be invoked for each device found.
+ */
+async function startScan(
+  onDeviceFound: (device: { id: string; name?: string; rssi?: number }) => void
+): Promise<void> {
+  if (isNative) {
+    // On native, we can start a background scan.
+    await BleClient.requestLEScan(
+      {
+        services: [NUS_SERVICE],
+        allowDuplicates: false,
+      },
+      (result: ScanResult) => {
+        onDeviceFound({
+          id: result.device.deviceId,
+          name: result.device.name || result.localName,
+          rssi: result.rssi,
+        });
+      }
+    );
+  } else {
+    // On the web, scanning is part of the connection flow initiated by a user click.
+    console.log('Web Bluetooth scanning is initiated by the user via the connect button.');
   }
 }
 
-export const ensurePermissions = async (): Promise<boolean> => {
-  if (isNative) {
-    try {
-      await BleClient.initialize();
-      return true;
-    } catch (err) {
-      console.warn('BLE initialize failed', err);
-      return false;
-    }
-  }
-
-  // Web: nothing to pre-grant; browser prompts when requestDevice/requestLEScan are called
-  return true;
-};
-
-export const startScan = async (onDeviceFound: (device: { id: string; name?: string; rssi?: number }) => void): Promise<boolean> => {
-  if (isNative) {
-    try {
-      // ensure BLE plugin initialized
-      await BleClient.initialize();
-
-      // remove existing listener if present
-      if (nativeScanListener) {
-        try { nativeScanListener.remove(); } catch (_) { /* ignore */ }
-        nativeScanListener = null;
-      }
-
-      // subscribe to onScanResult events from the plugin
-      nativeScanListener = BleClient.addListener('onScanResult', (payload: any) => {
-        try {
-          // payload.device has deviceId and name on native plugin
-          const device = payload.device || payload;
-          const id = device.deviceId ?? device.id ?? String(device);
-          const name = device.name ?? payload.localName ?? undefined;
-          const rssi = typeof payload.rssi === 'number' ? payload.rssi : undefined;
-          onDeviceFound({ id, name, rssi });
-        } catch (e) {
-          console.warn('onScanResult processing error', e);
-        }
-      });
-
-      // start a LE scan (plugin handles platform specifics)
-      await BleClient.requestLEScan({
-        services: [NUS_SERVICE],
-        allowDuplicates: false
-      });
-
-      return true;
-    } catch (err) {
-      console.warn('Native startScan failed', err);
-      return false;
-    }
-  }
-
-  // Web: try requestLEScan if available (note: many browsers restrict this)
-  try {
-    const nav = (navigator as any);
-    if (nav && nav.bluetooth && typeof nav.bluetooth.requestLEScan === 'function') {
-      webScanActive = await nav.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
-      // listen for 'advertisementreceived' events
-      const handler = (ev: any) => {
-        try {
-          const id = ev.device?.id ?? ev.device?.uuid ?? String(ev);
-          const name = ev.device?.name ?? ev.name ?? ev.localName;
-          const rssi = ev.rssi;
-          onDeviceFound({ id, name, rssi });
-        } catch (e) { /* ignore */ }
-      };
-      nav.bluetooth.addEventListener('advertisementreceived', handler);
-
-      // store handler so stopScan can remove it
-      (webScanActive as any)._handler = handler;
-      return true;
-    } else {
-      // not supported / not allowed without gesture — caller should fallback to requestDevice via a user gesture
-      return false;
-    }
-  } catch (err) {
-    console.warn('Web startScan failed', err);
-    return false;
-  }
-};
-
-export const stopScan = async (): Promise<void> => {
+/**
+ * Stops the BLE scan.
+ */
+async function stopScan(): Promise<void> {
   if (isNative) {
     try {
       await BleClient.stopLEScan();
     } catch (e) {
-      // ignore
+      console.warn('Error stopping scan', e);
     }
-    if (nativeScanListener) {
-      try { nativeScanListener.remove(); } catch (_) { /* ignore */ }
-      nativeScanListener = null;
-    }
-    return;
   }
+  // No-op for web
+}
+
+/**
+ * Connects to a device on a native platform.
+ * @param deviceId The ID of the device to connect to.
+ * @param onDisconnect A callback for when the device disconnects.
+ * @returns True if connection was successful, false otherwise.
+ */
+async function connect(
+  deviceId: string,
+  onDisconnect?: (deviceId: string) => void
+): Promise<boolean> {
+  if (!isNative) return false; // This function is for native only
 
   try {
-    const nav = (navigator as any);
-    if (webScanActive) {
-      try {
-        // stop() exists on some implementations
-        if (typeof webScanActive.stop === 'function') webScanActive.stop();
-      } catch (_) { /* ignore */ }
-
-      if (nav && nav.bluetooth && (webScanActive as any)._handler) {
-        try { nav.bluetooth.removeEventListener('advertisementreceived', (webScanActive as any)._handler); } catch (_) { /* ignore */ }
+    // Connect and set up a disconnect listener
+    await BleClient.connect(deviceId, (disconnectedId) => {
+      if (disconnectedId === connectedDeviceId) {
+        connectedDeviceId = null;
+        onDisconnect?.(disconnectedId);
       }
-      webScanActive = null;
-    }
-  } catch (e) {
-    // ignore
-  }
-};
-
-export const connectToDevice = async (deviceId?: string, onDisconnect?: (deviceId: string) => void): Promise<boolean> => {
-  if (isNative) {
-    try {
-      await BleClient.initialize();
-      let devId: string;
-      if (deviceId) {
-        devId = deviceId;
-      } else {
-        const device = await BleClient.requestDevice({
-          services: [NUS_SERVICE],
-          allowDuplicates: false
-        });
-        if (!device || !device.deviceId) return false;
-        devId = device.deviceId;
-      }
-      await BleClient.connect(devId, onDisconnect);
-      nativeDeviceId = devId;
-
-      // Make RX subscription mandatory; fail connection if char/service missing
-      try {
-        await BleClient.startNotifications(devId, NUS_SERVICE, NUS_RX_CHAR, (value) => {
-          const decoded = new TextDecoder().decode(value);
-          console.log('[BLE RX]', decoded);
-        });
-      } catch (e) {
-        console.warn('Failed to subscribe to RX char; disconnecting', e);
-        await disconnect();
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      console.error('Native connect failed', err);
-      await disconnect(); // Clean up on any error
-      return false;
-    }
-  }
-
-  // Web flow (user gesture required)
-  try {
-    const device = await (navigator as any).bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [NUS_SERVICE]
     });
+    connectedDeviceId = deviceId;
 
-    if (!device) return false;
-    const gatt = await device.gatt!.connect();
-    const service = await gatt.getPrimaryService(NUS_SERVICE);
-    const tx = await service.getCharacteristic(NUS_TX_CHAR);
-    webCharacteristic = tx;
-    webDevice = device; // Store for event listener
-
-    if (onDisconnect) {
-      device.addEventListener('gattserverdisconnected', () => onDisconnect(device.id));
-    }
-
-    // enable notifications on RX char if available (mandatory; fail if not)
-    try {
-      const rx = await service.getCharacteristic(NUS_RX_CHAR);
-      await rx.startNotifications();
-      rx.addEventListener('characteristicvaluechanged', (ev) => {
-        const val = (ev.target as BluetoothRemoteGATTCharacteristic).value!;
-        const decoded = new TextDecoder().decode(val);
+    // Start listening for data from the device
+    await BleClient.startNotifications(
+      deviceId,
+      NUS_SERVICE,
+      NUS_RX_CHAR,
+      (value) => {
+        const decoded = new TextDecoder().decode(value);
         console.log('[BLE RX]', decoded);
-      });
-    } catch (e) {
-      console.warn('Failed to subscribe to RX char; disconnecting', e);
-      await disconnect();
-      return false;
-    }
-
+      }
+    );
     return true;
-  } catch (err) {
-    console.error('Web connect failed', err);
-    await disconnect(); // Clean up on any error
+  } catch (error) {
+    console.error('Native connection failed', error);
+    connectedDeviceId = null;
     return false;
   }
-};
+}
 
-export const disconnect = async (): Promise<void> => {
-  if (isNative) {
-    if (nativeDeviceId) {
-      try {
-        await BleClient.disconnect(nativeDeviceId);
-      } catch (e) { /* ignore */ } finally { nativeDeviceId = null; }
-    }
-    return;
-  }
+/**
+ * Shows the browser's device picker and connects to the selected device.
+ * @param onDisconnect A callback for when the device disconnects.
+ * @returns True if connection was successful, false otherwise.
+ */
+async function requestAndConnectDeviceWeb(
+  onDisconnect?: (deviceId: string) => void
+): Promise<boolean> {
+  if (isNative) return false; // This function is for web only
 
   try {
-    if (webDevice && webDevice.gatt?.connected) {
-      webDevice.gatt.disconnect();
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [NUS_SERVICE] }],
+      optionalServices: [NUS_SERVICE],
+    });
+
+    if (!device.gatt) {
+        throw new Error("GATT server not available");
     }
-  } catch (e) { /* ignore */ } finally { 
-    webCharacteristic = null; 
-    webDevice = null; 
-  }
-};
 
-export const isConnected = async (): Promise<boolean> => {
-  if (isNative) {
-    if (!nativeDeviceId) return false;
-    try {
-      return await BleClient.isConnected(nativeDeviceId);
-    } catch (e) {
-      return false;
+    webGatt = await device.gatt.connect();
+    connectedDeviceId = device.id;
+
+    // Set up disconnect listener
+    device.addEventListener('gattserverdisconnected', () => {
+        webGatt = null;
+        webTxCharacteristic = null;
+        const disconnectedId = connectedDeviceId;
+        connectedDeviceId = null;
+        if (disconnectedId) {
+            onDisconnect?.(disconnectedId);
+        }
+    });
+
+    const service = await webGatt.getPrimaryService(NUS_SERVICE);
+    webTxCharacteristic = await service.getCharacteristic(NUS_TX_CHAR);
+
+    // Start listening for data from the device
+    const rxCharacteristic = await service.getCharacteristic(NUS_RX_CHAR);
+    await rxCharacteristic.startNotifications();
+    rxCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+      const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+      if (value) {
+        const decoded = new TextDecoder().decode(value);
+        console.log('[BLE RX]', decoded);
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('Web connection failed', error);
+    connectedDeviceId = null;
+    webGatt = null;
+    webTxCharacteristic = null;
+    return false;
+  }
+}
+
+/**
+ * Disconnects from the currently connected device.
+ */
+async function disconnect(): Promise<void> {
+  if (connectedDeviceId) {
+    if (isNative) {
+      try {
+        await BleClient.disconnect(connectedDeviceId);
+      } catch (e) { /* ignore */ }
+    } else if (webGatt) {
+      webGatt.disconnect();
     }
+    connectedDeviceId = null;
+    webGatt = null;
+    webTxCharacteristic = null;
   }
+}
 
-  return !!(webDevice && webDevice.gatt?.connected);
-};
-
-export const sendString = async (text: string): Promise<void> => {
+/**
+ * Checks if a device is currently connected.
+ * @returns A promise that resolves to true if connected, false otherwise.
+ */
+async function isConnected(): Promise<boolean> {
+  if (!connectedDeviceId) return false;
   if (isNative) {
-    if (!nativeDeviceId) throw new Error('Not connected');
+    // The native client doesn't have a reliable isConnected method.
+    // We rely on our internal state updated by the disconnect listener.
+    return true;
+  } else {
+    return webGatt?.connected || false;
+  }
+}
+
+/**
+ * Sends a string to the connected device.
+ * @param text The string to send.
+ */
+async function sendString(text: string): Promise<void> {
+  if (!connectedDeviceId) throw new Error('Not connected');
+  if (isNative) {
     const base64 = strToBase64(text);
-    await BleClient.write(nativeDeviceId, NUS_SERVICE, NUS_TX_CHAR, base64);
-    return;
+    await BleClient.write(connectedDeviceId, NUS_SERVICE, NUS_TX_CHAR, base64);
+  } else if (webTxCharacteristic) {
+    const encoder = new TextEncoder();
+    await webTxCharacteristic.writeValue(encoder.encode(text));
+  } else {
+    throw new Error('Not connected (web)');
   }
-
-  if (!webCharacteristic) throw new Error('Not connected (web)');
-  const encoder = new TextEncoder();
-  await webCharacteristic.writeValue(encoder.encode(text));
-};
+}
 
 export default {
-  ensurePermissions,
+  initialize,
   startScan,
   stopScan,
-  connectToDevice,
+  connect,
+  requestAndConnectDeviceWeb,
   disconnect,
   isConnected,
-  sendString
+  sendString,
 };

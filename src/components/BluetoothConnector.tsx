@@ -70,6 +70,13 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       }
     })();
 
+    // Listen for disconnect events (native/web via plugin)
+    const disconnectListener = BleClient.addListener('onDisconnected', () => {
+      setIsConnected(false);
+      onConnectionChange?.(false);
+      setStatusMessage('Device disconnected unexpectedly.');
+    });
+
     // initial connection check + periodic polling every 2s
     let cancelled = false;
     const doCheck = async () => {
@@ -123,6 +130,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       cancelled = true;
       isUnmountedRef.current = true;
       clearInterval(id);
+      disconnectListener.remove();
       (async () => {
         try { await bluetoothService.stopScan(); } catch (e) { /* ignore */ }
       })();
@@ -132,9 +140,12 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   const handleConnect = useCallback(async (deviceId?: string) => {
     if (isBusy) return;
     setIsBusy(true);
-    setStatusMessage(null);
+    setStatusMessage('Connecting...');
     try {
       const ok = await bluetoothService.connectToDevice(deviceId);
+      if (!ok) {
+        setStatusMessage('Connection failed: Device may lack required service.');
+      }
       setIsConnected(ok);
       if (ok && deviceId) {
         setRecentDevices(prev => [deviceId, ...prev.filter(d => d !== deviceId)].slice(0, 5));
@@ -145,7 +156,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       console.error('Bluetooth connection failed:', err);
       setIsConnected(false);
       onConnectionChange?.(false);
-      setStatusMessage('Failed to connect to device. Please try again.');
+      setStatusMessage('Failed to connect to device. Ensure it supports the required service.');
     } finally {
       setIsBusy(false);
     }
@@ -161,7 +172,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   // Web-only: explicit scan trigger (user gesture) — present if automatic scan wasn't started
   const webManualScan = useCallback(async () => {
     setIsBusy(true);
-    setStatusMessage(null);
+    setStatusMessage('Scanning...');
     try {
       // This will open the browser's device chooser (user gesture)
       const ok = await bluetoothService.connectToDevice();
@@ -201,6 +212,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           ${isConnected ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white hover:bg-gray-100 text-gray-600'}
         `}
         aria-label="Bluetooth connector"
+        disabled={isBusy}
       >
         {/* Spinner overlay while checking or busy */}
         {(isChecking || isBusy) && (
@@ -248,6 +260,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
             <button
               onClick={handleDisconnect}
               className="w-full px-4 py-2 text-left hover:bg-gray-50 text-red-600"
+              disabled={isBusy}
             >
               Disconnect Device
             </button>
@@ -283,15 +296,17 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
                 ))}
 
                 {/* Web fallback: browser usually requires a user gesture to show device chooser */}
-                <div className="mt-3">
-                  <button
-                    onClick={webManualScan}
-                    disabled={isBusy}
-                    className="w-full px-3 py-2 bg-blue-50 text-blue-600 rounded text-sm disabled:opacity-50"
-                  >
-                    {isBusy ? 'Opening chooser...' : 'Tap to scan (browser)'}
-                  </button>
-                </div>
+                {!isNative && (
+                  <div className="mt-3">
+                    <button
+                      onClick={webManualScan}
+                      disabled={isBusy}
+                      className="w-full px-3 py-2 bg-blue-50 text-blue-600 rounded text-sm disabled:opacity-50"
+                    >
+                      {isBusy ? 'Opening chooser...' : 'Tap to scan (browser)'}
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}

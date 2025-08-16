@@ -164,16 +164,22 @@ export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
       await BleClient.connect(devId);
       nativeDeviceId = devId;
 
+      // Make RX subscription mandatory; fail connection if char/service missing
       try {
         await BleClient.startNotifications(devId, NUS_SERVICE, NUS_RX_CHAR, (value) => {
           const decoded = new TextDecoder().decode(value);
           console.log('[BLE RX]', decoded);
         });
-      } catch (e) { /* not fatal */ }
+      } catch (e) {
+        console.warn('Failed to subscribe to RX char; disconnecting', e);
+        await disconnect();
+        return false;
+      }
 
       return true;
     } catch (err) {
       console.error('Native connect failed', err);
+      await disconnect(); // Clean up on any error
       return false;
     }
   }
@@ -191,7 +197,7 @@ export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
     const tx = await service.getCharacteristic(NUS_TX_CHAR);
     webCharacteristic = tx;
 
-    // enable notifications on RX char if available
+    // enable notifications on RX char if available (mandatory; fail if not)
     try {
       const rx = await service.getCharacteristic(NUS_RX_CHAR);
       await rx.startNotifications();
@@ -200,11 +206,16 @@ export const connectToDevice = async (deviceId?: string): Promise<boolean> => {
         const decoded = new TextDecoder().decode(val);
         console.log('[BLE RX]', decoded);
       });
-    } catch (e) { /* not fatal */ }
+    } catch (e) {
+      console.warn('Failed to subscribe to RX char; disconnecting', e);
+      await disconnect();
+      return false;
+    }
 
     return true;
   } catch (err) {
     console.error('Web connect failed', err);
+    await disconnect(); // Clean up on any error
     return false;
   }
 };

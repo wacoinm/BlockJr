@@ -4,6 +4,7 @@ import { Bluetooth, BluetoothConnected } from 'lucide-react';
 import bluetoothService from '../utils/bluetoothService';
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
+import { ensureBluetoothPermissions } from '../utils/ensureBluetoothPermissions';
 
 interface DeviceItem {
   id: string;
@@ -18,82 +19,227 @@ interface BluetoothConnectorProps {
 export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [isBusy, setIsBusy] = useState(false); // for connecting/scanning actions
+  const [isBusy, setIsBusy] = useState(false);
   const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const isNative = Capacitor.getPlatform() !== 'web';
 
-  /**
-   * Adds a device to the list of nearby devices, or updates its info if already present.
-   */
   const addOrUpdateDevice = useCallback((device: DeviceItem) => {
     setNearbyDevices(prev => {
       const existing = prev.find(d => d.id === device.id);
       if (existing) {
         return prev.map(d => d.id === device.id ? { ...d, ...device } : d);
       }
-      return [...prev, device].slice(-20); // Keep the list from growing too large
+      return [...prev, device].slice(-20);
     });
   }, []);
 
   /**
-   * Handles connecting to a device on native platforms.
+   * Diagnose whether location is available by trying to read a quick geolocation.
+   */
+  async function isLocationAvailable(timeout = 3000): Promise<boolean> {
+    if (!isNative) return true;
+    if (!('geolocation' in navigator)) return false;
+
+    return new Promise<boolean>((resolve) => {
+      let done = false;
+      const onSuccess = () => { if (!done) { done = true; resolve(true); } };
+      const onFail = () => { if (!done) { done = true; resolve(false); } };
+
+      navigator.geolocation.getCurrentPosition(
+        () => onSuccess(),
+        (err) => {
+          console.warn('geolocation check failed', err);
+          onFail();
+        },
+        { timeout, maximumAge: 0 }
+      );
+
+      setTimeout(() => {
+        if (!done) { done = true; resolve(false); }
+      }, timeout + 500);
+    });
+  }
+
+  /**
+   * Diagnose scan failure and set helpful statusMessage
+   */
+  const diagnoseScanFailure = useCallback(async (scanError?: any) => {
+    setStatusMessage('Scan failed — checking permissions and device state...');
+    try {
+      // try to ensure/request permissions (best-effort)
+      const permsOk = await ensureBluetoothPermissions();
+      if (!permsOk) {
+        setStatusMessage('Required Bluetooth/location permissions are not granted. Please grant them in app settings.');
+        return;
+      }
+
+      // check bluetooth enabled
+      let bluetoothEnabled = false;
+      try {
+        const res = await BluetoothSerial.isEnabled();
+        bluetoothEnabled = !!res.enabled;
+      } catch (e) {
+        console.warn('BluetoothSerial.isEnabled failed', e);
+      }
+
+      if (!bluetoothEnabled) {
+        setStatusMessage('Bluetooth appears to be OFF. Please enable Bluetooth.');
+        return;
+      }
+
+      // check location
+      const locationOk = await isLocationAvailable();
+      if (!locationOk) {
+        setStatusMessage('Location appears to be OFF or permission denied. Location is required for scanning on some devices.');
+        return;
+      }
+
+      // else show generic scan error
+      const errMsg = scanError?.message ?? String(scanError ?? 'Unknown error');
+      setStatusMessage(`Scan failed: ${errMsg}`);
+    } catch (e) {
+      console.error('diagnoseScanFailure failed', e);
+      setStatusMessage('Scan failed and diagnostics could not complete. See console.');
+    }
+  }, []);
+
+  /**
+   * Connect handler
    */
   const handleConnect = useCallback(async (device: DeviceItem) => {
     if (isBusy) return;
     setIsBusy(true);
     setStatusMessage(`Connecting to ${device.name ?? device.id}...`);
 
-    const ok = await bluetoothService.connect(device.id);
-    if (ok) {
-        setIsConnected(true);
-        onConnectionChange?.(true);
-        setStatusMessage(`Connected to ${device.name ?? device.id}`);
-        setIsMenuOpen(false);
-    } else {
+    try {
+      // try to ensure permissions first (best-effort)
+      const permsOk = await ensureBluetoothPermissions();
+      if (!permsOk) {
+        setStatusMessage('Permissions required. Please grant permissions in app settings.');
+        setIsBusy(false);
+        return;
+      }
+
+      const ok = await bluetoothService.connect(device.id);
+      if (!ok) {
         setStatusMessage(`Failed to connect to ${device.name ?? device.id}.`);
+        setIsBusy(false);
+        return;
+      }
+
+      setIsConnected(true);
+      onConnectionChange?.(true);
+      setStatusMessage(`Connected to ${device.name ?? device.id}`);
+
+      // start listeners
+      try {
+        await bluetoothService.startDataListener((s) => {
+          console.log('[BT UI] onData ->', s);
+          // optionally display incoming data (or parse it)
+          // setStatusMessage(`Received: ${s}`);
+        });
+      } catch (e) {
+        console.warn('startDataListener failed', e);
+      }
+
+      try {
+        await bluetoothService.startDisconnectListener(() => {
+          console.log('[BT UI] disconnect event');
+          setIsConnected(false);
+          onConnectionChange?.(false);
+          setStatusMessage('Disconnected.');
+          // cleanup
+          bluetoothService.stopDataListener().catch(() => {});
+          bluetoothService.stopEnabledListener().catch(() => {});
+          bluetoothService.stopDisconnectListener().catch(() => {});
+        });
+      } catch (e) {
+        console.warn('startDisconnectListener failed', e);
+      }
+
+      try {
+        await bluetoothService.startEnabledListener((enabled) => {
+          console.log('[BT UI] enabled change ->', enabled);
+          setStatusMessage(enabled ? null : 'Bluetooth is turned OFF on device.');
+        });
+      } catch (e) {
+        console.warn('startEnabledListener failed', e);
+      }
+
+      setIsMenuOpen(false);
+    } catch (err) {
+      console.error('handleConnect error', err);
+      setStatusMessage('Connection error. See console.');
+    } finally {
+      setIsBusy(false);
     }
-    setIsBusy(false);
   }, [isBusy, onConnectionChange]);
 
   /**
-   * Handles disconnecting from the current device.
+   * Disconnect handler
    */
   const handleDisconnect = useCallback(async () => {
-    await bluetoothService.disconnect();
+    if (isBusy) return;
+    setIsBusy(true);
+    try {
+      await bluetoothService.stopDataListener();
+      await bluetoothService.stopEnabledListener();
+      await bluetoothService.stopDisconnectListener();
+    } catch (e) {
+      console.warn('Error stopping listeners', e);
+    }
+
+    try {
+      await bluetoothService.disconnect();
+    } catch (e) {
+      console.warn('Disconnect failed', e);
+    }
+
     setIsConnected(false);
     onConnectionChange?.(false);
     setStatusMessage('Disconnected.');
-  }, [onConnectionChange]);
+    setIsBusy(false);
+  }, [isBusy, onConnectionChange]);
 
   const handleEnableBluetooth = async () => {
     try {
       await BluetoothSerial.enable();
       setStatusMessage(null);
     } catch (e) {
+      console.error('Failed to enable Bluetooth', e);
       setStatusMessage('Failed to enable Bluetooth.');
     }
   };
 
   /**
-   * Initializes Bluetooth on component mount.
+   * init on mount
    */
   useEffect(() => {
     const init = async () => {
-        try {
-            await bluetoothService.initialize();
-            if (!isNative) {
-              setStatusMessage("Bluetooth Serial is not supported on web.");
-            }
-        } catch (e) {
-            console.error("Bluetooth initialization failed", e);
-            setStatusMessage("Bluetooth permissions are required.");
+      try {
+        await bluetoothService.initialize();
+        if (!isNative) {
+          setStatusMessage('Bluetooth Serial is not supported on web.');
         }
+      } catch (e) {
+        console.error('Bluetooth initialization failed', e);
+        setStatusMessage('Bluetooth initialization failed (permissions may be required).');
+      }
     };
     init();
+    // cleanup on unmount: stop listeners
+    return () => {
+      bluetoothService.stopDataListener().catch(() => {});
+      bluetoothService.stopEnabledListener().catch(() => {});
+      bluetoothService.stopDisconnectListener().catch(() => {});
+    };
   }, [isNative]);
 
+  /**
+   * Scan when menu opens
+   */
   useEffect(() => {
     if (isMenuOpen && !isConnected && isNative) {
       const fetchNearby = async () => {
@@ -102,15 +248,24 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         try {
           const devices = await bluetoothService.scanForDevices();
           setNearbyDevices(devices);
-        } catch (e) {
-          setStatusMessage(`Scan failed: ${e.message || e}`);
+          if (!devices || devices.length === 0) {
+            setStatusMessage('No devices found.');
+          } else {
+            setStatusMessage(null);
+          }
+        } catch (e: any) {
+          console.error('Scan failed', e);
+          await diagnoseScanFailure(e);
         }
         setIsBusy(false);
       };
       fetchNearby();
     }
-  }, [isMenuOpen, isConnected, isNative]);
+  }, [isMenuOpen, isConnected, isNative, diagnoseScanFailure]);
 
+  /**
+   * When menu open and connected, verify connection still alive
+   */
   useEffect(() => {
     if (isMenuOpen && isConnected) {
       const checkConn = async () => {
@@ -163,9 +318,33 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           {statusMessage && (
             <div className="px-4 py-2 text-sm text-red-600 border-b border-gray-100">
               {statusMessage}
-              {statusMessage.includes('off') && (
+              {statusMessage.toLowerCase().includes('off') && (
                 <button onClick={handleEnableBluetooth} className="ml-2 text-blue-600 underline">
                   Enable
+                </button>
+              )}
+              {statusMessage.toLowerCase().includes('permission') && (
+                <button
+                  onClick={async () => {
+                    setStatusMessage('Requesting permissions...');
+                    const ok = await ensureBluetoothPermissions();
+                    setStatusMessage(ok ? null : 'Permissions required. Please grant them in settings.');
+                  }}
+                  className="ml-2 text-blue-600 underline"
+                >
+                  Request permissions
+                </button>
+              )}
+              {statusMessage.toLowerCase().includes('location') && (
+                <button
+                  onClick={async () => {
+                    setStatusMessage('Requesting permissions...');
+                    const ok = await ensureBluetoothPermissions();
+                    setStatusMessage(ok ? null : 'Permissions required. Please grant them in settings.');
+                  }}
+                  className="ml-2 text-blue-600 underline"
+                >
+                  Request permissions
                 </button>
               )}
             </div>

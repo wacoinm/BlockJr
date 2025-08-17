@@ -1,69 +1,100 @@
 // src/utils/ensureBluetoothPermissions.ts
 import { Capacitor } from '@capacitor/core';
+import { Device } from '@capacitor/device';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 
 const platform = Capacitor.getPlatform();
 const isNative = platform !== 'web';
 
 /**
- * Best-effort permission/init check for Bluetooth usage.
- * Returns true when everything *appears* OK (permissions likely granted and bluetooth enabled).
- * Returns false when manual user action is likely required (grant perms in settings / enable bluetooth).
+ * Best-effort check for Bluetooth usage prerequisites.
+ * Returns true when Bluetooth is enabled and necessary conditions are met.
+ * Returns false when user action is required (e.g., enable Bluetooth or location).
  */
 export async function ensureBluetoothPermissions(): Promise<boolean> {
   if (!isNative) {
-    console.log('[ensureBluetoothPermissions] not native; skipping native checks (web).');
+    console.log('[ensureBluetoothPermissions] Not native platform; skipping checks (web).');
     return true;
   }
 
-  // 1) Try to ensure Bluetooth is enabled (most important)
-  try {
-    const { enabled } = await BluetoothSerial.isEnabled();
-    if (!enabled) {
-      console.log('[ensureBluetoothPermissions] bluetooth disabled, attempting to enable...');
-      try {
-        await BluetoothSerial.enable();
-      } catch (e) {
-        console.warn('[ensureBluetoothPermissions] enable() failed (user may need to enable manually)', e);
+  // 1) Ensure Bluetooth is enabled
+  let bluetoothEnabled = false;
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      const { enabled } = await BluetoothSerial.isEnabled();
+      bluetoothEnabled = enabled;
+      if (enabled) {
+        console.log('[ensureBluetoothPermissions] Bluetooth is enabled');
+        break;
+      }
+      console.log(`[ensureBluetoothPermissions] Bluetooth disabled, attempting to enable... (attempt ${4 - retries}/3)`);
+      await BluetoothSerial.enable();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for enable to take effect
+    } catch (e) {
+      console.warn(`[ensureBluetoothPermissions] Bluetooth enable attempt failed (attempt ${4 - retries}/3)`, e);
+    }
+    retries--;
+  }
+
+  if (!bluetoothEnabled) {
+    console.warn('[ensureBluetoothPermissions] Bluetooth could not be enabled; user action required');
+    return false;
+  }
+
+  // 2) Check location availability (required for Android < 12 for scanning)
+  if (platform === 'android') {
+    let isAndroid12OrHigher = false;
+    try {
+      const info = await Device.getInfo();
+      const majorVersion = parseInt(info.osVersion.split('.')[0], 10);
+      isAndroid12OrHigher = majorVersion >= 12;
+      console.log(`[ensureBluetoothPermissions] Android version: ${info.osVersion}, isAndroid12OrHigher: ${isAndroid12OrHigher}`);
+    } catch (e) {
+      console.warn('[ensureBluetoothPermissions] Failed to get Android version', e);
+    }
+
+    const locationOk = await (async (): Promise<boolean> => {
+      if (!('geolocation' in navigator)) {
+        console.warn('[ensureBluetoothPermissions] Geolocation not available in webview');
+        return false;
+      }
+
+      return new Promise<boolean>((resolve) => {
+        let done = false;
+        const onSuccess = () => { if (!done) { done = true; resolve(true); } };
+        const onFail = (err: any) => {
+          console.warn('[ensureBluetoothPermissions] geolocation.getCurrentPosition failed', err);
+          if (!done) { done = true; resolve(false); }
+        };
+
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          onFail,
+          { timeout: 2500, maximumAge: 0 }
+        );
+
+        setTimeout(() => {
+          if (!done) {
+            console.warn('[ensureBluetoothPermissions] Location check timed out');
+            done = true;
+            resolve(false);
+          }
+        }, 3000);
+      });
+    })();
+
+    // Location is required for Android < 12; optional for Android 12+
+    if (!locationOk) {
+      console.warn('[ensureBluetoothPermissions] Location not available or permission denied');
+      if (!isAndroid12OrHigher) {
+        console.warn('[ensureBluetoothPermissions] Location required for Bluetooth scanning on Android < 12');
         return false;
       }
     }
-  } catch (e) {
-    // If isEnabled() itself fails, assume something's wrong with bluetooth stack -> return false
-    console.warn('[ensureBluetoothPermissions] Bluetooth isEnabled check failed', e);
-    return false;
   }
 
-  // 2) Quick check for location availability (some Android devices require location for scanning)
-  // Use navigator.geolocation to check permission/service availability in hybrid webview.
-  const locationOk = await (async (): Promise<boolean> => {
-    if (!('geolocation' in navigator)) return false;
-
-    return new Promise<boolean>((resolve) => {
-      let done = false;
-      const onSuccess = () => { if (!done) { done = true; resolve(true); } };
-      const onFail = () => { if (!done) { done = true; resolve(false); } };
-
-      navigator.geolocation.getCurrentPosition(
-        () => onSuccess(),
-        (err) => {
-          console.warn('[ensureBluetoothPermissions] geolocation.getCurrentPosition failed', err);
-          onFail();
-        },
-        { timeout: 2500, maximumAge: 0 }
-      );
-
-      setTimeout(() => { if (!done) { done = true; resolve(false); } }, 3000);
-    });
-  })();
-
-  if (!locationOk) {
-    // not necessarily fatal on all devices, but common cause of "scan failed"
-    console.warn('[ensureBluetoothPermissions] location not available or permission denied');
-    // return false to let caller show "please enable location/permissions" UI
-    return false;
-  }
-
-  // If we reached here, bluetooth enabled and location available (likely permissions OK)
+  // All checks passed (Bluetooth enabled, location OK if required)
+  console.log('[ensureBluetoothPermissions] All checks passed');
   return true;
 }

@@ -53,10 +53,16 @@ async function connect(deviceId: string): Promise<boolean> {
     connectedDeviceId = deviceId;
     console.log('[BT] connect succeeded');
     try {
-      const { value } = await BluetoothSerial.isConnected({ address: deviceId });
-      console.log('[BT] isConnected after connect ->', value);
+      const connected = await isConnected();
+      console.log('[BT] isConnected after connect ->', connected);
+      if (!connected) {
+        connectedDeviceId = null;
+        return false;
+      }
     } catch (e) {
       console.warn('[BT] isConnected check failed after connect', e);
+      connectedDeviceId = null;
+      return false;
     }
     return true;
   } catch (error) {
@@ -95,11 +101,34 @@ async function isConnected(): Promise<boolean> {
   if (!isNative) return false;
   if (!connectedDeviceId) return false;
   try {
+    // primary: {address}
     const { value } = await BluetoothSerial.isConnected({ address: connectedDeviceId });
     if (!value) connectedDeviceId = null;
     return value;
   } catch (e) {
-    console.warn('[BT] isConnected check failed', e);
+    console.warn('[BT] isConnected({address}) failed, trying fallback', e);
+  }
+
+  try {
+    // fallback 1: raw deviceId
+    // @ts-ignore
+    const res = await BluetoothSerial.isConnected(connectedDeviceId);
+    const value = res?.value ?? res?.connected ?? res ?? false;
+    if (!value) connectedDeviceId = null;
+    return !!value;
+  } catch (e) {
+    console.warn('[BT] isConnected(deviceId) fallback failed, trying empty arg fallback', e);
+  }
+
+  try {
+    // fallback 2: no arg (checks any connection?)
+    // @ts-ignore
+    const res = await BluetoothSerial.isConnected();
+    const value = res?.value ?? res?.connected ?? res ?? false;
+    if (!value) connectedDeviceId = null;
+    return !!value;
+  } catch (e) {
+    console.error('[BT] isConnected fallback final failed', e);
     connectedDeviceId = null;
     return false;
   }
@@ -206,18 +235,28 @@ export async function stopDataListener() {
 }
 
 /**
- * startDisconnectListener: listens for disconnect events (common name 'onDisconnect')
+ * startDisconnectListener: listens for disconnect events
  */
 export async function startDisconnectListener(onDisconnect: () => void) {
   if (!isNative) return;
   if (disconnectListener) return;
   try {
-    disconnectListener = await BluetoothSerial.addListener('onDisconnect', (ev: any) => {
-      console.log('[BT] onDisconnect event', ev);
-      connectedDeviceId = null;
-      onDisconnect();
-    });
-    console.log('[BT] disconnect listener registered');
+    // Try multiple event names for robustness
+    const tryNames = ['onDisconnect', 'disconnected', 'onConnectionLost'];
+    for (const name of tryNames) {
+      try {
+        disconnectListener = await BluetoothSerial.addListener(name, (ev: any) => {
+          console.log(`[BT] ${name} event`, ev);
+          connectedDeviceId = null;
+          onDisconnect();
+        });
+        console.log('[BT] disconnect listener (' + name + ') registered');
+        return;
+      } catch (e) {
+        console.warn(`[BT] addListener(${name}) failed`, e);
+      }
+    }
+    console.warn('[BT] startDisconnectListener: no known disconnect event names succeeded');
   } catch (e) {
     console.warn('[BT] startDisconnectListener failed', e);
   }
@@ -236,7 +275,6 @@ export async function stopDisconnectListener() {
 
 /**
  * startEnabledListener: subscribe to enabled-state changes if plugin emits them
- * common event name in your note: 'onEnabledChange' (payload: { enabled: boolean } or similar)
  */
 export async function startEnabledListener(onEnabledChange: (enabled: boolean) => void) {
   if (!isNative) return;

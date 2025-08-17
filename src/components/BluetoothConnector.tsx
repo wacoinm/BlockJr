@@ -1,42 +1,30 @@
-// src/components/BluetoothConnector.tsx
-import React, { useEffect, useState, useCallback } from 'react';
-import { Bluetooth, BluetoothConnected } from 'lucide-react';
-import bluetoothService from '../utils/bluetoothService';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { ensureBluetoothPermissions } from '../utils/ensureBluetoothPermissions';
+import bluetoothService from '../utils/bluetoothService';
+import { Bluetooth, BluetoothConnected } from 'lucide-react';
 
 interface DeviceItem {
   id: string;
   name?: string;
-  rssi?: number;
 }
 
 interface BluetoothConnectorProps {
-  onConnectionChange?: (connected: boolean) => void;
+  onConnectionChange?: (isConnected: boolean) => void;
 }
 
 export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange }) => {
+  const isNative = Capacitor.getPlatform() !== 'web';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
-  const isNative = Capacitor.getPlatform() !== 'web';
-
-  const addOrUpdateDevice = useCallback((device: DeviceItem) => {
-    setNearbyDevices(prev => {
-      const existing = prev.find(d => d.id === device.id);
-      if (existing) {
-        return prev.map(d => d.id === device.id ? { ...d, ...device } : d);
-      }
-      return [...prev, device].slice(-20);
-    });
-  }, []);
+  const [lastConnectedDevice, setLastConnectedDevice] = useState<DeviceItem | null>(null);
 
   /**
-   * Diagnose whether location is available by trying to read a quick geolocation.
+   * Check if location services are available (some Android devices require this for Bluetooth scanning)
    */
   async function isLocationAvailable(timeout = 3000): Promise<boolean> {
     if (!isNative) return true;
@@ -130,14 +118,16 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       }
 
       setIsConnected(true);
+      setLastConnectedDevice(device);
       onConnectionChange?.(true);
       setStatusMessage(`Connected to ${device.name ?? device.id}`);
+      alert(`Connected to ${device.name ?? device.id}`);
 
       // start listeners
       try {
         await bluetoothService.startDataListener((s) => {
           console.log('[BT UI] onData ->', s);
-          // optionally display incoming data (or parse it)
+          // optionally display incoming data
           // setStatusMessage(`Received: ${s}`);
         });
       } catch (e) {
@@ -148,8 +138,10 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         await bluetoothService.startDisconnectListener(() => {
           console.log('[BT UI] disconnect event');
           setIsConnected(false);
+          setLastConnectedDevice(null);
           onConnectionChange?.(false);
-          setStatusMessage('Disconnected.');
+          setStatusMessage('Disconnected from device.');
+          alert('Disconnected from device.');
           // cleanup
           bluetoothService.stopDataListener().catch(() => {});
           bluetoothService.stopEnabledListener().catch(() => {});
@@ -163,6 +155,12 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         await bluetoothService.startEnabledListener((enabled) => {
           console.log('[BT UI] enabled change ->', enabled);
           setStatusMessage(enabled ? null : 'Bluetooth is turned OFF on device.');
+          if (!enabled) {
+            setIsConnected(false);
+            setLastConnectedDevice(null);
+            onConnectionChange?.(false);
+            alert('Bluetooth turned OFF on device.');
+          }
         });
       } catch (e) {
         console.warn('startEnabledListener failed', e);
@@ -172,6 +170,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     } catch (err) {
       console.error('handleConnect error', err);
       setStatusMessage('Connection error. See console.');
+      alert('Connection error: ' + String(err));
     } finally {
       setIsBusy(false);
     }
@@ -193,25 +192,61 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
 
     try {
       await bluetoothService.disconnect();
+      setIsConnected(false);
+      setLastConnectedDevice(null);
+      onConnectionChange?.(false);
+      setStatusMessage('Disconnected.');
+      alert('Disconnected from device.');
     } catch (e) {
       console.warn('Disconnect failed', e);
+      setStatusMessage('Disconnect failed. See console.');
+      alert('Disconnect failed: ' + String(e));
+    } finally {
+      setIsBusy(false);
     }
-
-    setIsConnected(false);
-    onConnectionChange?.(false);
-    setStatusMessage('Disconnected.');
-    setIsBusy(false);
   }, [isBusy, onConnectionChange]);
 
   const handleEnableBluetooth = async () => {
     try {
       await BluetoothSerial.enable();
       setStatusMessage(null);
+      alert('Bluetooth enabled.');
     } catch (e) {
       console.error('Failed to enable Bluetooth', e);
       setStatusMessage('Failed to enable Bluetooth.');
+      alert('Failed to enable Bluetooth: ' + String(e));
     }
   };
+
+  /**
+   * Periodic connection check when connected
+   */
+  useEffect(() => {
+    if (!isConnected || !isNative) return;
+
+    const checkConnection = async () => {
+      try {
+        const conn = await bluetoothService.isConnected();
+        if (!conn) {
+          setIsConnected(false);
+          setLastConnectedDevice(null);
+          onConnectionChange?.(false);
+          setStatusMessage('Connection lost.');
+          alert('Connection lost. Please reconnect.');
+        }
+      } catch (e) {
+        console.warn('Periodic connection check failed', e);
+        setIsConnected(false);
+        setLastConnectedDevice(null);
+        onConnectionChange?.(false);
+        setStatusMessage('Connection check failed. See console.');
+        alert('Connection lost due to check failure: ' + String(e));
+      }
+    };
+
+    const interval = setInterval(checkConnection, 5000); // Check every 5 seconds
+    return () => clearInterval(interval);
+  }, [isConnected, isNative, onConnectionChange]);
 
   /**
    * init on mount
@@ -222,10 +257,12 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         await bluetoothService.initialize();
         if (!isNative) {
           setStatusMessage('Bluetooth Serial is not supported on web.');
+          alert('Bluetooth Serial is not supported on web.');
         }
       } catch (e) {
         console.error('Bluetooth initialization failed', e);
         setStatusMessage('Bluetooth initialization failed (permissions may be required).');
+        alert('Bluetooth initialization failed: ' + String(e));
       }
     };
     init();
@@ -250,12 +287,14 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           setNearbyDevices(devices);
           if (!devices || devices.length === 0) {
             setStatusMessage('No devices found.');
+            alert('No Bluetooth devices found.');
           } else {
             setStatusMessage(null);
           }
         } catch (e: any) {
           console.error('Scan failed', e);
           await diagnoseScanFailure(e);
+          alert('Scan failed: ' + String(e));
         }
         setIsBusy(false);
       };
@@ -272,12 +311,15 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         const conn = await bluetoothService.isConnected();
         if (!conn) {
           setIsConnected(false);
+          setLastConnectedDevice(null);
+          onConnectionChange?.(false);
           setStatusMessage('Connection lost.');
+          alert('Connection lost. Please reconnect.');
         }
       };
       checkConn();
     }
-  }, [isMenuOpen, isConnected]);
+  }, [isMenuOpen, isConnected, onConnectionChange]);
 
   return (
     <div className="absolute top-4 right-4 z-50">
@@ -305,7 +347,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           </span>
         )}
         <span className={isBusy ? 'opacity-0' : 'opacity-100'}>
-          {isConnected ? <BluetoothConnected className="w-6 h-6" /> : <Bluetooth className="w-6 h-6" />}
+          {isConnected ? <BluetoothConnected className="w-6 h-6"/> : <Bluetooth  className="w-6 h-6" />}
         </span>
       </button>
 

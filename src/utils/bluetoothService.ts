@@ -26,23 +26,14 @@ async function initialize(): Promise<void> {
 }
 
 async function getPairedDevices(): Promise<DeviceItem[]> {
-  if (!isNative) return [];
-  try {
-    const { devices } = await BluetoothSerial.list();
-    return devices.map((d: any) => ({
-      id: d.address,
-      name: d.name,
-    }));
-  } catch (e) {
-    console.error('Failed to get paired devices', e);
-    return [];
-  }
+  // This method is not available in the plugin, so returning empty array
+  return [];
 }
 
 async function scanForDevices(): Promise<DeviceItem[]> {
   if (!isNative) return [];
   try {
-    const { devices } = await BluetoothSerial.discoverUnpaired();
+    const { devices } = await BluetoothSerial.scan();
     return devices.map((d: any) => ({
       id: d.address,
       name: d.name,
@@ -79,7 +70,7 @@ async function isConnected(): Promise<boolean> {
   if (!connectedDeviceId) return false;
   if (!isNative) return false;
   try {
-    const { value } = await BluetoothSerial.isConnected();
+    const { value } = await BluetoothSerial.isConnected({ address: connectedDeviceId });
     if (!value) {
       connectedDeviceId = null;
     }

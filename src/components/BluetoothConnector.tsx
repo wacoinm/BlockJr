@@ -20,7 +20,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   const [isConnected, setIsConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false); // for connecting/scanning actions
   const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);
-  const [historyDevices, setHistoryDevices] = useState<DeviceItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const isNative = Capacitor.getPlatform() !== 'web';
@@ -84,8 +83,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     const init = async () => {
         try {
             await bluetoothService.initialize();
-            const history = await bluetoothService.getPairedDevices();
-            setHistoryDevices(history);
             if (!isNative) {
               setStatusMessage("Bluetooth Serial is not supported on web.");
             }
@@ -101,12 +98,10 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     if (isMenuOpen && !isConnected && isNative) {
       const fetchNearby = async () => {
         setIsBusy(true);
-        setStatusMessage('Scanning for unpaired devices...');
+        setStatusMessage('Scanning for devices...');
         try {
           const devices = await bluetoothService.scanForDevices();
           setNearbyDevices(devices);
-          const history = await bluetoothService.getPairedDevices();
-          setHistoryDevices(history);
         } catch (e) {
           setStatusMessage(`Scan failed: ${e.message || e}`);
         }
@@ -182,21 +177,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
             </button>
           ) : (
             <>
-              {historyDevices.length > 0 && (
-                <div className="px-4 py-2 border-b border-gray-100">
-                  <p className="text-sm text-gray-600 mb-2">Previously Paired:</p>
-                  {historyDevices.map((device) => (
-                    <button
-                      key={device.id}
-                      onClick={() => handleConnect(device)}
-                      disabled={isBusy}
-                      className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-sm text-gray-700 disabled:opacity-50"
-                    >
-                      {device.name ?? 'Unknown'} ({device.id.slice(0, 8)}...)
-                    </button>
-                  ))}
-                </div>
-              )}
               {isNative ? (
                 <div className="px-4 py-2">
                   <p className="text-sm text-gray-600 mb-2">Discovered Devices:</p>

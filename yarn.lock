@@ -215,6 +215,11 @@
   dependencies:
     tslib "^2.1.0"
 
+"@e-is/capacitor-bluetooth-serial@^6.0.3":
+  version "6.0.3"
+  resolved "https://registry.yarnpkg.com/@e-is/capacitor-bluetooth-serial/-/capacitor-bluetooth-serial-6.0.3.tgz#66581ed8f1993f7b7c1b631c90b6eb6487a3aff7"
+  integrity sha512-YmoM9M2wkl5kvxFUlF39+bErSWCOkIyI7mVJfOxA2trC8acxKJKKMMulGc978R2QoiccQRhqVqpPPfVF30ZPBw==
+
 "@esbuild/aix-ppc64@0.21.5":
   version "0.21.5"
   resolved "https://registry.yarnpkg.com/@esbuild/aix-ppc64/-/aix-ppc64-0.21.5.tgz#c7184a326533fcdf1b8ee0733e21c713b975575f"

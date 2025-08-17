@@ -119,12 +119,12 @@ async function connect(
 /**
  * Shows the browser's device picker and connects to the selected device.
  * @param onDisconnect A callback for when the device disconnects.
- * @returns True if connection was successful, false otherwise.
+ * @returns The connected device info if successful, null otherwise.
  */
 async function requestAndConnectDeviceWeb(
   onDisconnect?: (deviceId: string) => void
-): Promise<boolean> {
-  if (isNative) return false; // This function is for web only
+): Promise<{ id: string; name: string } | null> {
+  if (isNative) return null; // This function is for web only
 
   try {
     const device = await navigator.bluetooth.requestDevice({
@@ -163,13 +163,13 @@ async function requestAndConnectDeviceWeb(
         console.log('[BLE RX]', decoded);
       }
     });
-    return true;
+    return { id: device.id, name: device.name || 'Unknown' };
   } catch (error) {
     console.error('Web connection failed', error);
     connectedDeviceId = null;
     webGatt = null;
     webTxCharacteristic = null;
-    return false;
+    return null;
   }
 }
 

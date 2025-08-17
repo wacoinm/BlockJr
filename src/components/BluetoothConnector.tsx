@@ -4,6 +4,7 @@ import { Bluetooth, BluetoothConnected } from 'lucide-react';
 import bluetoothService from '../utils/bluetoothService';
 import { Capacitor } from '@capacitor/core';
 import { BleClient } from '@capacitor-community/bluetooth-le';
+import { Preferences } from '@capacitor/preferences';
 
 interface DeviceItem {
   id: string;
@@ -20,6 +21,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   const [isConnected, setIsConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false); // for connecting/scanning actions
   const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);
+  const [historyDevices, setHistoryDevices] = useState<DeviceItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const isNative = Capacitor.getPlatform() !== 'web';
@@ -54,12 +56,35 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
 
 
   /**
+   * Loads previously connected devices from storage.
+   */
+  const loadHistory = async () => {
+    const { value } = await Preferences.get({ key: 'ble_history' });
+    if (value) {
+      setHistoryDevices(JSON.parse(value));
+    }
+  };
+
+  /**
+   * Adds a device to history if not already present.
+   */
+  const addToHistory = async (device: DeviceItem) => {
+    const exists = historyDevices.some(d => d.id === device.id);
+    if (exists) return;
+
+    const newHistory = [...historyDevices, device];
+    setHistoryDevices(newHistory);
+    await Preferences.set({ key: 'ble_history', value: JSON.stringify(newHistory) });
+  };
+
+  /**
    * Initializes Bluetooth on component mount.
    */
   useEffect(() => {
     const init = async () => {
         try {
             await bluetoothService.initialize();
+            await loadHistory();
             if (isNative) {
                 const enabled = await BleClient.isEnabled();
                 if (!enabled) {
@@ -94,20 +119,21 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   /**
    * Handles connecting to a device on native platforms.
    */
-  const handleConnect = useCallback(async (deviceId: string) => {
+  const handleConnect = useCallback(async (device: DeviceItem) => {
     if (isBusy) return;
     setIsBusy(true);
-    setStatusMessage(`Connecting to ${deviceId}...`);
+    setStatusMessage(`Connecting to ${device.name ?? device.id}...`);
     await bluetoothService.stopScan();
 
-    const ok = await bluetoothService.connect(deviceId, handleDisconnectCallback);
+    const ok = await bluetoothService.connect(device.id, handleDisconnectCallback);
     if (ok) {
         setIsConnected(true);
         onConnectionChange?.(true);
-        setStatusMessage(`Connected to ${deviceId}`);
+        setStatusMessage(`Connected to ${device.name ?? device.id}`);
+        await addToHistory(device);
         setIsMenuOpen(false);
     } else {
-        setStatusMessage(`Failed to connect to ${deviceId}.`);
+        setStatusMessage(`Failed to connect to ${device.name ?? device.id}.`);
         if (isNative) startScanning(); // Resume scanning on failure
     }
     setIsBusy(false);
@@ -121,18 +147,18 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     setIsBusy(true);
     setStatusMessage('Opening device picker...');
 
-    const ok = await bluetoothService.requestAndConnectDeviceWeb(handleDisconnectCallback);
-     if (ok) {
+    const webDevice = await bluetoothService.requestAndConnectDeviceWeb(handleDisconnectCallback);
+     if (webDevice) {
         setIsConnected(true);
         onConnectionChange?.(true);
         setStatusMessage(`Connected.`);
+        await addToHistory(webDevice);
         setIsMenuOpen(false);
     } else {
         setStatusMessage('Connection cancelled or failed.');
     }
     setIsBusy(false);
   }, [isBusy, onConnectionChange, handleDisconnectCallback]);
-
 
   /**
    * Handles disconnecting from the current device.
@@ -214,18 +240,33 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
             </button>
           ) : (
             <>
+              {!isConnected && historyDevices.length > 0 && (
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <p className="text-sm text-gray-600 mb-2">Previously Connected:</p>
+                  {historyDevices.map((device) => (
+                    <button
+                      key={device.id}
+                      onClick={() => handleConnect(device)}
+                      disabled={isBusy}
+                      className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-sm text-gray-700 disabled:opacity-50"
+                    >
+                      {device.name ?? 'Unknown'} ({device.id.slice(0, 8)}...)
+                    </button>
+                  ))}
+                </div>
+              )}
               {isNative ? (
                 <div className="px-4 py-2">
-                  <p className="text-sm text-gray-600 mb-2">Nearby Devices:</p>
+                  <p className="text-sm text-gray-600 mb-2">Discovered Devices:</p>
                   {nearbyDevices.length === 0 && <div className="text-sm text-gray-500">Scanning...</div>}
                   {nearbyDevices.map((device) => (
                     <button
                       key={device.id}
-                      onClick={() => handleConnect(device.id)}
+                      onClick={() => handleConnect(device)}
                       disabled={isBusy}
                       className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-sm text-gray-700 disabled:opacity-50"
                     >
-                      {device.name ?? device.id} {device.rssi ? `(${device.rssi}dBm)` : ''}
+                      {device.name ?? 'Unknown'} ({device.id.slice(0, 8)}...) {device.rssi ? `(${device.rssi}dBm)` : ''}
                     </button>
                   ))}
                 </div>

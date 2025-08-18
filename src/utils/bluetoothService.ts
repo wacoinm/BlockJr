@@ -47,7 +47,9 @@ async function connect(deviceId: string): Promise<boolean> {
       await BluetoothSerial.connect({ address: deviceId });
     } catch (firstErr) {
       console.warn('[BT] connect({address}) failed, trying connect(deviceId) fallback', firstErr);
-      // @ts-ignore
+      alert('[BT] connect({address}) failed, trying connect(deviceId) fallback'+ firstErr);
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
       await BluetoothSerial.connect(deviceId);
     }
     connectedDeviceId = deviceId;
@@ -67,6 +69,7 @@ async function connect(deviceId: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('[BT] Connection failed', error);
+    alert('[BT] Connection failed' + error);
     connectedDeviceId = null;
     return false;
   }

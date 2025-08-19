@@ -104,32 +104,54 @@ async function isConnected(): Promise<boolean> {
   if (!isNative) return false;
   if (!connectedDeviceId) return false;
   try {
-    // primary: {address}
-    const { value } = await BluetoothSerial.isConnected({ address: connectedDeviceId });
-    if (!value) connectedDeviceId = null;
+    const res = await BluetoothSerial.isConnected({ address: connectedDeviceId });
+    console.log('[BT] isConnected res:', res);
+    let value: boolean;
+    if (res === undefined) {
+      value = true;
+    } else if (typeof res === 'object' && res !== null) {
+      value = !!(res.value ?? res.connected ?? res);
+    } else {
+      value = !!res;
+    }
+    if (!value) {
+      connectedDeviceId = null;
+    }
     return value;
   } catch (e) {
     console.warn('[BT] isConnected({address}) failed, trying fallback', e);
   }
 
   try {
-    // fallback 1: raw deviceId
-    // @ts-ignore
     const res = await BluetoothSerial.isConnected(connectedDeviceId);
-    const value = res?.value ?? res?.connected ?? res ?? false;
+    console.log('[BT] isConnected fallback res:', res);
+    let value: boolean;
+    if (res === undefined) {
+      value = true;
+    } else if (typeof res === 'object' && res !== null) {
+      value = !!(res.value ?? res.connected ?? res);
+    } else {
+      value = !!res;
+    }
     if (!value) connectedDeviceId = null;
-    return !!value;
+    return value;
   } catch (e) {
     console.warn('[BT] isConnected(deviceId) fallback failed, trying empty arg fallback', e);
   }
 
   try {
-    // fallback 2: no arg (checks any connection?)
-    // @ts-ignore
     const res = await BluetoothSerial.isConnected();
-    const value = res?.value ?? res?.connected ?? res ?? false;
+    console.log('[BT] isConnected empty res:', res);
+    let value: boolean;
+    if (res === undefined) {
+      value = true;
+    } else if (typeof res === 'object' && res !== null) {
+      value = !!(res.value ?? res.connected ?? res);
+    } else {
+      value = !!res;
+    }
     if (!value) connectedDeviceId = null;
-    return !!value;
+    return value;
   } catch (e) {
     console.error('[BT] isConnected fallback final failed', e);
     connectedDeviceId = null;

@@ -21,7 +21,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   const [isBusy, setIsBusy] = useState(false);
   const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [lastConnectedDevice, setLastConnectedDevice] = useState<DeviceItem | null>(null);
+  const [, setLastConnectedDevice] = useState<DeviceItem | null>(null);
 
   /**
    * Check if location services are available (some Android devices require this for Bluetooth scanning)
@@ -291,7 +291,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           } else {
             setStatusMessage(null);
           }
-        } catch (e: any) {
+        } catch (e) {
           console.error('Scan failed', e);
           await diagnoseScanFailure(e);
           alert('Scan failed: ' + String(e));

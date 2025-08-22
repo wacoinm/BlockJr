@@ -46,7 +46,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
 
   // Panning handlers
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
-    if ((e as any).button !== undefined && (e as any).button !== 0) return;
+    if ((e).button !== undefined && (e).button !== 0) return;
     panState.current.active = true;
     panState.current.lastX = e.clientX;
     panState.current.lastY = e.clientY;
@@ -54,7 +54,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     setIsGrabbing(true);
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    } catch {}
+    } catch(e) {
+      console.log("ERR : ", e)
+    }
     e.preventDefault();
   };
 

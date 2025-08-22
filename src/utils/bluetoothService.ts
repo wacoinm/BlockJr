@@ -182,6 +182,7 @@ async function sendString(text: string): Promise<void> {
 
   // 2) try value-only object
   try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     await BluetoothSerial.write({ value: payload });
     return;
@@ -191,6 +192,7 @@ async function sendString(text: string): Promise<void> {
 
   // 3) try raw string (some builds)
   try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     await BluetoothSerial.write(payload);
     return;
@@ -254,7 +256,9 @@ export async function stopDataListener() {
       // some plugin proxies return a Promise-like with remove
       await dataListener.remove();
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { 
+    console.log("ERR : ", e)
+   }
   dataListener = null;
   console.log('[BT] data listener removed');
 }
@@ -293,7 +297,9 @@ export async function stopDisconnectListener() {
     if (typeof disconnectListener.remove === 'function') {
       await disconnectListener.remove();
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { 
+    console.log("ERR : ", e)
+   }
   disconnectListener = null;
   console.log('[BT] disconnect listener removed');
 }
@@ -323,7 +329,9 @@ export async function stopEnabledListener() {
     if (typeof enabledListener.remove === 'function') {
       await enabledListener.remove();
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { 
+    console.log("ERR : ", e)
+   }
   enabledListener = null;
   console.log('[BT] enabled listener removed');
 }

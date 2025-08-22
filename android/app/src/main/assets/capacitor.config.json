@@ -1,5 +1,6 @@
 {
 	"appId": "me.sharik.blockjr",
 	"appName": "BlockJr",
-	"webDir": "dist"
+	"webDir": "dist",
+	"android": {}
 }

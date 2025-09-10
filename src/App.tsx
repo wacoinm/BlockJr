@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useCallback, createContext, useMemo, useEffect, useRef } from 'react';
 import { useSnapSound } from './utils/soundEffects';
 import { executeBlocks } from './utils/blockExecutor';
@@ -10,7 +11,7 @@ import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
 
 export const SoundContext = createContext(() => {});
 
-const App = () => {
+const App: React.FC = () => {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
   const playSnapSound = useSnapSound();
@@ -69,10 +70,24 @@ const App = () => {
     return chain;
   }, [blocksMap]);
 
+  // Helper: extract clientX/clientY from Mouse | Touch | Pointer events without using `any`
+  const getClientXY = useCallback((e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
+    // TouchEvent has touches
+    if ('touches' in e && e.touches && e.touches.length > 0) {
+      const t = e.touches[0];
+      return { clientX: t.clientX, clientY: t.clientY };
+    }
+    // PointerEvent and MouseEvent have clientX/clientY
+    if ('clientX' in e && 'clientY' in e) {
+      return { clientX: (e as React.MouseEvent | React.PointerEvent).clientX, clientY: (e as React.MouseEvent | React.PointerEvent).clientY };
+    }
+    // Fallback (shouldn't happen)
+    return { clientX: 0, clientY: 0 };
+  }, []);
+
   // --- Drag / Drop logic with click offset fix ---
-  const handleBlockDragStart = useCallback((block: Block, e: React.MouseEvent | React.TouchEvent) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as any).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as any).clientY;
+  const handleBlockDragStart = useCallback((block: Block, e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
+    const { clientX, clientY } = getClientXY(e);
     const pointerWorld = screenToWorld(clientX, clientY);
 
     if (block.id.endsWith('-template')) {
@@ -104,7 +119,7 @@ const App = () => {
       }
     }
     return block;
-  }, [blocks, blocksMap, getChain, screenToWorld, BLOCK_WIDTH, BLOCK_HEIGHT]);
+  }, [blocks, blocksMap, getChain, screenToWorld, BLOCK_WIDTH, BLOCK_HEIGHT, getClientXY]);
 
   const handleBlockDrag = useCallback((pos: { x: number; y: number }, draggedBlock: Block) => {
     const chain = getChain(draggedBlock.id);
@@ -172,7 +187,7 @@ const App = () => {
   });
 
   // inside App.tsx (replace existing handleGreenFlagClick)
-const handleGreenFlagClick = useCallback(async (blockId: string) => {
+  const handleGreenFlagClick = useCallback(async (blockId: string) => {
     // If Bluetooth isn't connected, show alert and don't execute.
     if (!isBluetoothConnected) {
       alert('You must connect to a device');
@@ -217,7 +232,6 @@ const handleGreenFlagClick = useCallback(async (blockId: string) => {
     <SoundContext.Provider value={playSnapSound}>
       <div className="h-screen w-screen overflow-hidden relative">
         <BluetoothConnector 
-          isConnected={isBluetoothConnected}
           onConnectionChange={setIsBluetoothConnected}
         />
         <Workspace

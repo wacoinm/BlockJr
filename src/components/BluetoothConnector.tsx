@@ -304,10 +304,17 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           } else {
             setStatusMessage(null);
           }
-        } catch (e: any) {
-          console.error('Scan failed', e);
-          await diagnoseScanFailure(e);
-          alert('Scan failed: ' + String(e));
+        } catch (e: unknown) {
+          if (e instanceof Error) {
+            await diagnoseScanFailure(e);
+            alert('Scan failed: ' + e.message);
+          } else if (typeof e === 'string') {
+            await diagnoseScanFailure(e);
+            alert('Scan failed: ' + e);
+          } else {
+            await diagnoseScanFailure({ message: 'Unknown error' });
+            alert('Scan failed: Unknown error');
+          }
         }
         setIsBusy(false);
       };

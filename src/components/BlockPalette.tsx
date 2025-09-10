@@ -42,7 +42,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
                  md:top-4 md:bottom-auto md:w-auto md:left-4 md:flex md:flex-col md:space-y-4"
     >
       {/* Horizontal scroll for mobile */}
-      <div className="flex overflow-x-auto overflow-y-hidden px-4 py-2 space-x-4 md:flex-col md:space-x-0 md:space-y-4">
+      <div className="flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 md:flex-col md:space-x-0 md:space-y-4 xs:justify-center">
         {paletteBlocks.map((block) => (
           <div
             key={block.id}

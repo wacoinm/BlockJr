@@ -17,6 +17,9 @@ interface WorkspaceProps {
   onZoom?: (factor: number, centerX?: number, centerY?: number) => void;
   bottomInsetPx?: number;
   gridCellSize?: number;
+
+  pinchSensitivity?: number; // 0..1
+  pinchMaxStep?: number;     // max per-step multiplier
 }
 
 export const Workspace: React.FC<WorkspaceProps> = ({
@@ -34,6 +37,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   onZoom,
   bottomInsetPx = 120,
   gridCellSize = 72,
+  pinchSensitivity = 0.5,
+  pinchMaxStep = 1.12,
 }) => {
   const panState = useRef<{ active: boolean; lastX: number; lastY: number; pointerId?: number | null }>({
     active: false,
@@ -42,25 +47,82 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     pointerId: null,
   });
 
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+
+  const pinch = useRef<{ active: boolean; lastDist: number } | null>(null);
+
   const [isGrabbing, setIsGrabbing] = useState(false);
 
-  // Panning handlers
+  const getDistance = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.hypot(dx, dy);
+  };
+
+  const getCenter = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  });
+
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    panState.current.active = true;
-    panState.current.lastX = e.clientX;
-    panState.current.lastY = e.clientY;
-    panState.current.pointerId = e.pointerId ?? null;
-    setIsGrabbing(true);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    } catch { /* empty */ }
-    e.preventDefault();
+    } catch { /* ignore */ }
+
+    const pointerCount = pointers.current.size;
+
+    if (pointerCount === 1) {
+      panState.current.active = true;
+      panState.current.lastX = e.clientX;
+      panState.current.lastY = e.clientY;
+      panState.current.pointerId = e.pointerId;
+      setIsGrabbing(true);
+      e.preventDefault();
+    } else if (pointerCount === 2) {
+      panState.current.active = false;
+      panState.current.pointerId = null;
+
+      const iter = pointers.current.values();
+      const p1 = iter.next().value as { x: number; y: number } | undefined;
+      const p2 = iter.next().value as { x: number; y: number } | undefined;
+      if (!p1 || !p2) return; // <-- TS-safe check
+
+      const startDist = getDistance(p1, p2) || 1;
+      pinch.current = { active: true, lastDist: startDist };
+      setIsGrabbing(true);
+      e.preventDefault();
+    } else {
+      e.preventDefault();
+    }
   };
 
   const onBackgroundPointerMove = (e: React.PointerEvent) => {
+    if (pointers.current.has(e.pointerId)) {
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (pinch.current?.active && pointers.current.size >= 2) {
+      const iter = pointers.current.values();
+      const p1 = iter.next().value as { x: number; y: number } | undefined;
+      const p2 = iter.next().value as { x: number; y: number } | undefined;
+      if (!p1 || !p2) return;
+
+      const currentDist = getDistance(p1, p2) || 0.0001;
+      const incremental = currentDist / pinch.current.lastDist;
+      const adjusted = 1 + (incremental - 1) * pinchSensitivity;
+      const clamped = Math.max(1 / pinchMaxStep, Math.min(pinchMaxStep, adjusted));
+      const center = getCenter(p1, p2);
+
+      onZoom?.(clamped, center.x, center.y);
+      pinch.current.lastDist = currentDist;
+      e.preventDefault();
+      return;
+    }
+
     if (!panState.current.active) return;
     if (panState.current.pointerId != null && e.pointerId !== panState.current.pointerId) return;
+
     const dx = e.clientX - panState.current.lastX;
     const dy = e.clientY - panState.current.lastY;
     panState.current.lastX = e.clientX;
@@ -70,20 +132,48 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     e.preventDefault();
   };
 
-  const endPan = () => {
-    if (!panState.current.active) return;
-    panState.current.active = false;
-    panState.current.pointerId = null;
-    setIsGrabbing(false);
+  const onBackgroundPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+
+    if (pinch.current?.active) {
+      if (pointers.current.size < 2) {
+        pinch.current = null;
+        setIsGrabbing(false);
+
+        if (pointers.current.size === 1) {
+          const remainingEntry = pointers.current.entries().next().value as [number, { x: number; y: number }] | undefined;
+          if (remainingEntry) {
+            const [id, pos] = remainingEntry;
+            panState.current.active = true;
+            panState.current.pointerId = id;
+            panState.current.lastX = pos.x;
+            panState.current.lastY = pos.y;
+            setIsGrabbing(true);
+          }
+        }
+      }
+      try {
+        (e.currentTarget as Element).releasePointerCapture(e.pointerId);
+      } catch { /* empty */ }
+      e.preventDefault();
+      return;
+    }
+
+    if (panState.current.active && panState.current.pointerId === e.pointerId) {
+      panState.current.active = false;
+      panState.current.pointerId = null;
+      setIsGrabbing(false);
+    }
+
+    try {
+      (e.currentTarget as Element).releasePointerCapture(e.pointerId);
+    } catch { /* empty */ }
   };
 
-  // Zoom with wheel + modifiers
   const onWheel = (e: React.WheelEvent) => {
-    const shouldZoom = e.ctrlKey || e.metaKey || e.shiftKey;
-    if (!shouldZoom) return;
+    if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;
     e.preventDefault();
-    const delta = -e.deltaY;
-    const factor = delta > 0 ? 1.08 : 1 / 1.08;
+    const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
     onZoom?.(factor, e.clientX, e.clientY);
   };
 
@@ -91,12 +181,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   const handleZoomOut = () => onZoom?.(1 / 1.12);
   const handleZoomReset = () => {
     if (zoom === 1) return;
-    const factor = 1 / zoom;
-    onZoom?.(factor);
+    onZoom?.(1 / zoom);
   };
 
-  // Infinite grid simulation (huge area)
-  const GRID_EXTENT = useMemo(() => 200000, []);
+  const GRID_EXTENT = useMemo(() => 200_000, []);
   const half = GRID_EXTENT / 2;
 
   const gridStyle: React.CSSProperties = {
@@ -120,21 +208,16 @@ export const Workspace: React.FC<WorkspaceProps> = ({
       style={{ bottom: `${bottomInsetPx}px`, touchAction: 'none' }}
       onWheel={onWheel}
     >
-      {/* Panning layer */}
       <div
         className="absolute inset-0 z-0"
         onPointerDown={onBackgroundPointerDown}
         onPointerMove={onBackgroundPointerMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
-        onPointerLeave={endPan}
-        style={{
-          background: 'transparent',
-          cursor: isGrabbing ? 'grabbing' : 'grab',
-        }}
+        onPointerUp={onBackgroundPointerUp}
+        onPointerCancel={onBackgroundPointerUp}
+        onPointerLeave={onBackgroundPointerUp}
+        style={{ background: 'transparent', cursor: isGrabbing ? 'grabbing' : 'grab' }}
       />
 
-      {/* Zoom controls */}
       <div style={{ position: 'absolute', left: 10, top: 10, zIndex: 80 }}>
         <div className="flex flex-col gap-2 bg-white/90 p-2 rounded-lg shadow">
           <button onClick={handleZoomIn} className="w-8 h-8 rounded-md border text-sm">+</button>
@@ -143,7 +226,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({
         </div>
       </div>
 
-      {/* World (pan+zoom) */}
       <div
         className="absolute z-10"
         style={{
@@ -155,14 +237,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({
           pointerEvents: 'none',
         }}
       >
-        {/* Infinite grid */}
         <div style={gridStyle} />
-
-        {/* Blocks (in world coords) */}
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           {blocks.map((block) => {
             const isCurrentlyDragged = isDragging && draggedBlockId === block.id;
-
             return (
               <div
                 key={block.id}
@@ -175,7 +253,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                   pointerEvents: 'auto',
                   touchAction: 'none',
                 }}
-                // capture pointer on the wrapper so the drag hook gets a stable target rect
                 onPointerDownCapture={(e) => onBlockDragStart(block, e)}
               >
                 <BlockComponent

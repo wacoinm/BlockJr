@@ -14,6 +14,8 @@ interface BluetoothConnectorProps {
   onConnectionChange?: (isConnected: boolean) => void;
 }
 
+type ScanError = Error | { message?: string } | string | null | undefined;
+
 export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange }) => {
   const isNative = Capacitor.getPlatform() !== 'web';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -53,7 +55,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   /**
    * Diagnose scan failure and set helpful statusMessage
    */
-  const diagnoseScanFailure = useCallback(async (scanError?: any) => {
+  const diagnoseScanFailure = useCallback(async (scanError?: ScanError) => {
     setStatusMessage('Scan failed — checking permissions and device state...');
     try {
       // try to ensure/request permissions (best-effort)
@@ -85,7 +87,18 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       }
 
       // else show generic scan error
-      const errMsg = scanError?.message ?? String(scanError ?? 'Unknown error');
+      let errMsg: string;
+
+      if (scanError instanceof Error) {
+        errMsg = scanError.message;
+      } else if (typeof scanError === "string") {
+        errMsg = scanError;
+      } else if (scanError && typeof scanError.message === "string") {
+        errMsg = scanError.message;
+      } else {
+        errMsg = 'Unknown error';
+      }
+
       setStatusMessage(`Scan failed: ${errMsg}`);
     } catch (e) {
       console.error('diagnoseScanFailure failed', e);

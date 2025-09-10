@@ -420,6 +420,34 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
               )}
             </>
           )}
+
+          {/* Recents section */}
+          {!isConnected && lastConnectedDevice && (
+            <div className="px-4 py-3 border-t border-gray-100">
+              <h4 className="text-sm font-medium text-gray-700">Recents</h4>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  {lastConnectedDevice.name ?? 'Unknown'}
+                  <span className="text-xs text-gray-500 ml-2">({lastConnectedDevice.id.slice(0, 8)}...)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleConnect(lastConnectedDevice)}
+                    disabled={isBusy}
+                    className="text-sm px-2 py-1 rounded bg-blue-50 text-blue-600 disabled:opacity-50"
+                  >
+                    Connect
+                  </button>
+                  <button
+                    onClick={() => setLastConnectedDevice(null)}
+                    className="text-sm px-2 py-1 rounded text-gray-500 hover:bg-gray-50"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

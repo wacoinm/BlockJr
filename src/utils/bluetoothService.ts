@@ -29,47 +29,105 @@ async function scanForDevices(): Promise<DeviceItem[]> {
   if (!isNative) return [];
   try {
     const { devices } = await BluetoothSerial.scan();
-    return (devices || []).map((d: any) => ({
-      id: d.address ?? d.id ?? d.deviceId ?? String(d),
-      name: d.name ?? d.deviceName ?? undefined,
-    }));
+    const list = (devices || []).map((d: any) => {
+      // normalize to a single id string that connect() will accept
+      const id = d.address ?? d.id ?? d.deviceId ?? String(d);
+      const name = d.name ?? d.deviceName ?? undefined;
+      return { id, name } as DeviceItem;
+    });
+    console.log('[BT] scanForDevices -> devices:', devices, 'normalized ->', list);
+    return list;
   } catch (e) {
     console.error('[BT] Scan failed', e);
     throw e;
   }
 }
 
-async function connect(deviceId: string): Promise<boolean> {
-  if (!isNative) return false;
-  console.log('[BT] trying to connect to', deviceId);
+/**
+ * normalizeAddress:
+ * Accepts a string or an object device and returns a normalized address string (or null).
+ */
+function normalizeAddress(deviceIdOrObj: any): string | null {
+  if (!deviceIdOrObj && deviceIdOrObj !== 0) return null;
+  if (typeof deviceIdOrObj === 'string') {
+    const s = deviceIdOrObj.trim();
+    return s.length ? s : null;
+  }
+  if (typeof deviceIdOrObj === 'object') {
+    const v = deviceIdOrObj.address ?? deviceIdOrObj.id ?? deviceIdOrObj.deviceId ?? deviceIdOrObj.nativeId ?? null;
+    if (typeof v === 'string' && v.trim().length) return v.trim();
+    if (typeof v === 'number') return String(v);
+  }
+  // fallback: try to stringify
   try {
-    try {
-      await BluetoothSerial.connect({ address: deviceId });
-    } catch (firstErr) {
-      console.warn('[BT] connect({address}) failed, trying connect(deviceId) fallback', firstErr);
-      alert('[BT] connect({address}) failed, trying connect(deviceId) fallback'+ firstErr);
+    const s = String(deviceIdOrObj);
+    return s.length ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+async function connect(deviceId: string | { [k: string]: any }): Promise<boolean> {
+  if (!isNative) return false;
+  const addr = normalizeAddress(deviceId);
+  console.log('[BT] trying to connect to (raw):', deviceId, '-> normalized:', addr);
+  if (!addr) {
+    console.error('[BT] connect aborted: device address property is required but missing or empty.');
+    return false;
+  }
+
+  // do not set connectedDeviceId until we know it succeeded
+  try {
+    // Try multiple signatures in order of likelihood
+    const attempts: Array<() => Promise<any>> = [
+      () => BluetoothSerial.connect({ address: addr }),
+      () => BluetoothSerial.connect({ id: addr }),
+      () => BluetoothSerial.connect({ deviceId: addr }),
+      // some older / different builds accept the raw string
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-expect-error
-      await BluetoothSerial.connect(deviceId);
-    }
-    connectedDeviceId = deviceId;
-    console.log('[BT] connect succeeded');
-    try {
-      const connected = await isConnected();
-      console.log('[BT] isConnected after connect ->', connected);
-      if (!connected) {
-        connectedDeviceId = null;
-        return false;
+      // @ts-ignore
+      () => BluetoothSerial.connect(addr),
+      // insecure connect variants (if available)
+      () => BluetoothSerial.connectInsecure ? BluetoothSerial.connectInsecure({ address: addr }) : Promise.reject(new Error('connectInsecure not available')) : Promise.reject(new Error('no-op')),
+      // last-resort: try connectInsecure raw
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      () => BluetoothSerial.connectInsecure ? BluetoothSerial.connectInsecure(addr) : Promise.reject(new Error('connectInsecure not available')) : Promise.reject(new Error('no-op')),
+    ];
+
+    let lastErr: any = null;
+    for (const fn of attempts) {
+      try {
+        console.log('[BT] connect: attempting signature with payload ->', fn.toString().slice(0, 200));
+        await fn();
+        // success
+        connectedDeviceId = addr;
+        console.log('[BT] connect succeeded ->', addr);
+        // double-check connection state
+        try {
+          const ok = await isConnected();
+          console.log('[BT] isConnected after connect ->', ok);
+          if (!ok) {
+            console.warn('[BT] isConnected returned false right after connect; clearing connectedDeviceId');
+            connectedDeviceId = null;
+            return false;
+          }
+        } catch (e) {
+          console.warn('[BT] isConnected check failed after connect', e);
+          connectedDeviceId = null;
+          return false;
+        }
+        return true;
+      } catch (err) {
+        lastErr = err;
+        console.warn('[BT] connect attempt failed (continuing to next fallback):', err);
       }
-    } catch (e) {
-      console.warn('[BT] isConnected check failed after connect', e);
-      connectedDeviceId = null;
-      return false;
     }
-    return true;
+
+    console.error('[BT] All connect attempts failed. lastErr=', lastErr);
+    return false;
   } catch (error) {
     console.error('[BT] Connection failed', error);
-    alert('[BT] Connection failed' + error);
     connectedDeviceId = null;
     return false;
   }
@@ -85,13 +143,21 @@ async function disconnect(): Promise<void> {
       } catch (e1) {
         console.warn('[BT] disconnect({address}) failed, trying disconnect() fallback', e1);
         try {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
           await BluetoothSerial.disconnect();
         } catch (e2) {
           console.warn('[BT] disconnect() fallback also failed', e2);
         }
       }
     } else {
-      await BluetoothSerial.disconnect();
+      try {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        await BluetoothSerial.disconnect();
+      } catch (e) {
+        console.warn('[BT] disconnect() (no address) failed', e);
+      }
     }
   } catch (e) {
     console.warn('[BT] disconnect error', e);
@@ -103,60 +169,38 @@ async function disconnect(): Promise<void> {
 async function isConnected(): Promise<boolean> {
   if (!isNative) return false;
   if (!connectedDeviceId) return false;
-  try {
-    const res = await BluetoothSerial.isConnected({ address: connectedDeviceId });
-    console.log('[BT] isConnected res:', res);
-    let value: boolean;
-    if (res === undefined) {
-      value = true;
-    } else if (typeof res === 'object' && res !== null) {
-      value = !!(res.value ?? res.connected ?? res);
-    } else {
-      value = !!res;
+  // Try several shapes
+  const attempts: Array<() => Promise<any>> = [
+    () => BluetoothSerial.isConnected({ address: connectedDeviceId }),
+    () => BluetoothSerial.isConnected({ id: connectedDeviceId }),
+    () => BluetoothSerial.isConnected({ deviceId: connectedDeviceId }),
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    () => BluetoothSerial.isConnected ? BluetoothSerial.isConnected(connectedDeviceId) : Promise.reject(new Error('isConnected not available')) : Promise.reject(new Error('no-op')),
+    () => BluetoothSerial.isConnected ? BluetoothSerial.isConnected() : Promise.reject(new Error('isConnected not available')) : Promise.reject(new Error('no-op')),
+  ];
+
+  for (const fn of attempts) {
+    try {
+      const res = await fn();
+      console.log('[BT] isConnected res:', res);
+      let value: boolean;
+      if (res === undefined) {
+        value = true;
+      } else if (typeof res === 'object' && res !== null) {
+        value = !!(res.value ?? res.connected ?? res);
+      } else {
+        value = !!res;
+      }
+      if (!value) connectedDeviceId = null;
+      return value;
+    } catch (e) {
+      console.warn('[BT] isConnected attempt failed, trying next fallback', e);
     }
-    if (!value) {
-      connectedDeviceId = null;
-    }
-    return value;
-  } catch (e) {
-    console.warn('[BT] isConnected({address}) failed, trying fallback', e);
   }
 
-  try {
-    const res = await BluetoothSerial.isConnected(connectedDeviceId);
-    console.log('[BT] isConnected fallback res:', res);
-    let value: boolean;
-    if (res === undefined) {
-      value = true;
-    } else if (typeof res === 'object' && res !== null) {
-      value = !!(res.value ?? res.connected ?? res);
-    } else {
-      value = !!res;
-    }
-    if (!value) connectedDeviceId = null;
-    return value;
-  } catch (e) {
-    console.warn('[BT] isConnected(deviceId) fallback failed, trying empty arg fallback', e);
-  }
-
-  try {
-    const res = await BluetoothSerial.isConnected();
-    console.log('[BT] isConnected empty res:', res);
-    let value: boolean;
-    if (res === undefined) {
-      value = true;
-    } else if (typeof res === 'object' && res !== null) {
-      value = !!(res.value ?? res.connected ?? res);
-    } else {
-      value = !!res;
-    }
-    if (!value) connectedDeviceId = null;
-    return value;
-  } catch (e) {
-    console.error('[BT] isConnected fallback final failed', e);
-    connectedDeviceId = null;
-    return false;
-  }
+  connectedDeviceId = null;
+  return false;
 }
 
 /**
@@ -204,11 +248,6 @@ async function sendString(text: string): Promise<void> {
 
 /* --- listeners --- */
 
-/**
- * startDataListener:
- *   tries multiple event names (onRead, onDataReceived, data, onData)
- *   calls onData with a string payload when an event arrives.
- */
 export async function startDataListener(onData: (s: string) => void) {
   if (!isNative) return;
   if (dataListener) return;
@@ -229,7 +268,6 @@ export async function startDataListener(onData: (s: string) => void) {
     const tryNames = ['onDataReceived', 'data', 'onData'];
     for (const name of tryNames) {
       try {
-        // register and keep handle
         dataListener = await BluetoothSerial.addListener(name, (ev: any) => {
           console.log(`[BT] ${name}`, ev);
           onData(ev.data ?? ev.value ?? ev?.read ?? ev);
@@ -253,19 +291,15 @@ export async function stopDataListener() {
     if (typeof dataListener.remove === 'function') {
       await dataListener.remove();
     } else if (dataListener && typeof dataListener.then === 'function' && dataListener.remove) {
-      // some plugin proxies return a Promise-like with remove
       await dataListener.remove();
     }
-  } catch (e) { 
-    console.log("ERR : ", e)
-   }
+  } catch (e) {
+    console.log('ERR : ', e);
+  }
   dataListener = null;
   console.log('[BT] data listener removed');
 }
 
-/**
- * startDisconnectListener: listens for disconnect events
- */
 export async function startDisconnectListener(onDisconnect: () => void) {
   if (!isNative) return;
   if (disconnectListener) return;
@@ -297,16 +331,13 @@ export async function stopDisconnectListener() {
     if (typeof disconnectListener.remove === 'function') {
       await disconnectListener.remove();
     }
-  } catch (e) { 
-    console.log("ERR : ", e)
-   }
+  } catch (e) {
+    console.log('ERR : ', e);
+  }
   disconnectListener = null;
   console.log('[BT] disconnect listener removed');
 }
 
-/**
- * startEnabledListener: subscribe to enabled-state changes if plugin emits them
- */
 export async function startEnabledListener(onEnabledChange: (enabled: boolean) => void) {
   if (!isNative) return;
   if (enabledListener) return;
@@ -329,9 +360,9 @@ export async function stopEnabledListener() {
     if (typeof enabledListener.remove === 'function') {
       await enabledListener.remove();
     }
-  } catch (e) { 
-    console.log("ERR : ", e)
-   }
+  } catch (e) {
+    console.log('ERR : ', e);
+  }
   enabledListener = null;
   console.log('[BT] enabled listener removed');
 }

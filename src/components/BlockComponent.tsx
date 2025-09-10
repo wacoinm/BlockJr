@@ -34,12 +34,18 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
 
   const getBlockColor = (type: string) => {
     switch (type) {
-      case 'up': return 'bg-blue-500 shadow-blue-600';
-      case 'down': return 'bg-red-500 shadow-red-600';
-      case 'delay': return 'bg-yellow-500 shadow-yellow-600';
-      case 'green-flag': return 'bg-green-500 shadow-green-600';
-      default: return 'bg-gray-500 shadow-gray-600';
-    }
+  case 'up':
+    return 'bg-blue-500 shadow-blue-600 bg-gradient-to-b from-blue-400 to-blue-600';
+  case 'down':
+    return 'bg-red-500 shadow-red-600 bg-gradient-to-b from-red-400 to-red-600';
+  case 'delay':
+    return 'bg-yellow-500 shadow-yellow-600 bg-gradient-to-b from-yellow-300 to-yellow-500';
+  case 'green-flag':
+    return 'bg-green-500 shadow-green-600 bg-gradient-to-b from-green-400 to-green-600';
+  default:
+    return 'bg-gray-500 shadow-gray-600 bg-gradient-to-b from-gray-400 to-gray-600';
+}
+
   };
 
   const getBlockIcon = () => {

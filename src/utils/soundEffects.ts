@@ -1,14 +1,21 @@
-import React, { useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
+
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
 
 export const useSnapSound = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
 
   const playSnapSound = useCallback(() => {
-    if (typeof window.AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined') {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = new AudioCtx();
       }
-      
+
       const audioContext = audioContextRef.current;
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();

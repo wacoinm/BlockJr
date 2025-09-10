@@ -1,66 +1,64 @@
-import React from "react";
+import React, { useRef } from "react";
 import { BlockComponent } from "./BlockComponent";
 import { Block } from "../types/Block";
 
 interface BlockPaletteProps {
-  onBlockDrag: (
-    block: Block,
-    event: React.MouseEvent | React.TouchEvent
-  ) => void;
+  onBlockDrag: (block: Block, event: React.MouseEvent | React.TouchEvent) => void;
 }
 
 const paletteBlocks: Block[] = [
-  {
-    id: "up-template",
-    type: "up",
-    x: 0,
-    y: 0,
-    parentId: null,
-    childId: null,
-  },
-  {
-    id: "down-template",
-    type: "down",
-    x: 0,
-    y: 0,
-    parentId: null,
-    childId: null,
-  },
-  {
-    id: "delay-template",
-    type: "delay",
-    value: 1,
-    x: 0,
-    y: 0,
-    parentId: null,
-    childId: null,
-  },
-  {
-    id: "green-flag-template",
-    type: "green-flag",
-    x: 0,
-    y: 0,
-    parentId: null,
-    childId: null,
-  },
+  { id: "up-template", type: "up", x: 0, y: 0, parentId: null, childId: null },
+  { id: "down-template", type: "down", x: 0, y: 0, parentId: null, childId: null },
+  { id: "delay-template", type: "delay", value: 1, x: 0, y: 0, parentId: null, childId: null },
+  { id: "green-flag-template", type: "green-flag", x: 0, y: 0, parentId: null, childId: null },
 ];
 
 export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
+  // store timeout id
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePressStart = (
+    block: Block,
+    e: React.MouseEvent | React.TouchEvent
+  ) => {
+    e.persist?.(); // keep synthetic event around
+
+    // start 400ms timer
+    holdTimer.current = setTimeout(() => {
+      onBlockDrag(block, e);
+    }, 400);
+  };
+
+  const handlePressEnd = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
   return (
-    // Fixed and responsive: desktop -> top (md:top-4), mobile -> bottom-0
     <div
-      className="fixed left-0 w-full z-40 bg-white border-t-2 border-gray-200 shadow-lg flex items-center justify-center px-4
-                    h-20 md:h-24
-                    bottom-0 md:bottom-auto md:top-4
-                    "
+      className="fixed left-0 bottom-0 w-full z-40 bg-white shadow-inner border-t border-gray-200 
+                 md:top-4 md:bottom-auto md:w-auto md:left-4 md:flex md:flex-col md:space-y-4"
     >
-      <div className="flex space-x-4 md:space-x-6">
+      {/* Horizontal scroll for mobile */}
+      <div className="flex overflow-x-auto overflow-y-hidden px-4 py-2 space-x-4 md:flex-col md:space-x-0 md:space-y-4">
         {paletteBlocks.map((block) => (
-          <div key={block.id} className="cursor-grab active:cursor-grabbing">
+          <div
+            key={block.id}
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={(e) => handlePressStart(block, e)}
+            onMouseUp={handlePressEnd}
+            onMouseLeave={handlePressEnd}
+            onTouchStart={(e) => handlePressStart(block, e)}
+            onTouchEnd={handlePressEnd}
+            onTouchCancel={handlePressEnd}
+          >
             <BlockComponent
               block={block}
-              onDragStart={(e) => onBlockDrag(block, e)}
+              // remove direct onDragStart — we handle it manually after long press
               isPaletteBlock
+              style={{ width: 64, height: 64 }}
             />
           </div>
         ))}

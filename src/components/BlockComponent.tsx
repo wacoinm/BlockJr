@@ -43,12 +43,25 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
   };
 
   const getBlockIcon = () => {
-    switch (block.type) {
-      case 'up': return <ArrowUp className="w-4 h-4 md:w-6 md:h-6 text-white" />;
-      case 'down': return <ArrowDown className="w-4 h-4 md:w-6 md:h-6 text-white" />;
-      case 'delay': return <Clock className="w-4 h-4 md:w-6 md:h-6 text-white" />;
-      case 'green-flag': return <Play className="w-4 h-4 md:w-6 md:h-6 text-white" />;
-      default: return null;
+    const baseIconClass = 'text-white'; // ✅ استفاده شد
+
+    if (isPaletteBlock) {
+      // bigger icons for kids
+      switch (block.type) {
+        case 'up': return <ArrowUp className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'down': return <ArrowDown className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'delay': return <Clock className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'green-flag': return <Play className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
+        default: return null;
+      }
+    } else {
+      switch (block.type) {
+        case 'up': return <ArrowUp className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
+        case 'down': return <ArrowDown className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
+        case 'delay': return <Clock className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
+        case 'green-flag': return <Play className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
+        default: return null;
+      }
     }
   };
 
@@ -75,20 +88,37 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     }
   };
 
+  // size classes: bigger for palette items (for kids)
+  const sizeClasses = isPaletteBlock
+    ? 'relative w-16 h-16 md:w-20 md:h-20 rounded-3xl'
+    : 'relative w-12 h-12 md:w-16 md:h-16 rounded-2xl';
+
+  // notch sizes
+  const leftNotchClasses = isPaletteBlock
+    ? 'absolute -left-3 top-1/2 transform -translate-y-1/2 w-4 h-7 md:w-5 md:h-8 bg-white/10 rounded-l-lg'
+    : 'absolute -left-2 top-1/2 transform -translate-y-1/2 w-3 h-5 md:w-4 md:h-6 bg-white/10 rounded-l-lg';
+
+  const rightNotchBase = isPaletteBlock
+    ? 'absolute -right-3 top-1/2 transform -translate-y-1/2 w-4 h-8 md:w-5 md:h-10'
+    : 'absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8';
+
   return (
     <div className="relative group" style={style}>
       <div
         className={`
-          relative w-12 h-12 md:w-16 md:h-16 rounded-2xl cursor-pointer select-none
-          transform transition-all duration-200 hover:scale-105 active:scale-95
+          ${sizeClasses}
           ${getBlockColor(block.type)}
           shadow-lg hover:shadow-xl
           flex items-center justify-center
           border-2 border-white/20
+          cursor-pointer select-none
+          transform transition-all duration-200 hover:scale-105 active:scale-95
         `}
         onMouseDown={onDragStart}
         onTouchStart={onDragStart}
         onClick={handleClick}
+        role="button"
+        tabIndex={0}
       >
         <div className="flex items-center justify-center">
           {getBlockIcon()}
@@ -96,16 +126,16 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
 
         {/* left notch */}
         {block.type !== 'green-flag' && (
-          <div className="absolute -left-2 top-1/2 transform -translate-y-1/2 w-3 h-5 md:w-4 md:h-6 bg-white/10 rounded-l-lg" />
+          <div className={leftNotchClasses} />
         )}
 
         {/* right notch when no child (visual connector) */}
         {(block.childId === null || block.childId === undefined) && block.type !== 'green-flag' && (
-          <div className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8 bg-inherit rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20" />
+          <div className={`${rightNotchBase} bg-inherit rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20`} />
         )}
 
         {block.type === 'green-flag' && (
-            <div className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8 bg-inherit rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20" />
+          <div className={`${rightNotchBase} bg-inherit rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20`} />
         )}
       </div>
 

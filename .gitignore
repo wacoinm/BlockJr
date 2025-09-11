@@ -27,3 +27,6 @@ dist-ssr
 # Ignore generated context file
 project_context.txt
 local-maven/
+
+# Ignore todo lists
+*.todo

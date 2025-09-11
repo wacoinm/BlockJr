@@ -22,11 +22,12 @@ import {
   Monitor,
   Sun,
   Moon,
-  Menu,
   X,
   FolderOpenDot,
   FolderKanban
 } from 'lucide-react';
+import Kamaan from '../public/icon.svg?react';
+import { SplashScreen } from '@capacitor/splash-screen';
 
 export const SoundContext = createContext(() => {});
 
@@ -45,6 +46,9 @@ const App: React.FC = () => {
     ensureBluetoothPermissions().catch((err) => console.error(err));
     const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener('resize', onResize);
+    SplashScreen.hide().catch(err => {
+      console.warn('Failed to hide splash screen:', err);
+    });
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
@@ -434,8 +438,8 @@ const App: React.FC = () => {
             className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 transition-transform duration-200 hover:scale-105"
           >
             <div className="relative w-6 h-6">
-              <Menu
-                className={`absolute inset-0 w-6 h-6 transform transition-all duration-300 ${
+              <Kamaan
+                className={`absolute inset-0 w-6 h-6 scale-150 transform transition-all duration-300 ${
                   menuOpen ? 'scale-0 rotate-90 opacity-0' : 'scale-100 opacity-100'
                 }`}
               />

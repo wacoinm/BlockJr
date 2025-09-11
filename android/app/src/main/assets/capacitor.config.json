@@ -1,5 +1,19 @@
 {
 	"appId": "me.sharik.blockjr",
 	"appName": "BlockJr",
-	"webDir": "dist"
+	"webDir": "dist",
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 3000,
+			"launchAutoHide": true,
+			"launchFadeOutDuration": 300,
+			"backgroundColor": "#ffffffff",
+			"androidSplashResourceName": "splash",
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": false,
+			"spinnerColor": "#999999",
+			"splashFullScreen": true,
+			"splashImmersive": true
+		}
+	}
 }

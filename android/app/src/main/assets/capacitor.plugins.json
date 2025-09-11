@@ -8,6 +8,10 @@
 		"classpath": "com.capacitorjs.plugins.device.DevicePlugin"
 	},
 	{
+		"pkg": "@capacitor/splash-screen",
+		"classpath": "com.capacitorjs.plugins.splashscreen.SplashScreenPlugin"
+	},
+	{
 		"pkg": "@e-is/capacitor-bluetooth-serial",
 		"classpath": "com.bluetoothserial.plugin.BluetoothSerialPlugin"
 	}

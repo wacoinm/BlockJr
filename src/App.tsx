@@ -439,7 +439,7 @@ const App: React.FC = () => {
           >
             <div className="relative w-6 h-6">
               <Kamaan
-                className={`absolute inset-0 w-6 h-6 scale-150 transform transition-all duration-300 ${
+                className={`absolute inset-0 w-6 h-6 scale-[200%] transform transition-all duration-300 ${
                   menuOpen ? 'scale-0 rotate-90 opacity-0' : 'scale-100 opacity-100'
                 }`}
               />

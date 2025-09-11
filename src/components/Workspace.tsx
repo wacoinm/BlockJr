@@ -1,5 +1,5 @@
 // src/components/Workspace.tsx
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Block } from '../types/Block';
 import { BlockComponent } from './BlockComponent';
 
@@ -57,6 +57,15 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   const pinch = useRef<{ active: boolean; lastDist: number } | null>(null);
 
   const [isGrabbing, setIsGrabbing] = useState(false);
+  const [isDark, setIsDark] = useState<boolean>(() => typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false);
+
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
 
   const getDistance = (a: { x: number; y: number }, b: { x: number; y: number }) => {
     const dx = a.x - b.x;
@@ -192,6 +201,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   const GRID_EXTENT = useMemo(() => 200_000, []);
   const half = GRID_EXTENT / 2;
 
+  const gridColorStrong = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.12)';
+  const gridColorLight = isDark ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.06)';
+
   const gridStyle: React.CSSProperties = {
     position: 'absolute',
     left: -half,
@@ -200,8 +212,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     height: GRID_EXTENT,
     pointerEvents: 'none',
     backgroundImage: `
-      linear-gradient(0deg, rgba(0,0,0,0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px)
+      linear-gradient(0deg, ${gridColorStrong} 1px, transparent 1px),
+      linear-gradient(90deg, ${gridColorLight} 1px, transparent 1px)
     `,
     backgroundSize: `${gridCellSize}px ${gridCellSize}px`,
     willChange: 'transform, background-position',
@@ -223,11 +235,17 @@ export const Workspace: React.FC<WorkspaceProps> = ({
         style={{ background: 'transparent', cursor: isGrabbing ? 'grabbing' : 'grab' }}
       />
 
+      {/* Zoom helper buttons - style respects dark mode */}
       <div style={{ position: 'absolute', left: 10, top: 10, zIndex: 80 }}>
-        <div className="flex flex-col gap-2 bg-white/90 p-2 rounded-lg shadow">
-          <button onClick={handleZoomIn} className="w-8 h-8 rounded-md border text-sm">+</button>
-          <button onClick={handleZoomOut} className="w-8 h-8 rounded-md border text-sm">−</button>
-          <button onClick={handleZoomReset} className="w-8 h-8 rounded-md border text-sm">⤾</button>
+        <div className="flex flex-col gap-2 p-2 rounded-lg shadow"
+             style={{
+               backgroundColor: isDark ? 'rgba(9,12,20,0.7)' : 'rgba(255,255,255,0.92)',
+               border: isDark ? '1px solid rgba(148,163,184,0.06)' : '1px solid rgba(203,213,225,0.6)'
+             }}
+        >
+          <button onClick={handleZoomIn} className="w-8 h-8 rounded-md border text-sm" aria-label="Zoom in">+</button>
+          <button onClick={handleZoomOut} className="w-8 h-8 rounded-md border text-sm" aria-label="Zoom out">−</button>
+          <button onClick={handleZoomReset} className="w-8 h-8 rounded-md border text-sm" aria-label="Reset zoom">⤾</button>
         </div>
       </div>
 
@@ -261,7 +279,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                 onPointerDownCapture={(e: React.PointerEvent) => {
                   // If deleter mode — remove immediately and prevent drag start
                   if (interactionMode === 'deleter') {
-                    // stop anything else from handling this pointer (including your drag hook)
                     try { e.stopPropagation(); } catch { /* empty */ }
                     try { e.preventDefault(); } catch { /* empty */ }
                     onBlockRemove(block.id);
@@ -286,3 +303,5 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     </div>
   );
 };
+
+export default Workspace;

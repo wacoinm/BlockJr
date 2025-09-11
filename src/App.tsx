@@ -8,7 +8,7 @@ import { BlockPalette } from './components/BlockPalette';
 import { BluetoothConnector } from './components/BluetoothConnector';
 import { Workspace } from './components/Workspace';
 import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
-import { MousePointer2, Trash2 } from 'lucide-react';
+import { MousePointer2, Trash2, Bluetooth as BluetoothIcon, Monitor, Sun, Moon } from 'lucide-react';
 
 export const SoundContext = createContext(() => {});
 
@@ -232,22 +232,102 @@ const App: React.FC = () => {
   // NEW: interaction mode state: 'runner' | 'deleter' (default 'runner')
   const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>('runner');
 
+  // NEW: Bluetooth panel open state (controlled by App-level FAB)
+  const [bluetoothOpen, setBluetoothOpen] = useState<boolean>(false);
+
+  // THEME: 'system' | 'light' | 'dark' (default system)
+  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(() => {
+    try {
+      const s = localStorage.getItem('theme') as ('system' | 'light' | 'dark') | null;
+      return s ?? 'system';
+    } catch {
+      return 'system';
+    }
+  });
+
+  // Apply theme to documentElement and listen to system changes if theme === 'system'
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+
+    const apply = () => {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else if (theme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        // system
+        if (mq?.matches) document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      }
+    };
+
+    apply();
+
+    if (theme === 'system' && mq) {
+      const handler = () => apply();
+      if (typeof mq.addEventListener === 'function') {
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+      } else {
+        // older browsers
+        mq.addListener(handler);
+        return () => {
+          mq.removeListener(handler);
+        };
+      }
+    }
+    return;
+  }, [theme]);
+
+  const cycleTheme = () => {
+    const next = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
+    setTheme(next);
+    try { localStorage.setItem('theme', next); } catch { /* empty */ }
+  };
+
+
   return (
     <SoundContext.Provider value={playSnapSound}>
       <div className="h-screen w-screen overflow-hidden relative">
+        {/* Pass open prop so App-level FAB can control the connector panel */}
         <BluetoothConnector
+          open={bluetoothOpen}
           onConnectionChange={setIsBluetoothConnected}
         />
 
-        {/* New FAB placed below the Bluetooth FAB */}
-        <div className="absolute top-20 right-4 z-50">
+        {/* Top-right stacked FABs: consistent gap between each */}
+        <div className="absolute top-4 right-4 z-50 flex flex-col gap-3 items-end">
+          {/* Bluetooth FAB */}
+          <button
+            onClick={() => setBluetoothOpen(prev => !prev)}
+            title="Bluetooth"
+            className="w-12 h-12 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:scale-105"
+            aria-pressed={bluetoothOpen}
+          >
+            <BluetoothIcon className="w-6 h-6" />
+          </button>
+
+          {/* Theme FAB */}
+          <button
+            onClick={cycleTheme}
+            title={`Theme: ${theme}`}
+            className="w-12 h-12 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:scale-105"
+          >
+            {theme === 'system' && <Monitor className="w-6 h-6" />}
+            {theme === 'light' && <Sun className="w-6 h-6" />}
+            {theme === 'dark' && <Moon className="w-6 h-6" />}
+          </button>
+
+          {/* Interaction mode FAB (same gap as others) */}
           <button
             onClick={() => setInteractionMode(prev => prev === 'runner' ? 'deleter' : 'runner')}
             title={interactionMode === 'runner' ? 'Runner mode (default)' : 'Deleter mode (click a block to remove)'}
             className={`
               w-12 h-12 rounded-full shadow-lg transition-all duration-200
               flex items-center justify-center
-              ${interactionMode === 'runner' ? 'bg-white hover:bg-gray-50 text-gray-700' : 'bg-red-500 hover:bg-red-600 text-white'}
+              ${interactionMode === 'runner'
+                ? 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700'
+                : 'bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700'}
             `}
           >
             {interactionMode === 'runner' ? <MousePointer2 className="w-6 h-6" /> : <Trash2 className="w-6 h-6" />}
@@ -271,7 +351,7 @@ const App: React.FC = () => {
         />
         <BlockPalette onBlockDrag={handleDragStart} />
 
-        <div className="fixed right-4 bottom-4 text-xs text-slate-600 bg-white/90 px-3 py-2 rounded-md shadow-sm z-60">
+        <div className="fixed right-4 bottom-4 text-xs text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-900/80 px-3 py-2 rounded-md shadow-sm z-60">
           <div>vw: {viewportWidth}px</div>
           <div>zoom: {zoom.toFixed(2)}</div>
           <div>pan: {Math.round(pan.x)}, {Math.round(pan.y)}</div>

@@ -28,3 +28,28 @@ html, body, #root {
   display: none; /* Chrome, Safari, Opera */
 }
 
+@layer base {
+  :root {
+    --app-bg: #f7f9fc;
+    --app-surface: #ffffff;
+    --app-text: #0f172a;
+  }
+
+  .dark {
+    --app-bg: #071025;
+    --app-surface: #0b1220;
+    --app-text: #e6eef8;
+  }
+
+  html, body, #root {
+    background-color: var(--app-bg);
+    color: var(--app-text);
+  }
+
+  /* Helpful tiny default for card surfaces that use 'bg-white' to look okay in dark: */
+  .bg-surface {
+    background-color: var(--app-surface);
+  }
+}
+
+

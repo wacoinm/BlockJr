@@ -1,3 +1,4 @@
+// src/components/BlockPalette.tsx
 import React, { useRef, useEffect } from "react";
 import { BlockComponent } from "./BlockComponent";
 import { Block } from "../types/Block";
@@ -32,11 +33,12 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     block: Block,
     e: React.MouseEvent | React.TouchEvent
   ) => {
+    // keep the original semantics: long-press (200ms) to start drag for mobile
     e.persist?.();
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
       onBlockDrag(block, e);
-    }, 400);
+    }, 200);
   };
 
   const handlePressEnd = () => {
@@ -50,7 +52,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     <div
       className={
         // mobile-first: fixed bottom bar
-        "fixed left-0 bottom-0 w-full z-40 bg-white shadow-inner border-t border-gray-200 " +
+        "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 shadow-inner border-t border-gray-200 dark:border-slate-700 " +
         // desktop overrides
         "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full md:flex md:items-center md:justify-center md:shadow-lg"
       }
@@ -78,7 +80,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
           >
             <BlockComponent
               block={block}
-              // remove direct onDragStart — we handle it manually after long press
               isPaletteBlock
               style={{ width: 64, height: 64 }}
             />
@@ -88,3 +89,5 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     </div>
   );
 };
+
+export default BlockPalette;

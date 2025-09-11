@@ -1,3 +1,4 @@
+// src/components/BluetoothConnector.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
@@ -12,11 +13,12 @@ interface DeviceItem {
 
 interface BluetoothConnectorProps {
   onConnectionChange?: (isConnected: boolean) => void;
+  open?: boolean; // optional prop to allow parent to control
 }
 
 type ScanError = Error | { message?: string } | string | null | undefined;
 
-export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange }) => {
+export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange, open }) => {
   const isNative = Capacitor.getPlatform() !== 'web';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -25,9 +27,10 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [lastConnectedDevice, setLastConnectedDevice] = useState<DeviceItem | null>(null);
 
-  /**
-   * Check if location services are available (some Android devices require this for Bluetooth scanning)
-   */
+  useEffect(() => {
+    if (typeof open === 'boolean') setIsMenuOpen(open);
+  }, [open]);
+
   async function isLocationAvailable(timeout = 3000): Promise<boolean> {
     if (!isNative) return true;
     if (!('geolocation' in navigator)) return false;
@@ -52,20 +55,15 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     });
   }
 
-  /**
-   * Diagnose scan failure and set helpful statusMessage
-   */
   const diagnoseScanFailure = useCallback(async (scanError?: ScanError) => {
     setStatusMessage('Scan failed — checking permissions and device state...');
     try {
-      // try to ensure/request permissions (best-effort)
       const permsOk = await ensureBluetoothPermissions();
       if (!permsOk) {
         setStatusMessage('Required Bluetooth/location permissions are not granted. Please grant them in app settings.');
         return;
       }
 
-      // check bluetooth enabled
       let bluetoothEnabled = false;
       try {
         const res = await BluetoothSerial.isEnabled();
@@ -79,14 +77,12 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         return;
       }
 
-      // check location
       const locationOk = await isLocationAvailable();
       if (!locationOk) {
         setStatusMessage('Location appears to be OFF or permission denied. Location is required for scanning on some devices.');
         return;
       }
 
-      // else show generic scan error
       let errMsg: string;
 
       if (scanError instanceof Error) {
@@ -106,16 +102,12 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     }
   }, []);
 
-  /**
-   * Connect handler
-   */
   const handleConnect = useCallback(async (device: DeviceItem) => {
     if (isBusy) return;
     setIsBusy(true);
     setStatusMessage(`Connecting to ${device.name ?? device.id}...`);
 
     try {
-      // try to ensure permissions first (best-effort)
       const permsOk = await ensureBluetoothPermissions();
       if (!permsOk) {
         setStatusMessage('Permissions required. Please grant permissions in app settings.');
@@ -136,12 +128,9 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       setStatusMessage(`Connected to ${device.name ?? device.id}`);
       alert(`Connected to ${device.name ?? device.id}`);
 
-      // start listeners
       try {
         await bluetoothService.startDataListener((s) => {
           console.log('[BT UI] onData ->', s);
-          // optionally display incoming data
-          // setStatusMessage(`Received: ${s}`);
         });
       } catch (e) {
         console.warn('startDataListener failed', e);
@@ -155,7 +144,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           onConnectionChange?.(false);
           setStatusMessage('Disconnected from device.');
           alert('Disconnected from device.');
-          // cleanup
           bluetoothService.stopDataListener().catch(() => {});
           bluetoothService.stopEnabledListener().catch(() => {});
           bluetoothService.stopDisconnectListener().catch(() => {});
@@ -189,9 +177,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     }
   }, [isBusy, onConnectionChange]);
 
-  /**
-   * Disconnect handler
-   */
   const handleDisconnect = useCallback(async () => {
     if (isBusy) return;
     setIsBusy(true);
@@ -231,9 +216,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     }
   };
 
-  /**
-   * Periodic connection check when connected
-   */
   useEffect(() => {
     if (!isConnected || !isNative) return;
 
@@ -257,29 +239,23 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       }
     };
 
-    const interval = setInterval(checkConnection, 5000); // Check every 5 seconds
+    const interval = setInterval(checkConnection, 5000);
     return () => clearInterval(interval);
   }, [isConnected, isNative, onConnectionChange]);
 
-  /**
-   * init on mount
-   */
   useEffect(() => {
     const init = async () => {
       try {
         await bluetoothService.initialize();
         if (!isNative) {
           setStatusMessage('Bluetooth Serial is not supported on web.');
-          alert('Bluetooth Serial is not supported on web.');
         }
       } catch (e) {
         console.error('Bluetooth initialization failed', e);
         setStatusMessage('Bluetooth initialization failed (permissions may be required).');
-        alert('Bluetooth initialization failed: ' + String(e));
       }
     };
     init();
-    // cleanup on unmount: stop listeners
     return () => {
       bluetoothService.stopDataListener().catch(() => {});
       bluetoothService.stopEnabledListener().catch(() => {});
@@ -287,9 +263,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     };
   }, [isNative]);
 
-  /**
-   * Scan when menu opens
-   */
   useEffect(() => {
     if (isMenuOpen && !isConnected && isNative) {
       const fetchNearby = async () => {
@@ -322,9 +295,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     }
   }, [isMenuOpen, isConnected, isNative, diagnoseScanFailure]);
 
-  /**
-   * When menu open and connected, verify connection still alive
-   */
   useEffect(() => {
     if (isMenuOpen && isConnected) {
       const checkConn = async () => {
@@ -348,7 +318,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         className={`
           w-12 h-12 rounded-full shadow-lg transition-all duration-300
           flex items-center justify-center relative
-          ${isConnected ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white hover:bg-gray-100 text-gray-600'}
+          ${isConnected ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-100'}
         `}
         aria-label="Bluetooth connector"
         disabled={isBusy}
@@ -356,7 +326,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
         {isBusy && (
           <span className="absolute inset-0 flex items-center justify-center">
             <svg
-              className={`${isConnected ? 'text-white' : 'text-gray-600'} animate-spin h-5 w-5`}
+              className={`${isConnected ? 'text-white' : 'text-gray-100'} animate-spin h-5 w-5`}
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -372,13 +342,15 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
       </button>
 
       {isMenuOpen && (
-        <div className="absolute top-14 right-0 w-72 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
-          <div className="px-4 py-2 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800">Bluetooth</h3>
+        <div className="absolute top-14 right-0 w-72 rounded-lg shadow-xl border py-2"
+             style={{ backgroundColor: document.documentElement.classList.contains('dark') ? '#071025' : '#fff', borderColor: document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,0.06)' : '#e5e7eb' }}
+        >
+          <div className="px-4 py-2 border-b" style={{ borderColor: document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,0.06)' : '#f3f4f6' }}>
+            <h3 className="font-semibold" style={{ color: document.documentElement.classList.contains('dark') ? '#e6eef8' : '#111827' }}>Bluetooth</h3>
           </div>
 
           {statusMessage && (
-            <div className="px-4 py-2 text-sm text-red-600 border-b border-gray-100">
+            <div className="px-4 py-2 text-sm text-red-600 border-b" style={{ borderColor: document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,0.06)' : '#f3f4f6' }}>
               {statusMessage}
               {statusMessage.toLowerCase().includes('off') && (
                 <button onClick={handleEnableBluetooth} className="ml-2 text-blue-600 underline">
@@ -413,40 +385,39 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
           )}
 
           {isConnected ? (
-            <button onClick={handleDisconnect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-red-600">
+            <button onClick={handleDisconnect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-red-600 dark:text-red-400">
               Disconnect
             </button>
           ) : (
             <>
               {isNative ? (
                 <div className="px-4 py-2">
-                  <p className="text-sm text-gray-600 mb-2">Discovered Devices:</p>
-                  {nearbyDevices.length === 0 && <div className="text-sm text-gray-500">No devices found</div>}
+                  <p className="text-sm text-gray-600 dark:text-slate-300 mb-2">Discovered Devices:</p>
+                  {nearbyDevices.length === 0 && <div className="text-sm text-gray-500 dark:text-slate-400">No devices found</div>}
                   {nearbyDevices.map((device) => (
                     <button
                       key={device.id}
                       onClick={() => handleConnect(device)}
                       disabled={isBusy}
-                      className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 text-sm text-gray-700 disabled:opacity-50"
+                      className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-slate-800 text-sm text-gray-700 dark:text-slate-100 disabled:opacity-50"
                     >
                       {device.name ?? 'Unknown'} ({device.id.slice(0, 8)}...)
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="px-4 py-2 text-sm text-gray-600">
+                <div className="px-4 py-2 text-sm text-gray-600 dark:text-slate-300">
                   Not supported on web.
                 </div>
               )}
             </>
           )}
 
-          {/* Recents section */}
           {!isConnected && lastConnectedDevice && (
-            <div className="px-4 py-3 border-t border-gray-100">
-              <h4 className="text-sm font-medium text-gray-700">Recents</h4>
+            <div className="px-4 py-3 border-t" style={{ borderColor: document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,0.06)' : '#f3f4f6' }}>
+              <h4 className="text-sm font-medium" style={{ color: document.documentElement.classList.contains('dark') ? '#e6eef8' : '#111827' }}>Recents</h4>
               <div className="mt-2 flex items-center justify-between">
-                <div className="text-sm text-gray-700">
+                <div className="text-sm" style={{ color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#374151' }}>
                   {lastConnectedDevice.name ?? 'Unknown'}
                   <span className="text-xs text-gray-500 ml-2">({lastConnectedDevice.id.slice(0, 8)}...)</span>
                 </div>
@@ -460,7 +431,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
                   </button>
                   <button
                     onClick={() => setLastConnectedDevice(null)}
-                    className="text-sm px-2 py-1 rounded text-gray-500 hover:bg-gray-50"
+                    className="text-sm px-2 py-1 rounded text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800"
                   >
                     Clear
                   </button>

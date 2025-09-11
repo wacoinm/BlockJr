@@ -9,7 +9,11 @@ import {
   Play,
   RotateCw,
   RotateCcw,
-  X
+  X,
+  Lightbulb,
+  LightbulbOff,
+  Turtle,
+  Rabbit
 } from 'lucide-react';
 import { Block } from '../types/Block';
 import { SoundContext } from '../App';
@@ -61,6 +65,14 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         return 'bg-pink-500 shadow-pink-600 bg-gradient-to-b from-pink-400 to-pink-600 dark:from-fuchsia-700 dark:to-fuchsia-900 dark:shadow-black/40';
       case 'countclockwise':
         return 'bg-teal-500 shadow-teal-600 bg-gradient-to-b from-teal-400 to-teal-600 dark:from-red-700 dark:to-red-900 dark:shadow-black/40';
+      case 'lamp-on':
+        return 'bg-amber-400 shadow-amber-500 bg-gradient-to-b from-amber-300 to-amber-500 dark:from-amber-700 dark:to-amber-900 dark:shadow-black/30';
+      case 'lamp-off':
+        return 'bg-gray-400 shadow-gray-500 bg-gradient-to-b from-gray-300 to-gray-500 dark:from-gray-700 dark:to-gray-900 dark:shadow-black/30';
+      case 'speed-low':
+        return 'bg-cyan-400 shadow-cyan-500 bg-gradient-to-b from-cyan-300 to-cyan-500 dark:from-cyan-700 dark:to-cyan-900 dark:shadow-black/30';
+      case 'speed-high':
+        return 'bg-purple-500 shadow-purple-600 bg-gradient-to-b from-purple-400 to-purple-600 dark:from-purple-700 dark:to-purple-900 dark:shadow-black/40';
       default:
         return 'bg-gray-500 shadow-gray-600 bg-gradient-to-b from-gray-400 to-gray-600 dark:from-slate-700 dark:to-slate-800 dark:shadow-black/30';
     }
@@ -70,7 +82,6 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     const baseIconClass = 'text-white';
 
     if (isPaletteBlock) {
-      // larger / more prominent icons for palette
       switch (block.type) {
         case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
         case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
@@ -80,10 +91,13 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         case 'green-flag': return <Play className={`w-8 h-8 md:w-8 md:h-8 ${baseIconClass}`} />;
         case 'clockwise': return <RotateCw className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
         case 'countclockwise': return <RotateCcw className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
+        case 'lamp-on': return <Lightbulb className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
+        case 'lamp-off': return <LightbulbOff className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
+        case 'speed-low': return <Turtle className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
+        case 'speed-high': return <Rabbit className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
         default: return null;
       }
     } else {
-      // in-canvas icons (slightly smaller)
       switch (block.type) {
         case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
         case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
@@ -93,6 +107,10 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         case 'green-flag': return <Play className={`w-8 h-8 md:w-6 md:h-6 ${baseIconClass}`} />;
         case 'clockwise': return <RotateCw className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
         case 'countclockwise': return <RotateCcw className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'lamp-on': return <Lightbulb className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'lamp-off': return <LightbulbOff className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'speed-low': return <Turtle className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'speed-high': return <Rabbit className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
         default: return null;
       }
     }
@@ -133,24 +151,19 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
 
   const getNotchColor = (type: string) => {
     switch (type) {
-      case 'up':
-        return 'bg-blue-500 dark:bg-blue-800';
-      case 'down':
-        return 'bg-red-500 dark:bg-red-800';
-      case 'delay':
-        return 'bg-yellow-500 dark:bg-amber-700';
-      case 'green-flag':
-        return 'bg-green-500 dark:bg-emerald-800';
-      case 'forward':
-        return 'bg-indigo-500 dark:bg-indigo-800';
-      case 'backward':
-        return 'bg-orange-500 dark:bg-orange-800';
-      case 'clockwise':
-        return 'bg-pink-500 dark:bg-fuchsia-800';
-      case 'countclockwise':
-        return 'bg-teal-500 dark:bg-red-800';
-      default:
-        return 'bg-gray-500 dark:bg-slate-700';
+      case 'up': return 'bg-blue-500 dark:bg-blue-800';
+      case 'down': return 'bg-red-500 dark:bg-red-800';
+      case 'delay': return 'bg-yellow-500 dark:bg-amber-700';
+      case 'green-flag': return 'bg-green-500 dark:bg-emerald-800';
+      case 'forward': return 'bg-indigo-500 dark:bg-indigo-800';
+      case 'backward': return 'bg-orange-500 dark:bg-orange-800';
+      case 'clockwise': return 'bg-pink-500 dark:bg-fuchsia-800';
+      case 'countclockwise': return 'bg-teal-500 dark:bg-red-800';
+      case 'lamp-on': return 'bg-amber-400 dark:bg-amber-700';
+      case 'lamp-off': return 'bg-gray-400 dark:bg-gray-700';
+      case 'speed-low': return 'bg-cyan-400 dark:bg-cyan-700';
+      case 'speed-high': return 'bg-purple-500 dark:bg-purple-700';
+      default: return 'bg-gray-500 dark:bg-slate-700';
     }
   };
 

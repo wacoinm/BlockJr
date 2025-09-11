@@ -11,6 +11,7 @@ interface BlockPaletteProps {
   ) => void;
 }
 
+// Updated paletteBlocks including new blocks
 const paletteBlocks: Block[] = [
   { id: "up-template", type: "up", x: 0, y: 0, parentId: null, childId: null },
   { id: "down-template", type: "down", x: 0, y: 0, parentId: null, childId: null },
@@ -20,16 +21,17 @@ const paletteBlocks: Block[] = [
   { id: "countclockwise-template", type: "countclockwise", x: 0, y: 0, parentId: null, childId: null },
   { id: "delay-template", type: "delay", value: 1, x: 0, y: 0, parentId: null, childId: null },
   { id: "green-flag-template", type: "green-flag", x: 0, y: 0, parentId: null, childId: null },
+  { id: "lamp-on-template", type: "lamp-on", x: 0, y: 0, parentId: null, childId: null },
+  { id: "lamp-off-template", type: "lamp-off", x: 0, y: 0, parentId: null, childId: null },
+  { id: "speed-low-template", type: "speed-low", x: 0, y: 0, parentId: null, childId: null },
+  { id: "speed-high-template", type: "speed-high", x: 0, y: 0, parentId: null, childId: null },
 ];
 
 export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [isOpen, setIsOpen] = useState<boolean>(true);
-
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const [paletteHeight, setPaletteHeight] = useState<number>(0);
-
   const TOGGLE_WIDTH = 34;
 
   useEffect(() => {
@@ -38,7 +40,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
         setPaletteHeight(paletteRef.current.offsetHeight);
       }
     };
-
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
@@ -57,7 +58,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     block: Block,
     e: React.MouseEvent | React.TouchEvent
   ) => {
-    // long-press (200ms) to start drag for mobile
     e.persist?.();
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;

@@ -6,7 +6,11 @@ export type BlockType =
   | "forward"
   | "backward"
   | "clockwise"
-  | "countclockwise";
+  | "countclockwise"
+  | "lamp-on"
+  | "lamp-off"
+  | "speed-low"
+  | "speed-high";
 
 export interface Block {
   id: string;

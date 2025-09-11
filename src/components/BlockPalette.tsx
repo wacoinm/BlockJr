@@ -1,9 +1,12 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import { BlockComponent } from "./BlockComponent";
 import { Block } from "../types/Block";
 
 interface BlockPaletteProps {
-  onBlockDrag: (block: Block, event: React.MouseEvent | React.TouchEvent) => void;
+  onBlockDrag: (
+    block: Block,
+    event: React.MouseEvent | React.TouchEvent | React.DragEvent
+  ) => void;
 }
 
 const paletteBlocks: Block[] = [
@@ -14,18 +17,25 @@ const paletteBlocks: Block[] = [
 ];
 
 export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
-  // store timeout id
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current) {
+        clearTimeout(holdTimer.current);
+        holdTimer.current = null;
+      }
+    };
+  }, []);
 
   const handlePressStart = (
     block: Block,
     e: React.MouseEvent | React.TouchEvent
   ) => {
-    e.persist?.(); // keep synthetic event around
-
-    // start 400ms timer
+    e.persist?.();
     holdTimer.current = setTimeout(() => {
-      onBlockDrag(block, e);
+      holdTimer.current = null;
+      onBlockDrag(block, e as any);
     }, 400);
   };
 
@@ -38,11 +48,23 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
 
   return (
     <div
-      className="fixed left-0 bottom-0 w-full z-40 bg-white shadow-inner border-t border-gray-200 
-                 md:top-4 md:bottom-auto md:w-auto md:left-4 md:flex md:flex-col md:space-y-4"
+      className={
+        // mobile-first: fixed bottom bar
+        "fixed left-0 bottom-0 w-full z-40 bg-white shadow-inner border-t border-gray-200 " +
+        // desktop overrides
+        "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full md:flex md:items-center md:justify-center md:shadow-lg"
+      }
     >
-      {/* Horizontal scroll for mobile */}
-      <div className="flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 md:flex-col md:space-x-0 md:space-y-4 xs:justify-center">
+      <div
+        className={
+          // base mobile: horizontal scroll, left aligned
+          "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
+          // xs+: center items
+          "xs:justify-center " +
+          // desktop: remove scroll, center nicely
+          "md:overflow-visible md:px-4 md:py-3 md:space-x-6 md:justify-center"
+        }
+      >
         {paletteBlocks.map((block) => (
           <div
             key={block.id}

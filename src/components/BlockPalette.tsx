@@ -9,6 +9,7 @@ interface BlockPaletteProps {
     block: Block,
     event: React.MouseEvent | React.TouchEvent | React.DragEvent
   ) => void;
+  selectedProject?: string | null;
 }
 
 // Updated paletteBlocks including new blocks
@@ -27,12 +28,42 @@ const paletteBlocks: Block[] = [
   { id: "speed-high-template", type: "speed-high", x: 0, y: 0, parentId: null, childId: null },
 ];
 
-export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
+export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selectedProject }) => {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isOpen, setIsOpen] = useState<boolean>(true);
+  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const [paletteHeight, setPaletteHeight] = useState<number>(0);
+
   const TOGGLE_WIDTH = 34;
+
+  const [isOpen, setIsOpen] = useState<boolean>(true);
+
+  const projectMap: Record<string, string[]> = {
+    elevator: ["up", "down", "delay"],
+    bulldozer: ["forward", "backward", "clockwise", "countclockwise", "delay"],
+    "lift truck": ["forward", "backward", "clockwise", "countclockwise", "up", "down", "delay"],
+  };
+
+  const alwaysInclude = ["speed-low", "speed-high", "lamp-on", "lamp-off"];
+
+  const typeMap = new Map<string, Block>();
+  for (const b of paletteBlocks) {
+    typeMap.set(b.type, b);
+  }
+
+  const computeTypesForProject = (proj?: string | null): string[] => {
+    if (proj && projectMap[proj]) {
+      return [...projectMap[proj], ...alwaysInclude];
+    } else if (proj && typeof proj === "string") {
+      const allTypes = paletteBlocks.map((b) => b.type);
+      const unique = Array.from(new Set([...allTypes.filter(t => !alwaysInclude.includes(t)), ...alwaysInclude]));
+      return unique;
+    } else {
+      return paletteBlocks.map((b) => b.type);
+    }
+  };
+
+  const [displayedTypes, setDisplayedTypes] = useState<string[]>(() => computeTypesForProject(selectedProject));
 
   useEffect(() => {
     const measure = () => {
@@ -47,40 +78,50 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
 
   useEffect(() => {
     return () => {
-      if (holdTimer.current) {
-        clearTimeout(holdTimer.current);
-        holdTimer.current = null;
-      }
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      if (swapTimer.current) clearTimeout(swapTimer.current);
     };
   }, []);
 
-  const handlePressStart = (
-    block: Block,
-    e: React.MouseEvent | React.TouchEvent
-  ) => {
-    e.persist?.();
+  useEffect(() => {
+    const nextTypes = computeTypesForProject(selectedProject);
+    const equal =
+      nextTypes.length === displayedTypes.length &&
+      nextTypes.every((t, i) => t === displayedTypes[i]);
+    if (equal) return;
+
+    setIsOpen(false);
+    const paletteTransitionMs = 380;
+    const buffer = 60;
+    if (swapTimer.current) clearTimeout(swapTimer.current);
+    swapTimer.current = setTimeout(() => {
+      setDisplayedTypes(nextTypes);
+      requestAnimationFrame(() => setIsOpen(true));
+    }, paletteTransitionMs + buffer);
+  }, [selectedProject, displayedTypes]);
+
+  const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
-      onBlockDrag(block, e);
+      onBlockDrag(block, e as any);
     }, 200);
   };
 
   const handlePressEnd = () => {
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
+    if (holdTimer.current) clearTimeout(holdTimer.current);
   };
 
   const toggleOpen = useCallback(() => {
     setIsOpen((s) => !s);
   }, []);
 
-  const paletteTransform = isOpen
-    ? "translateY(0)"
-    : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
-
+  const paletteTransform = isOpen ? "translateY(0)" : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
   const paletteTransition = "transform 380ms cubic-bezier(.2,.9,.2,1)";
+
+  const filteredBlocks: Block[] = displayedTypes
+    .map((t) => typeMap.get(t))
+    .filter((b): b is Block => !!b);
 
   return (
     <>
@@ -125,12 +166,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
           "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 " +
           "shadow-inner border-t border-gray-200 dark:border-slate-700 " +
           "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full " +
-          "md:flex md:items-center md:justify-center md:shadow-lg"
+          "md:flex md:items-center md:justify-center md:shadow-lg ml-10"
         }
         style={{
           transform: paletteTransform,
           transition: paletteTransition,
-          paddingLeft: TOGGLE_WIDTH + 8,
         }}
       >
         <div
@@ -141,13 +181,13 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
             "md:overflow-visible md:px-4 md:py-3 md:space-x-6 md:justify-center"
           }
           style={{
-            willChange: "transform, opacity",
+            paddingLeft: TOGGLE_WIDTH + 18, 
           }}
         >
-          {paletteBlocks.map((block, idx) => {
+          {filteredBlocks.map((block, idx) => {
             const baseDelay = 40;
             const openDelay = idx * baseDelay;
-            const closeDelay = (paletteBlocks.length - idx) * 28;
+            const closeDelay = (filteredBlocks.length - idx) * 28;
             const appliedDelay = isOpen ? openDelay : closeDelay;
 
             const scale = isOpen ? 1 : 0.62;
@@ -184,6 +224,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
           })}
         </div>
       </div>
+
     </>
   );
 };

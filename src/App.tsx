@@ -24,6 +24,8 @@ import {
   Moon,
   Menu,
   X,
+  FolderOpenDot,
+  FolderKanban
 } from 'lucide-react';
 
 export const SoundContext = createContext(() => {});
@@ -288,6 +290,44 @@ const App: React.FC = () => {
     useState<'runner' | 'deleter'>('runner');
   const [bluetoothOpen, setBluetoothOpen] = useState(false);
 
+  // --- Select Project popup states & animation config ---
+  const [selectVisible, setSelectVisible] = useState(false); // mounted
+  const [selectOpen, setSelectOpen] = useState(false); // animating / visible
+  const [selectedProject, setSelectedProject] = useState<string | null>("elevator");
+
+  // animation timing (ms)
+  const ITEM_STAGGER = 80;
+  const BASE_DURATION = 220;
+  const ITEM_DURATION = 180;
+  const totalCloseDelay = BASE_DURATION + ITEM_STAGGER * 2 + 40; // ~ safe unmount time
+
+  // open popup: mount then open (to trigger transitions)
+  const openSelectPopup = useCallback(() => {
+    setSelectVisible(true);
+    // next frame -> set open to true to run transitions
+    requestAnimationFrame(() => {
+      setSelectOpen(true);
+    });
+  }, []);
+
+  // close popup: trigger closing animation then unmount after animations complete
+  const closeSelectPopup = useCallback(() => {
+    setSelectOpen(false);
+    // unmount after animation + stagger
+    setTimeout(() => {
+      setSelectVisible(false);
+    }, totalCloseDelay);
+  }, [totalCloseDelay]);
+
+  // keyboard ESC to close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectVisible) closeSelectPopup();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectVisible, closeSelectPopup]);
+
   // theme
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(() => {
     try {
@@ -357,7 +397,25 @@ const App: React.FC = () => {
           <Trash2 className="w-6 h-6" />
         ),
     },
+    // NEW: Select Project FAB (appears under interaction)
+    {
+      key: 'selectProject',
+      onClick: () => {
+        if (!selectVisible) openSelectPopup();
+        else closeSelectPopup();
+      },
+      content: <FolderOpenDot className="w-6 h-6" />,
+    },
   ];
+
+  // project list
+  const projects = ['elevator', 'bulldozer', 'lift truck'];
+
+  const handleProjectSelect = (proj: string) => {
+    setSelectedProject(proj);
+    // you can trigger project loading logic here
+    closeSelectPopup();
+  };
 
   return (
     <SoundContext.Provider value={playSnapSound}>
@@ -371,6 +429,7 @@ const App: React.FC = () => {
         <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-3">
           {/* Hamburger */}
           <button
+            type="button"
             onClick={() => setMenuOpen((p) => !p)}
             className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 transition-transform duration-200 hover:scale-105"
           >
@@ -394,9 +453,9 @@ const App: React.FC = () => {
             return (
               <button
                 key={f.key}
+                type="button"
                 onClick={() => {
                   f.onClick();
-                  // setMenuOpen(false);
                 }}
                 style={{ transitionDelay: `${delay}ms` }}
                 className={`
@@ -420,6 +479,97 @@ const App: React.FC = () => {
           })}
         </div>
 
+        {/* Select Project popup: anchored upper-right with higher z-index */}
+        {selectVisible && (
+          <div
+            // container (covers whole screen, but panel anchored top-right)
+            className="fixed inset-0 z-[88] pointer-events-auto"
+            onClick={(e) => {
+              // clicking truly outside should close
+              if (e.target === e.currentTarget) closeSelectPopup();
+            }}
+            aria-modal="true"
+            role="dialog"
+          >
+            {/* backdrop (below panel) */}
+            <div
+              className={`absolute inset-0 bg-black transition-opacity`}
+              style={{
+                zIndex: 88,
+                transitionDuration: `${BASE_DURATION}ms`,
+                opacity: selectOpen ? 0.36 : 0,
+              }}
+            />
+
+            {/* Panel anchored near the top-right (above the FABs) */}
+            <div
+              className="absolute right-6 top-20"
+              style={{ zIndex: 90 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                // panel
+                className={`relative w-64 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl p-4 transform origin-top-right`}
+                style={{
+                  transitionProperty: 'transform, opacity',
+                  transitionDuration: `${BASE_DURATION}ms`,
+                  transform: selectOpen ? 'translateY(0px) scale(1)' : 'translateY(6px) scale(0.96)',
+                  opacity: selectOpen ? 1 : 0,
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className='flex gap-1 items-center'>
+                    <FolderKanban className='w-5 h-5' />
+                    <div className="text-sm font-semibold">Projects</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeSelectPopup();
+                    }}
+                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700"
+                    aria-label="Close select project"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {projects.map((p, i) => {
+                    // stagger delay top->down when opening,
+                    // when closing we reverse order for nicer effect
+                    const openDelay = i * ITEM_STAGGER;
+                    const closeDelay = (projects.length - 1 - i) * ITEM_STAGGER;
+                    const delay = selectOpen ? openDelay : closeDelay;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => handleProjectSelect(p)}
+                        className="w-full text-left px-3 py-2 rounded-lg transform transition-all"
+                        style={{
+                          transitionProperty: 'transform, opacity',
+                          transitionDuration: `${ITEM_DURATION}ms`,
+                          transitionDelay: `${delay}ms`,
+                          transform: selectOpen ? 'translateY(0px) scale(1)' : 'translateY(-6px) scale(0.96)',
+                          opacity: selectOpen ? 1 : 0,
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <div className="text-sm capitalize">{p}</div>
+                        {selectedProject === p && (
+                          <div className="text-xs text-slate-500">Selected</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Workspace
           blocks={blocks}
           isDragging={isDragging}
@@ -435,13 +585,16 @@ const App: React.FC = () => {
           onZoom={zoomBy}
           interactionMode={interactionMode}
         />
-        <BlockPalette onBlockDrag={handleDragStart} />
+        <BlockPalette onBlockDrag={handleDragStart} selectedProject={selectedProject} />
 
         <div className="fixed right-4 bottom-4 text-xs text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-900/80 px-3 py-2 rounded-md shadow-sm z-60">
           <div>vw: {viewportWidth}px</div>
           <div>zoom: {zoom.toFixed(2)}</div>
           <div>
             pan: {Math.round(pan.x)}, {Math.round(pan.y)}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            project: {selectedProject ?? 'none'}
           </div>
         </div>
       </div>

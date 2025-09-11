@@ -1,7 +1,8 @@
 // src/components/BlockPalette.tsx
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { BlockComponent } from "./BlockComponent";
 import { Block } from "../types/Block";
+import { ChevronDown } from "lucide-react";
 
 interface BlockPaletteProps {
   onBlockDrag: (
@@ -20,6 +21,25 @@ const paletteBlocks: Block[] = [
 export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [isOpen, setIsOpen] = useState<boolean>(true);
+
+  const paletteRef = useRef<HTMLDivElement | null>(null);
+  const [paletteHeight, setPaletteHeight] = useState<number>(0);
+
+  const TOGGLE_WIDTH = 34;
+
+  useEffect(() => {
+    const measure = () => {
+      if (paletteRef.current) {
+        setPaletteHeight(paletteRef.current.offsetHeight);
+      }
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (holdTimer.current) {
@@ -33,7 +53,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     block: Block,
     e: React.MouseEvent | React.TouchEvent
   ) => {
-    // keep the original semantics: long-press (200ms) to start drag for mobile
+    // long-press (200ms) to start drag for mobile
     e.persist?.();
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
@@ -48,45 +68,119 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     }
   };
 
+  const toggleOpen = useCallback(() => {
+    setIsOpen((s) => !s);
+  }, []);
+
+  const paletteTransform = isOpen
+    ? "translateY(0)"
+    : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
+
+  const paletteTransition = "transform 380ms cubic-bezier(.2,.9,.2,1)";
+
   return (
-    <div
-      className={
-        // mobile-first: fixed bottom bar
-        "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 shadow-inner border-t border-gray-200 dark:border-slate-700 " +
-        // desktop overrides
-        "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full md:flex md:items-center md:justify-center md:shadow-lg"
-      }
-    >
+    <>
+      {/* Toggle button */}
+      <button
+        aria-expanded={isOpen}
+        aria-label={isOpen ? "Close palette" : "Open palette"}
+        onClick={toggleOpen}
+        className="fixed left-0 bottom-0 z-50 focus:outline-none"
+        style={{
+          height: paletteHeight || 72,
+          width: TOGGLE_WIDTH,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          className="flex items-center justify-center rounded-r-md shadow-sm 
+                     bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
+          style={{
+            width: TOGGLE_WIDTH - 8,
+            height: (paletteHeight || 72) - 12,
+            backdropFilter: "blur(6px)",
+            boxShadow: "0 6px 20px rgba(2,6,23,0.08)",
+            transition: "transform 260ms cubic-bezier(.2,.9,.2,1), background 200ms",
+          }}
+        >
+          <ChevronDown
+            size={18}
+            className="text-slate-900 dark:text-slate-100 transition-transform duration-300"
+            style={{
+              transform: `rotate(${isOpen ? 0 : 180}deg)`,
+            }}
+          />
+        </div>
+      </button>
+
+      {/* Palette container */}
       <div
         className={
-          // base mobile: horizontal scroll, left aligned
-          "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
-          // xs+: center items
-          "xs:justify-center " +
-          // desktop: remove scroll, center nicely
-          "md:overflow-visible md:px-4 md:py-3 md:space-x-6 md:justify-center"
+          "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 " +
+          "shadow-inner border-t border-gray-200 dark:border-slate-700 " +
+          "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full " +
+          "md:flex md:items-center md:justify-center md:shadow-lg"
         }
+        style={{
+          transform: paletteTransform,
+          transition: paletteTransition,
+          paddingLeft: TOGGLE_WIDTH + 8,
+        }}
       >
-        {paletteBlocks.map((block) => (
-          <div
-            key={block.id}
-            className="flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
-            onMouseDown={(e) => handlePressStart(block, e)}
-            onMouseUp={handlePressEnd}
-            onMouseLeave={handlePressEnd}
-            onTouchStart={(e) => handlePressStart(block, e)}
-            onTouchEnd={handlePressEnd}
-            onTouchCancel={handlePressEnd}
-          >
-            <BlockComponent
-              block={block}
-              isPaletteBlock
-              style={{ width: 64, height: 64 }}
-            />
-          </div>
-        ))}
+        <div
+          ref={paletteRef}
+          className={
+            "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
+            "xs:justify-center " +
+            "md:overflow-visible md:px-4 md:py-3 md:space-x-6 md:justify-center"
+          }
+          style={{
+            willChange: "transform, opacity",
+          }}
+        >
+          {paletteBlocks.map((block, idx) => {
+            const baseDelay = 40;
+            const openDelay = idx * baseDelay;
+            const closeDelay = (paletteBlocks.length - idx) * 28;
+            const appliedDelay = isOpen ? openDelay : closeDelay;
+
+            const scale = isOpen ? 1 : 0.62;
+            const opacity = isOpen ? 1 : 0;
+            const translateY = isOpen ? "0px" : "6px";
+
+            return (
+              <div
+                key={block.id}
+                className="flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+                onMouseDown={(e) => handlePressStart(block, e)}
+                onMouseUp={handlePressEnd}
+                onMouseLeave={handlePressEnd}
+                onTouchStart={(e) => handlePressStart(block, e)}
+                onTouchEnd={handlePressEnd}
+                onTouchCancel={handlePressEnd}
+                style={{
+                  transitionProperty: "transform, opacity",
+                  transitionDuration: "360ms",
+                  transitionTimingFunction: "cubic-bezier(.2,.9,.2,1)",
+                  transitionDelay: `${appliedDelay}ms`,
+                  transform: `translateY(${translateY}) scale(${scale})`,
+                  opacity,
+                  willChange: "transform, opacity",
+                }}
+              >
+                <BlockComponent
+                  block={block}
+                  isPaletteBlock
+                  style={{ width: 64, height: 64 }}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

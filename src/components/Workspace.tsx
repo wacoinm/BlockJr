@@ -1,3 +1,4 @@
+// src/components/Workspace.tsx
 import React, { useRef, useState, useMemo } from 'react';
 import { Block } from '../types/Block';
 import { BlockComponent } from './BlockComponent';
@@ -20,6 +21,9 @@ interface WorkspaceProps {
 
   pinchSensitivity?: number; // 0..1
   pinchMaxStep?: number;     // max per-step multiplier
+
+  // NEW: interaction mode. 'runner' means normal (default). 'deleter' means clicking a component removes it.
+  interactionMode?: 'runner' | 'deleter';
 }
 
 export const Workspace: React.FC<WorkspaceProps> = ({
@@ -39,6 +43,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   gridCellSize = 72,
   pinchSensitivity = 0.5,
   pinchMaxStep = 1.12,
+  interactionMode = 'runner',
 }) => {
   const panState = useRef<{ active: boolean; lastX: number; lastY: number; pointerId?: number | null }>({
     active: false,
@@ -253,7 +258,18 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                   pointerEvents: 'auto',
                   touchAction: 'none',
                 }}
-                onPointerDownCapture={(e) => onBlockDragStart(block, e)}
+                onPointerDownCapture={(e: React.PointerEvent) => {
+                  // If deleter mode — remove immediately and prevent drag start
+                  if (interactionMode === 'deleter') {
+                    // stop anything else from handling this pointer (including your drag hook)
+                    try { e.stopPropagation(); } catch { /* empty */ }
+                    try { e.preventDefault(); } catch { /* empty */ }
+                    onBlockRemove(block.id);
+                    return;
+                  }
+                  // Otherwise, forward to the drag start handler (which will call your hook)
+                  onBlockDragStart(block, e);
+                }}
               >
                 <BlockComponent
                   block={block}

@@ -8,6 +8,7 @@ import { BlockPalette } from './components/BlockPalette';
 import { BluetoothConnector } from './components/BluetoothConnector';
 import { Workspace } from './components/Workspace';
 import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
+import { MousePointer2, Trash2 } from 'lucide-react';
 
 export const SoundContext = createContext(() => {});
 
@@ -228,12 +229,31 @@ const App: React.FC = () => {
     playSnapSound();
   }, [blocksMap, getChain, playSnapSound]);
 
+  // NEW: interaction mode state: 'runner' | 'deleter' (default 'runner')
+  const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>('runner');
+
   return (
     <SoundContext.Provider value={playSnapSound}>
       <div className="h-screen w-screen overflow-hidden relative">
-        <BluetoothConnector 
+        <BluetoothConnector
           onConnectionChange={setIsBluetoothConnected}
         />
+
+        {/* New FAB placed below the Bluetooth FAB */}
+        <div className="absolute top-20 right-4 z-50">
+          <button
+            onClick={() => setInteractionMode(prev => prev === 'runner' ? 'deleter' : 'runner')}
+            title={interactionMode === 'runner' ? 'Runner mode (default)' : 'Deleter mode (click a block to remove)'}
+            className={`
+              w-12 h-12 rounded-full shadow-lg transition-all duration-200
+              flex items-center justify-center
+              ${interactionMode === 'runner' ? 'bg-white hover:bg-gray-50 text-gray-700' : 'bg-red-500 hover:bg-red-600 text-white'}
+            `}
+          >
+            {interactionMode === 'runner' ? <MousePointer2 className="w-6 h-6" /> : <Trash2 className="w-6 h-6" />}
+          </button>
+        </div>
+
         <Workspace
           blocks={blocks}
           isDragging={isDragging}
@@ -247,6 +267,7 @@ const App: React.FC = () => {
           zoom={zoom}
           onPan={panBy}
           onZoom={zoomBy}
+          interactionMode={interactionMode} // <-- new prop
         />
         <BlockPalette onBlockDrag={handleDragStart} />
 

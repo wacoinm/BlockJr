@@ -28,27 +28,51 @@ const paletteBlocks: Block[] = [
   { id: "speed-high-template", type: "speed-high", x: 0, y: 0, parentId: null, childId: null },
 ];
 
-export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
+export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selectedProject }) => {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const [paletteHeight, setPaletteHeight] = useState<number>(0);
 
   const TOGGLE_WIDTH = 34;
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
-  // Always show ALL block types in the palette (user requested "show all blocks")
-  const allTypes = paletteBlocks.map((b) => b.type);
+  // Project -> types mapping
+  const projectMap: Record<string, string[]> = {
+    elevator: ["green-flag", "up", "down", "delay"],
+    bulldozer: ["green-flag", "forward", "backward", "clockwise", "countclockwise", "delay"],
+    "lift truck": ["green-flag", "forward", "backward", "clockwise", "countclockwise", "up", "down", "delay"],
+  };
 
-  // Map type -> block (for quick lookup)
+  const alwaysInclude = ["speed-low", "speed-high", "lamp-on", "lamp-off"];
+
+  // helper map type -> block for quick lookup
   const typeMap: Record<string, Block> = {};
   for (const b of paletteBlocks) {
     typeMap[b.type] = b;
   }
 
-  // displayedTypes contains all block types (no project filtering)
-  const [displayedTypes] = useState<string[]>(allTypes);
+  const computeTypesForProject = (proj?: string | null): string[] => {
+    const allTypes = paletteBlocks.map((b) => b.type);
 
-  // Measure palette height so the toggle button can match it
+    if (proj && projectMap[proj]) {
+      // project-specific ordering, but ensure alwaysInclude are appended once
+      return Array.from(new Set([...(projectMap[proj] || []), ...alwaysInclude]));
+    } else if (proj && typeof proj === "string") {
+      // project string provided but not in map => show everything (but keep alwaysInclude present)
+      // keep project-agnostic ordering: allTypes but ensure alwaysInclude at the end (unique)
+      const unique = Array.from(new Set([...allTypes.filter((t) => !alwaysInclude.includes(t)), ...alwaysInclude]));
+      return unique;
+    } else {
+      // no project selected: show all types (original order)
+      return allTypes;
+    }
+  };
+
+  // displayedTypes is the current list of block types shown in the palette
+  const [displayedTypes, setDisplayedTypes] = useState<string[]>(() => computeTypesForProject(selectedProject));
+
+  // Measure palette height so toggle button matches it
   useEffect(() => {
     const measure = () => {
       if (paletteRef.current) {
@@ -60,18 +84,42 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (holdTimer.current) clearTimeout(holdTimer.current);
+      if (swapTimer.current) clearTimeout(swapTimer.current);
     };
   }, []);
+
+  // If selectedProject changes, animate palette close, swap types, then open
+  useEffect(() => {
+    const nextTypes = computeTypesForProject(selectedProject);
+
+    const equal =
+      nextTypes.length === displayedTypes.length &&
+      nextTypes.every((t, i) => t === displayedTypes[i]);
+    if (equal) return;
+
+    // close palette, swap array after transition, then open
+    setIsOpen(false);
+    const paletteTransitionMs = 380;
+    const buffer = 60;
+    if (swapTimer.current) clearTimeout(swapTimer.current);
+    swapTimer.current = setTimeout(() => {
+      setDisplayedTypes(nextTypes);
+      // ensure the re-open animation runs in the next frame
+      requestAnimationFrame(() => setIsOpen(true));
+      swapTimer.current = null;
+    }, paletteTransitionMs + buffer);
+  }, [selectedProject, displayedTypes]);
 
   const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     // small hold delay to start drag
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
-      onBlockDrag(block, e);
+      onBlockDrag(block, e as any);
     }, 200);
   };
 
@@ -89,6 +137,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
   const paletteTransform = isOpen ? "translateY(0)" : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
   const paletteTransition = "transform 380ms cubic-bezier(.2,.9,.2,1)";
 
+  // Build filtered blocks in the order of displayedTypes
   const filteredBlocks: Block[] = displayedTypes
     .map((t) => typeMap[t])
     .filter((b): b is Block => !!b);
@@ -160,7 +209,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
             paddingLeft: 18,
             paddingRight: 18,
             // ensure touch scrolling is smooth
-            WebkitOverflowScrolling: "touch",
+            WebkitOverflowScrolling: "touch" as any,
           }}
         >
           <div style={{ minWidth: 8 }} />

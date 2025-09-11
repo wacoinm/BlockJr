@@ -35,7 +35,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
     e.persist?.();
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
-      onBlockDrag(block, e as any);
+      onBlockDrag(block, e);
     }, 400);
   };
 

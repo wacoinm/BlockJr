@@ -1,4 +1,12 @@
-export type BlockType = 'up' | 'down' | 'delay' | 'green-flag';
+export type BlockType =
+  | "up"
+  | "down"
+  | "delay"
+  | "green-flag"
+  | "forward"
+  | "backward"
+  | "clockwise"
+  | "countclockwise";
 
 export interface Block {
   id: string;

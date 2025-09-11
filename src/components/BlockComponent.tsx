@@ -1,5 +1,16 @@
+// src/components/BlockComponent.tsx
 import React, { useState, useContext, useEffect } from 'react';
-import { ArrowBigUpDash, ArrowBigDownDash, Clock, Play, X } from 'lucide-react';
+import {
+  ArrowBigUpDash,
+  ArrowBigDownDash,
+  ArrowBigRightDash,
+  ArrowBigLeftDash,
+  Clock,
+  Play,
+  RotateCw,
+  RotateCcw,
+  X
+} from 'lucide-react';
 import { Block } from '../types/Block';
 import { SoundContext } from '../App';
 
@@ -42,6 +53,14 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         return 'bg-yellow-500 shadow-yellow-600 bg-gradient-to-b from-yellow-300 to-yellow-500 dark:from-amber-700 dark:to-amber-800 dark:shadow-black/30';
       case 'green-flag':
         return 'bg-green-500 shadow-green-600 bg-gradient-to-b from-green-400 to-green-600 dark:from-emerald-700 dark:to-emerald-900 dark:shadow-black/30';
+      case 'forward':
+        return 'bg-indigo-500 shadow-indigo-600 bg-gradient-to-b from-indigo-400 to-indigo-600 dark:from-indigo-700 dark:to-indigo-900 dark:shadow-black/40';
+      case 'backward':
+        return 'bg-orange-500 shadow-orange-600 bg-gradient-to-b from-orange-400 to-orange-600 dark:from-orange-700 dark:to-orange-900 dark:shadow-black/40';
+      case 'clockwise':
+        return 'bg-pink-500 shadow-pink-600 bg-gradient-to-b from-pink-400 to-pink-600 dark:from-fuchsia-700 dark:to-fuchsia-900 dark:shadow-black/40';
+      case 'countclockwise':
+        return 'bg-teal-500 shadow-teal-600 bg-gradient-to-b from-teal-400 to-teal-600 dark:from-red-700 dark:to-red-900 dark:shadow-black/40';
       default:
         return 'bg-gray-500 shadow-gray-600 bg-gradient-to-b from-gray-400 to-gray-600 dark:from-slate-700 dark:to-slate-800 dark:shadow-black/30';
     }
@@ -51,19 +70,29 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     const baseIconClass = 'text-white';
 
     if (isPaletteBlock) {
+      // larger / more prominent icons for palette
       switch (block.type) {
         case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
         case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'forward': return <ArrowBigRightDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'backward': return <ArrowBigLeftDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
         case 'delay': return <Clock className={`w-8 h-8 md:w-8 md:h-8 ${baseIconClass}`} />;
         case 'green-flag': return <Play className={`w-8 h-8 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'clockwise': return <RotateCw className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
+        case 'countclockwise': return <RotateCcw className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
         default: return null;
       }
     } else {
+      // in-canvas icons (slightly smaller)
       switch (block.type) {
         case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
         case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'forward': return <ArrowBigRightDash className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
+        case 'backward': return <ArrowBigLeftDash className={`w-8 h-8 md:w-10 md:h-10 ${baseIconClass}`} />;
         case 'delay': return <Clock className={`w-8 h-8 md:w-6 md:h-6 ${baseIconClass}`} />;
         case 'green-flag': return <Play className={`w-8 h-8 md:w-6 md:h-6 ${baseIconClass}`} />;
+        case 'clockwise': return <RotateCw className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'countclockwise': return <RotateCcw className={`w-7 h-7 md:w-8 md:h-8 ${baseIconClass}`} />;
         default: return null;
       }
     }
@@ -112,14 +141,22 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         return 'bg-yellow-500 dark:bg-amber-700';
       case 'green-flag':
         return 'bg-green-500 dark:bg-emerald-800';
+      case 'forward':
+        return 'bg-indigo-500 dark:bg-indigo-800';
+      case 'backward':
+        return 'bg-orange-500 dark:bg-orange-800';
+      case 'clockwise':
+        return 'bg-pink-500 dark:bg-fuchsia-800';
+      case 'countclockwise':
+        return 'bg-teal-500 dark:bg-red-800';
       default:
         return 'bg-gray-500 dark:bg-slate-700';
     }
   };
 
   const rightNotchBase = isPaletteBlock
-  ? `absolute -right-3 top-1/2 transform -translate-y-1/2 w-4 h-8 md:w-5 md:h-10 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`
-  : `absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`;
+    ? `absolute -right-3 top-1/2 transform -translate-y-1/2 w-4 h-8 md:w-5 md:h-10 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`
+    : `absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`;
 
   return (
     <div className="relative group" style={style}>
@@ -194,3 +231,5 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     </div>
   );
 };
+
+export default BlockComponent;

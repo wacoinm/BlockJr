@@ -14,6 +14,10 @@ interface BlockPaletteProps {
 const paletteBlocks: Block[] = [
   { id: "up-template", type: "up", x: 0, y: 0, parentId: null, childId: null },
   { id: "down-template", type: "down", x: 0, y: 0, parentId: null, childId: null },
+  { id: "forward-template", type: "forward", x: 0, y: 0, parentId: null, childId: null },
+  { id: "backward-template", type: "backward", x: 0, y: 0, parentId: null, childId: null },
+  { id: "clockwise-template", type: "clockwise", x: 0, y: 0, parentId: null, childId: null },
+  { id: "countclockwise-template", type: "countclockwise", x: 0, y: 0, parentId: null, childId: null },
   { id: "delay-template", type: "delay", value: 1, x: 0, y: 0, parentId: null, childId: null },
   { id: "green-flag-template", type: "green-flag", x: 0, y: 0, parentId: null, childId: null },
 ];

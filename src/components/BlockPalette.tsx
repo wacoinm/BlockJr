@@ -12,7 +12,7 @@ interface BlockPaletteProps {
   selectedProject?: string | null;
 }
 
-// Updated paletteBlocks including new blocks
+// Palette blocks (all blocks are present here)
 const paletteBlocks: Block[] = [
   { id: "up-template", type: "up", x: 0, y: 0, parentId: null, childId: null },
   { id: "down-template", type: "down", x: 0, y: 0, parentId: null, childId: null },
@@ -28,43 +28,27 @@ const paletteBlocks: Block[] = [
   { id: "speed-high-template", type: "speed-high", x: 0, y: 0, parentId: null, childId: null },
 ];
 
-export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selectedProject }) => {
+export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag }) => {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const [paletteHeight, setPaletteHeight] = useState<number>(0);
 
   const TOGGLE_WIDTH = 34;
-
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
-  const projectMap: Record<string, string[]> = {
-    elevator: ["green-flag", "up", "down", "delay"],
-    bulldozer: ["green-flag", "forward", "backward", "clockwise", "countclockwise", "delay"],
-    "lift truck": ["green-flag", "forward", "backward", "clockwise", "countclockwise", "up", "down", "delay"],
-  };
+  // Always show ALL block types in the palette (user requested "show all blocks")
+  const allTypes = paletteBlocks.map((b) => b.type);
 
-  const alwaysInclude = ["speed-low", "speed-high", "lamp-on", "lamp-off"];
-
-  const typeMap = new Map<string, Block>();
+  // Map type -> block (for quick lookup)
+  const typeMap: Record<string, Block> = {};
   for (const b of paletteBlocks) {
-    typeMap.set(b.type, b);
+    typeMap[b.type] = b;
   }
 
-  const computeTypesForProject = (proj?: string | null): string[] => {
-    if (proj && projectMap[proj]) {
-      return [...projectMap[proj], ...alwaysInclude];
-    } else if (proj && typeof proj === "string") {
-      const allTypes = paletteBlocks.map((b) => b.type);
-      const unique = Array.from(new Set([...allTypes.filter(t => !alwaysInclude.includes(t)), ...alwaysInclude]));
-      return unique;
-    } else {
-      return paletteBlocks.map((b) => b.type);
-    }
-  };
+  // displayedTypes contains all block types (no project filtering)
+  const [displayedTypes] = useState<string[]>(allTypes);
 
-  const [displayedTypes, setDisplayedTypes] = useState<string[]>(() => computeTypesForProject(selectedProject));
-
+  // Measure palette height so the toggle button can match it
   useEffect(() => {
     const measure = () => {
       if (paletteRef.current) {
@@ -79,37 +63,23 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   useEffect(() => {
     return () => {
       if (holdTimer.current) clearTimeout(holdTimer.current);
-      if (swapTimer.current) clearTimeout(swapTimer.current);
     };
   }, []);
 
-  useEffect(() => {
-    const nextTypes = computeTypesForProject(selectedProject);
-    const equal =
-      nextTypes.length === displayedTypes.length &&
-      nextTypes.every((t, i) => t === displayedTypes[i]);
-    if (equal) return;
-
-    setIsOpen(false);
-    const paletteTransitionMs = 380;
-    const buffer = 60;
-    if (swapTimer.current) clearTimeout(swapTimer.current);
-    swapTimer.current = setTimeout(() => {
-      setDisplayedTypes(nextTypes);
-      requestAnimationFrame(() => setIsOpen(true));
-    }, paletteTransitionMs + buffer);
-  }, [selectedProject, displayedTypes]);
-
   const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
+    // small hold delay to start drag
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
-      onBlockDrag(block, e as any);
+      onBlockDrag(block, e);
     }, 200);
   };
 
   const handlePressEnd = () => {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
   };
 
   const toggleOpen = useCallback(() => {
@@ -120,7 +90,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   const paletteTransition = "transform 380ms cubic-bezier(.2,.9,.2,1)";
 
   const filteredBlocks: Block[] = displayedTypes
-    .map((t) => typeMap.get(t))
+    .map((t) => typeMap[t])
     .filter((b): b is Block => !!b);
 
   return (
@@ -165,25 +135,35 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
         className={
           "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 " +
           "shadow-inner border-t border-gray-200 dark:border-slate-700 " +
-          "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full " +
-          "md:flex md:items-center md:justify-center md:shadow-lg ml-10"
+          "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full md:shadow-lg"
         }
         style={{
           transform: paletteTransform,
           transition: paletteTransition,
         }}
       >
+        {/* 
+          Inner scroll area:
+          - always allow horizontal scrolling (overflow-x-auto) on all sizes including desktop
+          - add extra left/right padding so blocks can scroll partially into view
+          - keep items inline with flex, and prevent wrapping
+        */}
         <div
           ref={paletteRef}
           className={
             "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
-            "xs:justify-center " +
-            "md:overflow-visible md:px-4 md:py-3 md:space-x-6 md:justify-center"
+            "xs:justify-start md:justify-start ml-1"
           }
           style={{
-            paddingLeft: TOGGLE_WIDTH + 18, 
+            // Add extra horizontal padding so user can scroll blocks slightly off-edge.
+            // Adjust values if you want more/less 'peek' space.
+            paddingLeft: 18,
+            paddingRight: 18,
+            // ensure touch scrolling is smooth
+            WebkitOverflowScrolling: "touch",
           }}
         >
+          <div style={{ minWidth: 8 }} />
           {filteredBlocks.map((block, idx) => {
             const baseDelay = 40;
             const openDelay = idx * baseDelay;
@@ -222,9 +202,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
               </div>
             );
           })}
+          <div style={{ minWidth: 8 }} />
         </div>
       </div>
-
     </>
   );
 };

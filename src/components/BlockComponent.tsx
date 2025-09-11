@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Clock, Play, X } from 'lucide-react';
+import { ArrowBigUpDash, ArrowBigDownDash, Clock, Play, X } from 'lucide-react';
 import { Block } from '../types/Block';
 import { SoundContext } from '../App';
 
@@ -54,18 +54,18 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     if (isPaletteBlock) {
       // bigger icons for kids
       switch (block.type) {
-        case 'up': return <ArrowUp className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
-        case 'down': return <ArrowDown className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
-        case 'delay': return <Clock className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
-        case 'green-flag': return <Play className={`w-6 h-6 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'delay': return <Clock className={`w-8 h-8 md:w-8 md:h-8 ${baseIconClass}`} />;
+        case 'green-flag': return <Play className={`w-8 h-8 md:w-8 md:h-8 ${baseIconClass}`} />;
         default: return null;
       }
     } else {
       switch (block.type) {
-        case 'up': return <ArrowUp className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
-        case 'down': return <ArrowDown className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
-        case 'delay': return <Clock className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
-        case 'green-flag': return <Play className={`w-4 h-4 md:w-6 md:h-6 ${baseIconClass}`} />;
+        case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
+        case 'delay': return <Clock className={`w-8 h-8 md:w-6 md:h-6 ${baseIconClass}`} />;
+        case 'green-flag': return <Play className={`w-8 h-8 md:w-6 md:h-6 ${baseIconClass}`} />;
         default: return null;
       }
     }

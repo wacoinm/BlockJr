@@ -34,25 +34,23 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
 
   const getBlockColor = (type: string) => {
     switch (type) {
-  case 'up':
-    return 'bg-blue-500 shadow-blue-600 bg-gradient-to-b from-blue-400 to-blue-600';
-  case 'down':
-    return 'bg-red-500 shadow-red-600 bg-gradient-to-b from-red-400 to-red-600';
-  case 'delay':
-    return 'bg-yellow-500 shadow-yellow-600 bg-gradient-to-b from-yellow-300 to-yellow-500';
-  case 'green-flag':
-    return 'bg-green-500 shadow-green-600 bg-gradient-to-b from-green-400 to-green-600';
-  default:
-    return 'bg-gray-500 shadow-gray-600 bg-gradient-to-b from-gray-400 to-gray-600';
-}
-
+      case 'up':
+        return 'bg-blue-500 shadow-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 dark:from-blue-700 dark:to-blue-900 dark:shadow-black/40';
+      case 'down':
+        return 'bg-red-500 shadow-red-600 bg-gradient-to-b from-red-400 to-red-600 dark:from-red-700 dark:to-red-900 dark:shadow-black/40';
+      case 'delay':
+        return 'bg-yellow-500 shadow-yellow-600 bg-gradient-to-b from-yellow-300 to-yellow-500 dark:from-amber-700 dark:to-amber-800 dark:shadow-black/30';
+      case 'green-flag':
+        return 'bg-green-500 shadow-green-600 bg-gradient-to-b from-green-400 to-green-600 dark:from-emerald-700 dark:to-emerald-900 dark:shadow-black/30';
+      default:
+        return 'bg-gray-500 shadow-gray-600 bg-gradient-to-b from-gray-400 to-gray-600 dark:from-slate-700 dark:to-slate-800 dark:shadow-black/30';
+    }
   };
 
   const getBlockIcon = () => {
-    const baseIconClass = 'text-white'; // ✅ استفاده شد
+    const baseIconClass = 'text-white';
 
     if (isPaletteBlock) {
-      // bigger icons for kids
       switch (block.type) {
         case 'up': return <ArrowBigUpDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
         case 'down': return <ArrowBigDownDash className={`w-10 h-10 md:w-12 md:h-12 ${baseIconClass}`} />;
@@ -80,7 +78,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
   };
 
   const handleDelaySubmit = () => {
-    const value = parseInt(tempValue) || 1;
+    const value = parseInt(tempValue, 10) || 1;
     onDelayChange?.(Math.max(1, Math.min(10, value)));
     setIsEditing(false);
   };
@@ -94,19 +92,34 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     }
   };
 
-  // size classes: bigger for palette items (for kids)
   const sizeClasses = isPaletteBlock
     ? 'relative w-16 h-16 md:w-20 md:h-20 rounded-3xl'
     : 'relative w-12 h-12 md:w-16 md:h-16 rounded-2xl';
 
-  // notch sizes
   const leftNotchClasses = isPaletteBlock
-    ? 'absolute -left-3 top-1/2 transform -translate-y-1/2 w-4 h-7 md:w-5 md:h-8 bg-white/10 rounded-l-lg'
-    : 'absolute -left-2 top-1/2 transform -translate-y-1/2 w-3 h-5 md:w-4 md:h-6 bg-white/10 rounded-l-lg';
+    ? 'absolute -left-3 top-1/2 transform -translate-y-1/2 w-4 h-7 md:w-5 md:h-8 rounded-l-lg bg-white/10 dark:bg-slate-800/30'
+    : 'absolute -left-2 top-1/2 transform -translate-y-1/2 w-3 h-5 md:w-4 md:h-6 rounded-l-lg bg-white/10 dark:bg-slate-800/30';
+
+  const leftNotchExtraBorder = 'border-r-2 border-white/20 dark:border-slate-600';
+
+  const getNotchColor = (type: string) => {
+    switch (type) {
+      case 'up':
+        return 'bg-blue-500 dark:bg-blue-800';
+      case 'down':
+        return 'bg-red-500 dark:bg-red-800';
+      case 'delay':
+        return 'bg-yellow-500 dark:bg-amber-700';
+      case 'green-flag':
+        return 'bg-green-500 dark:bg-emerald-800';
+      default:
+        return 'bg-gray-500 dark:bg-slate-700';
+    }
+  };
 
   const rightNotchBase = isPaletteBlock
-    ? 'absolute -right-3 top-1/2 transform -translate-y-1/2 w-4 h-8 md:w-5 md:h-10'
-    : 'absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8';
+  ? `absolute -right-3 top-1/2 transform -translate-y-1/2 w-4 h-8 md:w-5 md:h-10 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`
+  : `absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`;
 
   return (
     <div className="relative group" style={style}>
@@ -116,7 +129,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
           ${getBlockColor(block.type)}
           shadow-lg hover:shadow-xl
           flex items-center justify-center
-          border-2 border-white/20
+          border-2 border-white/20 dark:border-white/8
           cursor-pointer select-none
           transform transition-all duration-200 hover:scale-105 active:scale-95
         `}
@@ -130,18 +143,16 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
           {getBlockIcon()}
         </div>
 
-        {/* left notch */}
         {block.type !== 'green-flag' && (
-          <div className={leftNotchClasses} />
+          <div className={`${leftNotchClasses} ${leftNotchExtraBorder}`} />
         )}
 
-        {/* right notch when no child (visual connector) */}
         {(block.childId === null || block.childId === undefined) && block.type !== 'green-flag' && (
-          <div className={`${rightNotchBase} bg-inherit rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20`} />
+          <div className={rightNotchBase} />
         )}
 
         {block.type === 'green-flag' && (
-          <div className={`${rightNotchBase} bg-inherit rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20`} />
+          <div className={rightNotchBase} />
         )}
       </div>
 
@@ -154,13 +165,13 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
               onChange={(e) => setTempValue(e.target.value)}
               onBlur={handleDelaySubmit}
               onKeyDown={handleKeyPress}
-              className="w-10 h-7 md:w-12 md:h-8 text-center border-2 border-yellow-400 rounded-lg bg-white text-gray-800 font-bold text-sm"
+              className="w-10 h-7 md:w-12 md:h-8 text-center border-2 border-yellow-400 rounded-lg bg-white text-gray-800 font-bold text-sm dark:bg-slate-800 dark:text-slate-200 dark:border-amber-600"
               min="1"
               max="10"
               autoFocus
             />
           ) : (
-            <div className="w-8 h-8 md:w-8 md:h-8 bg-white rounded-lg border-2 border-yellow-400 flex items-center justify-center text-gray-800 font-bold text-sm shadow-sm">
+            <div className="w-8 h-8 md:w-8 md:h-8 bg-white rounded-lg border-2 border-yellow-400 flex items-center justify-center text-gray-800 font-bold text-sm shadow-sm dark:bg-slate-800 dark:text-slate-200 dark:border-amber-600">
               {block.value || 1}
             </div>
           )}
@@ -174,7 +185,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
             onRemove();
             playSnapSound();
           }}
-          className="absolute -top-2 -right-2 w-5 h-5 md:w-6 md:h-6 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center hover:bg-red-600"
+          className="absolute -top-2 -right-2 w-5 h-5 md:w-6 md:h-6 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
           aria-label="remove block"
         >
           <X className="w-3 h-3 md:w-4 md:h-4" />

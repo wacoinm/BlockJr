@@ -39,9 +39,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
   const projectMap: Record<string, string[]> = {
-    elevator: ["up", "down", "delay"],
-    bulldozer: ["forward", "backward", "clockwise", "countclockwise", "delay"],
-    "lift truck": ["forward", "backward", "clockwise", "countclockwise", "up", "down", "delay"],
+    elevator: ["green-flag", "up", "down", "delay"],
+    bulldozer: ["green-flag", "forward", "backward", "clockwise", "countclockwise", "delay"],
+    "lift truck": ["green-flag", "forward", "backward", "clockwise", "countclockwise", "up", "down", "delay"],
   };
 
   const alwaysInclude = ["speed-low", "speed-high", "lamp-on", "lamp-off"];

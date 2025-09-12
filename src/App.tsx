@@ -55,24 +55,17 @@ const App: React.FC = () => {
     captureIndexRef.current = captureIndex;
   }, [captureIndex]);
 
-  // Keep a ref to latest blocks to avoid stale closure issues when capturing from callbacks
   const blocksRef = useRef<Block[]>(blocks);
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
 
-  // helper: deep clone a snapshot
   const cloneSnapshot = (arr: Block[]) => arr.map((b) => ({ ...b }));
-
-  // helper: stringify snapshot for equality check
   const snapshotKey = (arr: Block[]) => JSON.stringify(arr);
 
-  // submitCapture: push a snapshot (or current blocks if none passed)
-  // deduplicates identical consecutive snapshots and truncates forward history on new action
   const submitCapture = useCallback((snapshot?: Block[]) => {
     const snap = snapshot ? cloneSnapshot(snapshot) : cloneSnapshot(blocksRef.current);
     setCaptures((prev) => {
-      // if prev last equals new snap -> skip
       const last = prev[prev.length - 1];
       if (last && snapshotKey(last) === snapshotKey(snap)) {
         return prev;
@@ -81,14 +74,9 @@ const App: React.FC = () => {
       // truncate any redo history beyond current index
       const base = prev.slice(0, captureIndexRef.current + 1);
       const next = [...base, snap];
-
-      // update refs/state for index
       const newIndex = next.length - 1;
       captureIndexRef.current = newIndex;
-      // update state outside setCaptures (setCaptures is async but this setter is fine)
-      // we intentionally set state here because we must reflect new index to UI
       setCaptureIndex(newIndex);
-
       return next;
     });
   }, []);
@@ -101,7 +89,6 @@ const App: React.FC = () => {
     const snap = capturesRef.current[newIndex];
     if (!snap) return;
     const cloned = cloneSnapshot(snap);
-    // restore without creating a new capture
     captureIndexRef.current = newIndex;
     setCaptureIndex(newIndex);
     setBlocks(cloned);
@@ -120,9 +107,6 @@ const App: React.FC = () => {
     setBlocks(cloned);
     blocksRef.current = cloned;
   }, []);
-
-  // NOTE: removed the initial "submitCapture(empty)" on mount to avoid creating a
-  // leading empty snapshot that made Prev active for "nothing".
 
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -206,16 +190,11 @@ const App: React.FC = () => {
     [],
   );
 
-  // helper: apply updates map, then normalize ALL chains (so members align immediately)
-  // NOTE: also rebuild childId from parentId to keep links consistent (prevent visual-only connection)
-  // This now optionally submits a capture of the new merged state (default: true)
   const applyUpdatesAndNormalize = useCallback(
     (updates: Map<string, Partial<Block>>, capture: boolean = true) => {
       setBlocks((prev) => {
-        // merge updates into a fresh copy
         let merged = prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : { ...b }));
 
-        // === Rebuild child links from parent links to ensure bidirectional consistency ===
         const parentToChild = new Map<string, string>();
         for (const b of merged) {
           if (b.parentId) {
@@ -224,7 +203,6 @@ const App: React.FC = () => {
         }
         merged = merged.map((b) => ({ ...b, childId: parentToChild.get(b.id) ?? null }));
 
-        // normalize every chain: find heads (parentId === null) and lay out sequentially
         const heads = merged.filter((b) => b.parentId == null);
         for (const head of heads) {
           const headIndex = merged.findIndex((m) => m.id === head.id);
@@ -243,10 +221,8 @@ const App: React.FC = () => {
           }
         }
 
-        // update blocksRef so a capture uses latest
         blocksRef.current = merged;
 
-        // submit capture only if requested and not duplicate
         if (capture) {
           submitCapture(merged);
         }
@@ -263,7 +239,6 @@ const App: React.FC = () => {
       const { clientX, clientY } = getClientXY(e);
       const pointerWorld = screenToWorld(clientX, clientY);
 
-      // create from template
       if (block.id.endsWith('-template')) {
         dragOffsetRef.current = { x: BLOCK_WIDTH / 2, y: BLOCK_HEIGHT / 2 };
         const newBlock: Block = {
@@ -277,7 +252,6 @@ const App: React.FC = () => {
         setBlocks((prev) => {
           const next = [...prev, newBlock];
           blocksRef.current = next;
-          // submit capture for the new created block (dedupe prevents duplicates)
           submitCapture(next);
           return next;
         });
@@ -286,15 +260,12 @@ const App: React.FC = () => {
 
       dragOffsetRef.current = { x: pointerWorld.x - block.x, y: pointerWorld.y - block.y };
 
-      // Detach the dragged sub-chain from its parent and move to top of stacking order.
-      const draggedChain = getChain(block.id); // subchain starting at `block`
+      const draggedChain = getChain(block.id);
       if (draggedChain.length === 0) return block;
 
       const draggedIds = new Set(draggedChain.map((d) => d.id));
-      // other blocks excluding dragged chain
       const otherBlocks = blocks.filter((b) => !draggedIds.has(b.id)).map(b => ({ ...b }));
 
-      // If there is a parent pointing to the dragged head, clear that parent's childId
       const parentId = block.parentId;
       if (parentId) {
         const pi = otherBlocks.findIndex((b) => b.id === parentId);
@@ -303,7 +274,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Make dragged chain head have parentId === null (it's now detached)
       const normalizedDragged = draggedChain.map((d, idx, arr) => {
         const next = arr[idx + 1];
         const prev = arr[idx - 1];
@@ -314,11 +284,9 @@ const App: React.FC = () => {
         };
       });
 
-      // set state once: other blocks first (keeps z-order) then dragged chain
       setBlocks(() => {
         const next = [...otherBlocks, ...normalizedDragged];
         blocksRef.current = next;
-        // record the detach/reorder as a user action (dedupe will skip if no real change)
         submitCapture(next);
         return next;
       });
@@ -348,7 +316,6 @@ const App: React.FC = () => {
         updates.set(chain[i].id, { x: currentX, y: baseY });
       }
 
-      // during dragging we just update positions directly (no normalize here)
       setBlocks((prev) =>
         prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)),
       );
@@ -365,7 +332,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const draggedChain = getChain(blockToSnap.id); // the subchain we dragged
+      const draggedChain = getChain(blockToSnap.id);
       if (draggedChain.length === 0) {
         submitCapture();
         return;
@@ -403,7 +370,6 @@ const App: React.FC = () => {
             });
             updates.set(targetBlock.id, { parentId: blockToSnap.id });
 
-            // move target chain right after green
             let newX = snapX + horizSpacingWorld;
             const targetChain = getChain(targetBlock.id);
             for (let i = 0; i < targetChain.length; i++) {
@@ -419,11 +385,10 @@ const App: React.FC = () => {
 
             applyUpdatesAndNormalize(updates, true);
             playSnapSound();
-            return; // applyUpdates already captured
+            return;
           }
         }
 
-        // If not snapped to a head, do nothing for green-flag — it cannot attach elsewhere.
         submitCapture();
         return;
       }
@@ -558,11 +523,8 @@ const App: React.FC = () => {
           const firstDragged = draggedChain[0];
           const lastDragged = draggedChain[draggedChain.length - 1];
 
-          // connect target -> firstDragged
           updates.set(target.id, { childId: firstDragged.id });
-          // connect lastDragged -> child
           updates.set(lastDragged.id, { childId: child.id });
-          // set child's parent to lastDragged
           updates.set(child.id, { parentId: lastDragged.id });
 
           const insertionX = target.x + horizSpacingWorld;
@@ -597,7 +559,6 @@ const App: React.FC = () => {
         }
       }
 
-      // DEFAULT fallback: try attach to a block that has no child (append)
       const potentialTargets = blocks.filter((b) => !b.childId && !draggedIds.has(b.id));
       for (const targetBlock of potentialTargets) {
         const snapX = targetBlock.x + horizSpacingWorld;
@@ -644,7 +605,20 @@ const App: React.FC = () => {
     onDragEnd: () => {},
   });
 
-  // Green flag execution
+  // --- Unit selector additions ---
+  const unitOptions = [
+    { key: '100m', label: '100m', value: 100 },
+    { key: '10m', label: '10m', value: 10 },
+    { key: '1s', label: '1s', value: 1000 },
+  ];
+  const [unitIndex, setUnitIndex] = useState<number>(0); // default to first (100m)
+  const unitValue = unitOptions[unitIndex].value;
+  const unitLabel = unitOptions[unitIndex].label;
+  const cycleUnit = useCallback(() => {
+    setUnitIndex((i) => (i + 1) % unitOptions.length);
+  }, []);
+
+  // Green flag execution — passes unitValue to executor
   const handleGreenFlagClick = useCallback(
     async (blockId: string) => {
       if (!isBluetoothConnected) {
@@ -653,10 +627,11 @@ const App: React.FC = () => {
       const flag = blocksMap.get(blockId);
       if (flag && flag.childId) {
         const executionChain = getChain(flag.childId);
-        executeBlocks(executionChain);
+        // pass unitValue (100, 10, or 1000) to the executor
+        executeBlocks(executionChain, unitValue);
       }
     },
-    [blocksMap, getChain, isBluetoothConnected],
+    [blocksMap, getChain, isBluetoothConnected, unitValue],
   );
 
   const handleDelayChange = useCallback((blockId: string, value: number) => {
@@ -703,26 +678,23 @@ const App: React.FC = () => {
   const [bluetoothOpen, setBluetoothOpen] = useState(false);
 
   // --- Select Project popup states & animation config ---
-  const [selectVisible, setSelectVisible] = useState(false); // mounted
-  const [selectOpen, setSelectOpen] = useState(false); // animating / visible
+  const [selectVisible, setSelectVisible] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>("elevator");
 
   // animation timing (ms)
   const ITEM_STAGGER = 80;
   const BASE_DURATION = 220;
   const ITEM_DURATION = 180;
-  const totalCloseDelay = BASE_DURATION + ITEM_STAGGER * 2 + 40; // ~ safe unmount time
+  const totalCloseDelay = BASE_DURATION + ITEM_STAGGER * 2 + 40;
 
-  // open popup: mount then open (to trigger transitions)
   const openSelectPopup = useCallback(() => {
     setSelectVisible(true);
-    // next frame -> set open to true to run transitions
     requestAnimationFrame(() => {
       setSelectOpen(true);
     });
   }, []);
 
-  // close popup: trigger closing animation then unmount after animations complete
   const closeSelectPopup = useCallback(() => {
     setSelectOpen(false);
     // unmount after animation + stagger
@@ -778,6 +750,7 @@ const App: React.FC = () => {
   // Hamburger state
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // FAB items (added 'unit' FAB last — text label, click to cycle unit)
   const fabItems = [
     {
       key: 'bluetooth',
@@ -817,9 +790,19 @@ const App: React.FC = () => {
       },
       content: <FolderOpenDot className="w-6 h-6" />,
     },
+    {
+      key: 'unit',
+      onClick: () => {
+        cycleUnit();
+      },
+      content: (
+        <div className="text-xs font-semibold select-none pointer-events-none">
+          {unitLabel}
+        </div>
+      ),
+    },
   ];
 
-  // project list
   const projects = ['elevator', 'bulldozer', 'lift truck'];
 
   const handleProjectSelect = (proj: string) => {
@@ -891,6 +874,8 @@ const App: React.FC = () => {
                       : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700'
                   }
                 `}
+                aria-label={f.key === 'unit' ? `Unit: ${unitLabel}` : f.key}
+                title={f.key === 'unit' ? `Unit: ${unitLabel} (click to cycle)` : undefined}
               >
                 {f.content}
               </button>
@@ -1006,6 +991,9 @@ const App: React.FC = () => {
           </div>
           <div className="mt-1 text-xs text-slate-500">
             project: {selectedProject ?? 'none'}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            unit: {unitLabel}
           </div>
         </div>
       </div>

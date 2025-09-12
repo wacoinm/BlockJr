@@ -1,3 +1,4 @@
+// ./utils/blockExecutor.ts
 import bluetoothService from './bluetoothService';
 import { Block } from '../types/Block';
 
@@ -47,37 +48,45 @@ const buildExecutionOrder = (blocks: Block[]): Block[] => {
 
 /**
  * Map a block into the appropriate command string fragment.
- * delayValueForAction is used for action types that accept a following delay as a parameter.
+ *
+ * - delayUnits: number of base-units to convert (e.g. sum of consecutive delay blocks or a single delay value)
+ * - unitMs: multiplier in milliseconds (100 for 100m, 10 for 10m, 1000 for 1s)
+ *
+ * For action types that accept a delay parameter we multiply delayUnits * unitMs to produce a milli-second value.
+ * For 'delay' block we multiply the block.value by unitMs.
  */
-const mapBlockToCommand = (block: Block, delayValueForAction?: number): string => {
+const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 100): string => {
+  // Helper to compute ms from units (units may be undefined)
+  const unitsToMs = (u?: number) => (typeof u === 'number' ? u * unitMs : 0);
+
   switch (block.type) {
     case 'up':
-      return `up(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `up(${unitsToMs(delayUnits)})`;
     case 'down':
-      return `down(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `down(${unitsToMs(delayUnits)})`;
     case 'delay': {
       const v = typeof block.value === 'number' ? block.value : 1;
-      return `delay(${v})`;
+      return `delay(${v * unitMs})`;
     }
     case 'forward':
-      return `forward(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `forward(${unitsToMs(delayUnits)})`;
     case 'backward':
-      return `backward(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `backward(${unitsToMs(delayUnits)})`;
     case 'clockwise':
       // map to turnright
-      return `turnright(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `turnright(${unitsToMs(delayUnits)})`;
     case 'countclockwise':
       // map to turnleft
-      return `turnleft(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `turnleft(${unitsToMs(delayUnits)})`;
     case 'speed-low':
       // fixed speed, do not consume a following delay
       return `speed(50)`;
     case 'speed-high':
       return `speed(100)`;
     case 'lamp-on':
-      return `lampon(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `lampon(${unitsToMs(delayUnits)})`;
     case 'lamp-off':
-      return `lampoff(${typeof delayValueForAction === 'number' ? delayValueForAction : 0})`;
+      return `lampoff(${unitsToMs(delayUnits)})`;
     default: {
       const v = block.value !== undefined ? block.value : '';
       return `${block.type}(${v})`;
@@ -91,14 +100,19 @@ const mapBlockToCommand = (block: Block, delayValueForAction?: number): string =
  * Rules implemented:
  * - The following types WILL consume a following delay block(s) as their parameter:
  *   up, down, forward, backward, clockwise, countclockwise, lamp-on, lamp-off
- *   If multiple consecutive delay blocks follow, their values are summed and applied to the action.
+ *   If multiple consecutive delay blocks follow, their values are summed and applied to the action (in units, then multiplied by `unit`).
  * - speed-low and speed-high are fixed and DO NOT consume a following delay (delay remains standalone).
  * - Standalone delay blocks:
  *   - If the standalone delay occurs immediately after a speed block, it is ignored (no matter single or multiple).
  *   - If at the start (no previous block) AND there are 2+ consecutive delays, the whole run of delays is ignored.
- *   - Otherwise delays are encoded as delay(x).
+ *   - Otherwise delays are encoded as delay(x) where x is block.value * unit
+ *
+ * New: accepts optional `unit` parameter (milliseconds per unit). For:
+ * - 100m => pass 100
+ * - 10m  => pass 10
+ * - 1s   => pass 1000
  */
-export const executeBlocks = async (blocks: Block[]) => {
+export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
   if (!blocks || blocks.length === 0) {
     console.log('Execution chain is empty.');
     return;
@@ -109,7 +123,7 @@ export const executeBlocks = async (blocks: Block[]) => {
   const commands: string[] = [];
   let i = 0;
 
-  // set of types that consume the following delay(s) as a parameter
+  // set of types that consume the following delay(s) as a parameter (in units)
   const consumesDelay = new Set<Block['type']>([
     'up',
     'down',
@@ -130,21 +144,18 @@ export const executeBlocks = async (blocks: Block[]) => {
       continue;
     }
 
-    // 1) If this block consumes delay(s), sum all consecutive delays after it and apply the sum
+    // 1) If this block consumes delay(s), sum all consecutive delays after it (in units) and apply the sum
     if (consumesDelay.has(currentBlock.type)) {
-      let sumDelay = 0;
+      let sumDelayUnits = 0;
       let j = i + 1;
       while (j < orderedBlocks.length && orderedBlocks[j].type === 'delay') {
         const d = typeof orderedBlocks[j].value === 'number' ? orderedBlocks[j].value! : 1;
-        sumDelay += d;
+        sumDelayUnits += d;
         j++;
       }
 
-      if (sumDelay > 0) {
-        commands.push(mapBlockToCommand(currentBlock, sumDelay));
-      } else {
-        commands.push(mapBlockToCommand(currentBlock, 0));
-      }
+      // mapBlockToCommand will multiply units by `unit` (ms)
+      commands.push(mapBlockToCommand(currentBlock, sumDelayUnits, unit));
       i = j; // skip action + consumed delays
       continue;
     }
@@ -156,10 +167,10 @@ export const executeBlocks = async (blocks: Block[]) => {
       // count how many consecutive delays starting from i
       let k = i;
       let consecutiveCount = 0;
-      let totalConsecutiveDelay = 0;
+      let totalConsecutiveDelayUnits = 0;
       while (k < orderedBlocks.length && orderedBlocks[k].type === 'delay') {
         const d = typeof orderedBlocks[k].value === 'number' ? orderedBlocks[k].value! : 1;
-        totalConsecutiveDelay += d;
+        totalConsecutiveDelayUnits += d;
         consecutiveCount++;
         k++;
       }
@@ -176,17 +187,17 @@ export const executeBlocks = async (blocks: Block[]) => {
         continue;
       }
 
-      // Otherwise, emit each delay as standalone
+      // Otherwise, emit each delay as standalone (mapBlockToCommand handles multiplying by `unit`)
       for (let p = i; p < k; p++) {
-        const dVal = typeof orderedBlocks[p].value === 'number' ? orderedBlocks[p].value! : 1;
-        commands.push(mapBlockToCommand(orderedBlocks[p]!, dVal));
+        // For 'delay' type we simply call mapBlockToCommand which reads block.value and multiplies by `unit`
+        commands.push(mapBlockToCommand(orderedBlocks[p]!, undefined, unit));
       }
       i = k;
       continue;
     }
 
-    // 3) Other blocks (including speed) — just map directly
-    commands.push(mapBlockToCommand(currentBlock));
+    // 3) Other blocks (including speed) — just map directly (no delay parameter)
+    commands.push(mapBlockToCommand(currentBlock, undefined, unit));
     i += 1;
   }
 
@@ -206,3 +217,5 @@ export const executeBlocks = async (blocks: Block[]) => {
     console.error('Failed to send command over Bluetooth:', e);
   }
 };
+
+export default executeBlocks;

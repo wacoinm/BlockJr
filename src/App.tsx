@@ -27,6 +27,7 @@ import {
   FolderKanban
 } from 'lucide-react';
 import Kamaan from '../public/icon.svg?react';
+import Header from './components/Header';
 import { SplashScreen } from '@capacitor/splash-screen';
 
 export const SoundContext = createContext(() => {});
@@ -39,6 +40,89 @@ const App: React.FC = () => {
   const [viewportWidth, setViewportWidth] = useState<number>(
     typeof window !== 'undefined' ? window.innerWidth : 1024,
   );
+
+  // --- Capture history (temporary storage) ---
+  // array of Block[] snapshots
+  const [captures, setCaptures] = useState<Block[][]>([]);
+  const capturesRef = useRef<Block[][]>(captures);
+  useEffect(() => {
+    capturesRef.current = captures;
+  }, [captures]);
+
+  const [captureIndex, setCaptureIndex] = useState<number>(-1);
+  const captureIndexRef = useRef<number>(-1);
+  useEffect(() => {
+    captureIndexRef.current = captureIndex;
+  }, [captureIndex]);
+
+  // Keep a ref to latest blocks to avoid stale closure issues when capturing from callbacks
+  const blocksRef = useRef<Block[]>(blocks);
+  useEffect(() => {
+    blocksRef.current = blocks;
+  }, [blocks]);
+
+  // helper: deep clone a snapshot
+  const cloneSnapshot = (arr: Block[]) => arr.map((b) => ({ ...b }));
+
+  // helper: stringify snapshot for equality check
+  const snapshotKey = (arr: Block[]) => JSON.stringify(arr);
+
+  // submitCapture: push a snapshot (or current blocks if none passed)
+  // deduplicates identical consecutive snapshots and truncates forward history on new action
+  const submitCapture = useCallback((snapshot?: Block[]) => {
+    const snap = snapshot ? cloneSnapshot(snapshot) : cloneSnapshot(blocksRef.current);
+    setCaptures((prev) => {
+      // if prev last equals new snap -> skip
+      const last = prev[prev.length - 1];
+      if (last && snapshotKey(last) === snapshotKey(snap)) {
+        return prev;
+      }
+
+      // truncate any redo history beyond current index
+      const base = prev.slice(0, captureIndexRef.current + 1);
+      const next = [...base, snap];
+
+      // update refs/state for index
+      const newIndex = next.length - 1;
+      captureIndexRef.current = newIndex;
+      // update state outside setCaptures (setCaptures is async but this setter is fine)
+      // we intentionally set state here because we must reflect new index to UI
+      setCaptureIndex(newIndex);
+
+      return next;
+    });
+  }, []);
+
+  // navigate prev/next using capturesRef to avoid stale closures
+  const goPrev = useCallback(() => {
+    const curIndex = captureIndexRef.current;
+    if (curIndex <= 0) return;
+    const newIndex = curIndex - 1;
+    const snap = capturesRef.current[newIndex];
+    if (!snap) return;
+    const cloned = cloneSnapshot(snap);
+    // restore without creating a new capture
+    captureIndexRef.current = newIndex;
+    setCaptureIndex(newIndex);
+    setBlocks(cloned);
+    blocksRef.current = cloned;
+  }, []);
+
+  const goNext = useCallback(() => {
+    const curIndex = captureIndexRef.current;
+    if (curIndex >= capturesRef.current.length - 1) return;
+    const newIndex = curIndex + 1;
+    const snap = capturesRef.current[newIndex];
+    if (!snap) return;
+    const cloned = cloneSnapshot(snap);
+    captureIndexRef.current = newIndex;
+    setCaptureIndex(newIndex);
+    setBlocks(cloned);
+    blocksRef.current = cloned;
+  }, []);
+
+  // NOTE: removed the initial "submitCapture(empty)" on mount to avoid creating a
+  // leading empty snapshot that made Prev active for "nothing".
 
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -124,14 +208,14 @@ const App: React.FC = () => {
 
   // helper: apply updates map, then normalize ALL chains (so members align immediately)
   // NOTE: also rebuild childId from parentId to keep links consistent (prevent visual-only connection)
+  // This now optionally submits a capture of the new merged state (default: true)
   const applyUpdatesAndNormalize = useCallback(
-    (updates: Map<string, Partial<Block>>) => {
+    (updates: Map<string, Partial<Block>>, capture: boolean = true) => {
       setBlocks((prev) => {
         // merge updates into a fresh copy
         let merged = prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : { ...b }));
 
         // === Rebuild child links from parent links to ensure bidirectional consistency ===
-        // For each block where parentId != null, set parentToChild[parentId] = block.id
         const parentToChild = new Map<string, string>();
         for (const b of merged) {
           if (b.parentId) {
@@ -143,14 +227,11 @@ const App: React.FC = () => {
         // normalize every chain: find heads (parentId === null) and lay out sequentially
         const heads = merged.filter((b) => b.parentId == null);
         for (const head of heads) {
-          // find head in merged
           const headIndex = merged.findIndex((m) => m.id === head.id);
           if (headIndex === -1) continue;
-          // keep head.x and head.y as canonical starting coords for that chain
           let currX = merged[headIndex].x;
           const y = merged[headIndex].y;
 
-          // walk the chain by childId and normalize positions
           let cur = merged[headIndex];
           while (cur) {
             const i = merged.findIndex((m) => m.id === cur.id);
@@ -162,10 +243,18 @@ const App: React.FC = () => {
           }
         }
 
+        // update blocksRef so a capture uses latest
+        blocksRef.current = merged;
+
+        // submit capture only if requested and not duplicate
+        if (capture) {
+          submitCapture(merged);
+        }
+
         return merged;
       });
     },
-    [HORIZONTAL_SPACING],
+    [HORIZONTAL_SPACING, submitCapture],
   );
 
   // --- Drag / Drop logic with click offset fix ---
@@ -185,14 +274,19 @@ const App: React.FC = () => {
           parentId: null,
           childId: null,
         };
-        setBlocks((prev) => [...prev, newBlock]);
+        setBlocks((prev) => {
+          const next = [...prev, newBlock];
+          blocksRef.current = next;
+          // submit capture for the new created block (dedupe prevents duplicates)
+          submitCapture(next);
+          return next;
+        });
         return newBlock;
       }
 
       dragOffsetRef.current = { x: pointerWorld.x - block.x, y: pointerWorld.y - block.y };
 
-      // We want to detach the dragged sub-chain from its parent *atomically* and
-      // move it to top of stacking order (append it to the end of array).
+      // Detach the dragged sub-chain from its parent and move to top of stacking order.
       const draggedChain = getChain(block.id); // subchain starting at `block`
       if (draggedChain.length === 0) return block;
 
@@ -210,7 +304,6 @@ const App: React.FC = () => {
       }
 
       // Make dragged chain head have parentId === null (it's now detached)
-      // Also ensure internal parent/child pointers of the dragged chain are consistent
       const normalizedDragged = draggedChain.map((d, idx, arr) => {
         const next = arr[idx + 1];
         const prev = arr[idx - 1];
@@ -222,11 +315,17 @@ const App: React.FC = () => {
       });
 
       // set state once: other blocks first (keeps z-order) then dragged chain
-      setBlocks([...otherBlocks, ...normalizedDragged]);
+      setBlocks(() => {
+        const next = [...otherBlocks, ...normalizedDragged];
+        blocksRef.current = next;
+        // record the detach/reorder as a user action (dedupe will skip if no real change)
+        submitCapture(next);
+        return next;
+      });
 
       return block;
     },
-    [blocks, getChain, screenToWorld, BLOCK_WIDTH, BLOCK_HEIGHT, getClientXY],
+    [blocks, getChain, screenToWorld, BLOCK_WIDTH, BLOCK_HEIGHT, getClientXY, submitCapture],
   );
 
   const handleBlockDrag = useCallback(
@@ -260,10 +359,17 @@ const App: React.FC = () => {
   const handleDrop = useCallback(
     (pos: { x: number; y: number }, droppedBlock: Block) => {
       const blockToSnap = blocksMap.get(droppedBlock.id);
-      if (!blockToSnap) return;
+      if (!blockToSnap) {
+        // still submit a capture of current blocks (the drag may have moved them)
+        submitCapture();
+        return;
+      }
 
       const draggedChain = getChain(blockToSnap.id); // the subchain we dragged
-      if (draggedChain.length === 0) return;
+      if (draggedChain.length === 0) {
+        submitCapture();
+        return;
+      }
       const draggedIds = new Set(draggedChain.map((b) => b.id));
 
       const horizSpacingWorld = HORIZONTAL_SPACING;
@@ -311,19 +417,17 @@ const App: React.FC = () => {
               newX += horizSpacingWorld;
             }
 
-            applyUpdatesAndNormalize(updates);
+            applyUpdatesAndNormalize(updates, true);
             playSnapSound();
-            return;
+            return; // applyUpdates already captured
           }
         }
 
         // If not snapped to a head, do nothing for green-flag — it cannot attach elsewhere.
+        submitCapture();
         return;
       }
 
-      // We'll iterate targets and evaluate two possible actions:
-      // - attachAfterTarget: drop close to the target center -> add after target
-      // - insertBetweenTargetAndChild: drop close to the gap between target and its child
       type Candidate =
         | { kind: 'attachAfter'; target: Block; distance: number }
         | { kind: 'insertBetween'; target: Block; distance: number };
@@ -359,7 +463,6 @@ const App: React.FC = () => {
       candidates.sort((a, b) => a.distance - b.distance);
       if (candidates.length > 0) {
         const best = candidates[0];
-        // handle attachAfter (which effectively becomes insert if target has child)
         if (best.kind === 'attachAfter') {
           const target = best.target;
           const firstDragged = draggedChain[0];
@@ -369,13 +472,10 @@ const App: React.FC = () => {
           const snapX = target.x + horizSpacingWorld;
           const snapY = target.y;
 
-          // if target already has a child -> we will insert (shift child chain)
           if (target.childId) {
             const originalChild = blocksMap.get(target.childId!);
             if (!originalChild) {
-              // safety: treat as simple attach
               updates.set(target.id, { childId: firstDragged.id });
-              // position dragged chain
               let nextX = snapX;
               for (let i = 0; i < draggedChain.length; i++) {
                 const d = draggedChain[i];
@@ -388,16 +488,11 @@ const App: React.FC = () => {
                 nextX += horizSpacingWorld;
               }
             } else {
-              // insert between target and originalChild
               const originalChildChain = getChain(originalChild.id);
-              // link target -> firstDragged
               updates.set(target.id, { childId: firstDragged.id });
-              // link lastDragged -> originalChild
               updates.set(lastDragged.id, { childId: originalChild.id });
-              // update original child's parent
               updates.set(originalChild.id, { parentId: lastDragged.id });
 
-              // position dragged chain starting at snapX
               let nextX = snapX;
               for (let i = 0; i < draggedChain.length; i++) {
                 const d = draggedChain[i];
@@ -410,7 +505,6 @@ const App: React.FC = () => {
                 nextX += horizSpacingWorld;
               }
 
-              // reposition original child chain to start after inserted chain
               const startForOriginalChild = snapX + draggedChain.length * horizSpacingWorld;
               for (let i = 0; i < originalChildChain.length; i++) {
                 const oc = originalChildChain[i];
@@ -423,14 +517,12 @@ const App: React.FC = () => {
               }
             }
 
-            applyUpdatesAndNormalize(updates);
+            applyUpdatesAndNormalize(updates, true);
             playSnapSound();
             return;
           } else {
-            // simple attach to right of target (target has no child)
             updates.set(target.id, { childId: firstDragged.id });
 
-            // position dragged chain starting at snapX
             let nextX = snapX;
             for (let i = 0; i < draggedChain.length; i++) {
               const d = draggedChain[i];
@@ -443,7 +535,7 @@ const App: React.FC = () => {
               nextX += horizSpacingWorld;
             }
 
-            applyUpdatesAndNormalize(updates);
+            applyUpdatesAndNormalize(updates, true);
             playSnapSound();
             return;
           }
@@ -453,12 +545,14 @@ const App: React.FC = () => {
         if (best.kind === 'insertBetween') {
           const target = best.target;
           if (!target.childId) {
-            // nothing to insert between — skip
-            // (shouldn't happen, but safe guard)
+            submitCapture();
             return;
           }
           const child = blocksMap.get(target.childId!);
-          if (!child) return;
+          if (!child) {
+            submitCapture();
+            return;
+          }
 
           const updates = new Map<string, Partial<Block>>();
           const firstDragged = draggedChain[0];
@@ -471,7 +565,6 @@ const App: React.FC = () => {
           // set child's parent to lastDragged
           updates.set(child.id, { parentId: lastDragged.id });
 
-          // position dragged chain starting after target
           const insertionX = target.x + horizSpacingWorld;
           const insertionY = target.y;
           let nextX = insertionX;
@@ -486,7 +579,6 @@ const App: React.FC = () => {
             nextX += horizSpacingWorld;
           }
 
-          // shift the original child chain to start after the inserted chain
           const originalChildChain = getChain(child.id);
           const startForOriginalChild = insertionX + draggedChain.length * horizSpacingWorld;
           for (let i = 0; i < originalChildChain.length; i++) {
@@ -499,14 +591,13 @@ const App: React.FC = () => {
             });
           }
 
-          applyUpdatesAndNormalize(updates);
+          applyUpdatesAndNormalize(updates, true);
           playSnapSound();
           return;
         }
       }
 
       // DEFAULT fallback: try attach to a block that has no child (append)
-      // (green-flag is already handled above and will not fall through here)
       const potentialTargets = blocks.filter((b) => !b.childId && !draggedIds.has(b.id));
       for (const targetBlock of potentialTargets) {
         const snapX = targetBlock.x + horizSpacingWorld;
@@ -533,15 +624,17 @@ const App: React.FC = () => {
             newX += horizSpacingWorld;
           }
 
-          applyUpdatesAndNormalize(updates);
+          applyUpdatesAndNormalize(updates, true);
           playSnapSound();
           return;
         }
       }
 
       // If nothing matched, leave blocks where they are (no snap).
+      // But we still want to capture the final moved positions (dedupe prevents duplicates)
+      submitCapture();
     },
-    [blocks, blocksMap, getChain, playSnapSound, HORIZONTAL_SPACING, BLOCK_WIDTH, BLOCK_HEIGHT, applyUpdatesAndNormalize],
+    [blocks, blocksMap, getChain, playSnapSound, HORIZONTAL_SPACING, BLOCK_WIDTH, BLOCK_HEIGHT, applyUpdatesAndNormalize, submitCapture],
   );
 
   const { handleDragStart, isDragging, draggedBlock } = useDragDrop({
@@ -556,7 +649,6 @@ const App: React.FC = () => {
     async (blockId: string) => {
       if (!isBluetoothConnected) {
         alert('You must connect to a device');
-        // return;
       }
       const flag = blocksMap.get(blockId);
       if (flag && flag.childId) {
@@ -571,7 +663,10 @@ const App: React.FC = () => {
     setBlocks((prev) =>
       prev.map((block) => (block.id === blockId ? { ...block, value } : block)),
     );
-  }, []);
+    // capture change (dedupe will skip if no real change)
+    // we schedule a microtask to ensure blocksRef updated first
+    setTimeout(() => submitCapture(), 0);
+  }, [submitCapture]);
 
   const handleBlockRemove = useCallback(
     (blockId: string) => {
@@ -592,10 +687,15 @@ const App: React.FC = () => {
         }
       }
 
-      setBlocks(newBlocks);
+      setBlocks(() => {
+        const nb = newBlocks;
+        blocksRef.current = nb;
+        submitCapture(nb);
+        return nb;
+      });
       playSnapSound();
     },
-    [blocksMap, getChain, playSnapSound],
+    [blocksMap, getChain, playSnapSound, submitCapture],
   );
 
   const [interactionMode, setInteractionMode] =
@@ -709,7 +809,6 @@ const App: React.FC = () => {
           <Trash2 className="w-6 h-6" />
         ),
     },
-    // NEW: Select Project FAB (appears under interaction)
     {
       key: 'selectProject',
       onClick: () => {
@@ -725,12 +824,22 @@ const App: React.FC = () => {
 
   const handleProjectSelect = (proj: string) => {
     setSelectedProject(proj);
-    // you can trigger project loading logic here
     closeSelectPopup();
   };
 
+  // header props for prev/next
+  const hasPrev = captureIndex > 0;
+  const hasNext = captureIndex < captures.length - 1;
+
   return (
     <SoundContext.Provider value={playSnapSound}>
+      <Header
+        initialCollapsed={false}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={goPrev}
+        onNext={goNext}
+      />
       <div className="h-screen w-screen overflow-hidden relative">
         <BluetoothConnector
           open={bluetoothOpen}
@@ -739,7 +848,6 @@ const App: React.FC = () => {
 
         {/* Hamburger + animated FABs */}
         <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-3">
-          {/* Hamburger */}
           <button
             type="button"
             onClick={() => setMenuOpen((p) => !p)}
@@ -759,7 +867,6 @@ const App: React.FC = () => {
             </div>
           </button>
 
-          {/* FABs animate below */}
           {fabItems.map((f, idx) => {
             const delay = idx * 80;
             return (
@@ -791,19 +898,15 @@ const App: React.FC = () => {
           })}
         </div>
 
-        {/* Select Project popup: anchored upper-right with higher z-index */}
         {selectVisible && (
           <div
-            // container (covers whole screen, but panel anchored top-right)
             className="fixed inset-0 z-[88] pointer-events-auto"
             onClick={(e) => {
-              // clicking truly outside should close
               if (e.target === e.currentTarget) closeSelectPopup();
             }}
             aria-modal="true"
             role="dialog"
           >
-            {/* backdrop (below panel) */}
             <div
               className={`absolute inset-0 bg-black transition-opacity`}
               style={{
@@ -813,14 +916,12 @@ const App: React.FC = () => {
               }}
             />
 
-            {/* Panel anchored near the top-right (above the FABs) */}
             <div
               className="absolute right-6 top-20"
               style={{ zIndex: 90 }}
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                // panel
                 className={`relative w-64 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl p-4 transform origin-top-right`}
                 style={{
                   transitionProperty: 'transform, opacity',
@@ -849,8 +950,6 @@ const App: React.FC = () => {
 
                 <div className="flex flex-col gap-2">
                   {projects.map((p, i) => {
-                    // stagger delay top->down when opening,
-                    // when closing we reverse order for nicer effect
                     const openDelay = i * ITEM_STAGGER;
                     const closeDelay = (projects.length - 1 - i) * ITEM_STAGGER;
                     const delay = selectOpen ? openDelay : closeDelay;

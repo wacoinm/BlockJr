@@ -122,12 +122,59 @@ const App: React.FC = () => {
     [],
   );
 
+  // helper: apply updates map, then normalize ALL chains (so members align immediately)
+  // NOTE: also rebuild childId from parentId to keep links consistent (prevent visual-only connection)
+  const applyUpdatesAndNormalize = useCallback(
+    (updates: Map<string, Partial<Block>>) => {
+      setBlocks((prev) => {
+        // merge updates into a fresh copy
+        let merged = prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : { ...b }));
+
+        // === Rebuild child links from parent links to ensure bidirectional consistency ===
+        // For each block where parentId != null, set parentToChild[parentId] = block.id
+        const parentToChild = new Map<string, string>();
+        for (const b of merged) {
+          if (b.parentId) {
+            parentToChild.set(b.parentId, b.id);
+          }
+        }
+        merged = merged.map((b) => ({ ...b, childId: parentToChild.get(b.id) ?? null }));
+
+        // normalize every chain: find heads (parentId === null) and lay out sequentially
+        const heads = merged.filter((b) => b.parentId == null);
+        for (const head of heads) {
+          // find head in merged
+          const headIndex = merged.findIndex((m) => m.id === head.id);
+          if (headIndex === -1) continue;
+          // keep head.x and head.y as canonical starting coords for that chain
+          let currX = merged[headIndex].x;
+          const y = merged[headIndex].y;
+
+          // walk the chain by childId and normalize positions
+          let cur = merged[headIndex];
+          while (cur) {
+            const i = merged.findIndex((m) => m.id === cur.id);
+            if (i === -1) break;
+            merged[i] = { ...merged[i], x: currX, y };
+            currX += HORIZONTAL_SPACING;
+            if (!merged[i].childId) break;
+            cur = merged.find((m) => m.id === merged[i].childId) as Block | undefined;
+          }
+        }
+
+        return merged;
+      });
+    },
+    [HORIZONTAL_SPACING],
+  );
+
   // --- Drag / Drop logic with click offset fix ---
   const handleBlockDragStart = useCallback(
     (block: Block, e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
       const { clientX, clientY } = getClientXY(e);
       const pointerWorld = screenToWorld(clientX, clientY);
 
+      // create from template
       if (block.id.endsWith('-template')) {
         dragOffsetRef.current = { x: BLOCK_WIDTH / 2, y: BLOCK_HEIGHT / 2 };
         const newBlock: Block = {
@@ -144,21 +191,42 @@ const App: React.FC = () => {
 
       dragOffsetRef.current = { x: pointerWorld.x - block.x, y: pointerWorld.y - block.y };
 
-      const chain = getChain(block.id);
-      const otherBlocks = blocks.filter((b) => !chain.find((cb) => cb.id === b.id));
-      setBlocks([...otherBlocks, ...chain]);
+      // We want to detach the dragged sub-chain from its parent *atomically* and
+      // move it to top of stacking order (append it to the end of array).
+      const draggedChain = getChain(block.id); // subchain starting at `block`
+      if (draggedChain.length === 0) return block;
 
-      if (block.parentId) {
-        const parent = blocksMap.get(block.parentId);
-        if (parent) {
-          setBlocks((prev) =>
-            prev.map((b) => (b.id === parent.id ? { ...b, childId: null } : b)),
-          );
+      const draggedIds = new Set(draggedChain.map((d) => d.id));
+      // other blocks excluding dragged chain
+      const otherBlocks = blocks.filter((b) => !draggedIds.has(b.id)).map(b => ({ ...b }));
+
+      // If there is a parent pointing to the dragged head, clear that parent's childId
+      const parentId = block.parentId;
+      if (parentId) {
+        const pi = otherBlocks.findIndex((b) => b.id === parentId);
+        if (pi !== -1) {
+          otherBlocks[pi] = { ...otherBlocks[pi], childId: null };
         }
       }
+
+      // Make dragged chain head have parentId === null (it's now detached)
+      // Also ensure internal parent/child pointers of the dragged chain are consistent
+      const normalizedDragged = draggedChain.map((d, idx, arr) => {
+        const next = arr[idx + 1];
+        const prev = arr[idx - 1];
+        return {
+          ...d,
+          parentId: idx === 0 ? null : prev.id,
+          childId: idx < arr.length - 1 ? next.id : d.childId ?? null,
+        };
+      });
+
+      // set state once: other blocks first (keeps z-order) then dragged chain
+      setBlocks([...otherBlocks, ...normalizedDragged]);
+
       return block;
     },
-    [blocks, blocksMap, getChain, screenToWorld, BLOCK_WIDTH, BLOCK_HEIGHT, getClientXY],
+    [blocks, getChain, screenToWorld, BLOCK_WIDTH, BLOCK_HEIGHT, getClientXY],
   );
 
   const handleBlockDrag = useCallback(
@@ -181,6 +249,7 @@ const App: React.FC = () => {
         updates.set(chain[i].id, { x: currentX, y: baseY });
       }
 
+      // during dragging we just update positions directly (no normalize here)
       setBlocks((prev) =>
         prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)),
       );
@@ -193,48 +262,46 @@ const App: React.FC = () => {
       const blockToSnap = blocksMap.get(droppedBlock.id);
       if (!blockToSnap) return;
 
-      const chainIds = new Set(getChain(blockToSnap.id).map((b) => b.id));
+      const draggedChain = getChain(blockToSnap.id); // the subchain we dragged
+      if (draggedChain.length === 0) return;
+      const draggedIds = new Set(draggedChain.map((b) => b.id));
 
       const horizSpacingWorld = HORIZONTAL_SPACING;
       const blockWidthWorld = BLOCK_WIDTH;
       const blockHeightWorld = BLOCK_HEIGHT;
 
-      // SPECIAL CASE: green-flag snapping to the HEAD of an existing chain (become parent)
+      // thresholds
+      const centerThreshold = blockWidthWorld * 0.75;
+      const gapThreshold = blockWidthWorld * 0.75;
+
+      // FIRST: if green-flag special case => attach as parent of a head ONLY
       if (blockToSnap.type === 'green-flag') {
-        // potential targets are chain heads (no parent) and not part of the dragged chain
         const potentialHeadTargets = blocks.filter(
-          (b) => b.parentId === null && !chainIds.has(b.id) && b.id !== blockToSnap.id,
+          (b) => b.parentId === null && !draggedIds.has(b.id) && b.id !== blockToSnap.id,
         );
 
         for (const targetBlock of potentialHeadTargets) {
-          // place green flag to the left of the head
           const snapX = targetBlock.x - horizSpacingWorld;
           const snapY = targetBlock.y;
-
           if (
-            Math.abs(blockToSnap.x - snapX) < blockWidthWorld * 0.75 &&
+            Math.abs(blockToSnap.x - snapX) < gapThreshold &&
             Math.abs(blockToSnap.y - snapY) < blockHeightWorld * 0.75
           ) {
-            // connect green-flag as parent -> head
             const updates = new Map<string, Partial<Block>>();
-
-            // green flag becomes parent (no parentId) and points to target as child
+            // green becomes parent (head parentId stays null)
             updates.set(blockToSnap.id, {
               x: snapX,
               y: snapY,
               parentId: null,
               childId: targetBlock.id,
             });
-
-            // target's parent becomes the green flag
             updates.set(targetBlock.id, { parentId: blockToSnap.id });
 
-            // reposition the entire target chain so it sits after the green flag
+            // move target chain right after green
             let newX = snapX + horizSpacingWorld;
             const targetChain = getChain(targetBlock.id);
             for (let i = 0; i < targetChain.length; i++) {
               const t = targetChain[i];
-              // ensure parent/child are consistent for the shifted chain
               updates.set(t.id, {
                 x: newX,
                 y: snapY,
@@ -244,18 +311,203 @@ const App: React.FC = () => {
               newX += horizSpacingWorld;
             }
 
-            setBlocks((prev) =>
-              prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)),
-            );
+            applyUpdatesAndNormalize(updates);
             playSnapSound();
             return;
           }
         }
+
+        // If not snapped to a head, do nothing for green-flag — it cannot attach elsewhere.
+        return;
       }
 
-      // DEFAULT (existing) behavior: attach to the right of blocks that don't have a child
-      const potentialTargets = blocks.filter((b) => !b.childId && !chainIds.has(b.id));
+      // We'll iterate targets and evaluate two possible actions:
+      // - attachAfterTarget: drop close to the target center -> add after target
+      // - insertBetweenTargetAndChild: drop close to the gap between target and its child
+      type Candidate =
+        | { kind: 'attachAfter'; target: Block; distance: number }
+        | { kind: 'insertBetween'; target: Block; distance: number };
 
+      const candidates: Candidate[] = [];
+
+      for (const target of blocks) {
+        if (draggedIds.has(target.id) || target.id === blockToSnap.id) continue;
+
+        // center distance
+        const centerDistX = Math.abs(blockToSnap.x - target.x);
+        const centerDistY = Math.abs(blockToSnap.y - target.y);
+        const centerDist = Math.hypot(centerDistX, centerDistY);
+
+        if (centerDist < centerThreshold) {
+          candidates.push({ kind: 'attachAfter', target, distance: centerDist });
+        }
+
+        // if target has a child we can consider insertion point (gap right after target)
+        if (target.childId) {
+          const gapX = target.x + horizSpacingWorld;
+          const gapY = target.y;
+          const gapDistX = Math.abs(blockToSnap.x - gapX);
+          const gapDistY = Math.abs(blockToSnap.y - gapY);
+          const gapDist = Math.hypot(gapDistX, gapDistY);
+          if (gapDist < gapThreshold) {
+            candidates.push({ kind: 'insertBetween', target, distance: gapDist });
+          }
+        }
+      }
+
+      // choose best candidate by smallest distance
+      candidates.sort((a, b) => a.distance - b.distance);
+      if (candidates.length > 0) {
+        const best = candidates[0];
+        // handle attachAfter (which effectively becomes insert if target has child)
+        if (best.kind === 'attachAfter') {
+          const target = best.target;
+          const firstDragged = draggedChain[0];
+          const lastDragged = draggedChain[draggedChain.length - 1];
+          const updates = new Map<string, Partial<Block>>();
+
+          const snapX = target.x + horizSpacingWorld;
+          const snapY = target.y;
+
+          // if target already has a child -> we will insert (shift child chain)
+          if (target.childId) {
+            const originalChild = blocksMap.get(target.childId!);
+            if (!originalChild) {
+              // safety: treat as simple attach
+              updates.set(target.id, { childId: firstDragged.id });
+              // position dragged chain
+              let nextX = snapX;
+              for (let i = 0; i < draggedChain.length; i++) {
+                const d = draggedChain[i];
+                updates.set(d.id, {
+                  x: nextX,
+                  y: snapY,
+                  parentId: i === 0 ? target.id : draggedChain[i - 1].id,
+                  childId: i < draggedChain.length - 1 ? draggedChain[i + 1].id : draggedChain[i].childId ?? null,
+                });
+                nextX += horizSpacingWorld;
+              }
+            } else {
+              // insert between target and originalChild
+              const originalChildChain = getChain(originalChild.id);
+              // link target -> firstDragged
+              updates.set(target.id, { childId: firstDragged.id });
+              // link lastDragged -> originalChild
+              updates.set(lastDragged.id, { childId: originalChild.id });
+              // update original child's parent
+              updates.set(originalChild.id, { parentId: lastDragged.id });
+
+              // position dragged chain starting at snapX
+              let nextX = snapX;
+              for (let i = 0; i < draggedChain.length; i++) {
+                const d = draggedChain[i];
+                updates.set(d.id, {
+                  x: nextX,
+                  y: snapY,
+                  parentId: i === 0 ? target.id : draggedChain[i - 1].id,
+                  childId: i < draggedChain.length - 1 ? draggedChain[i + 1].id : draggedChain[i].childId ?? null,
+                });
+                nextX += horizSpacingWorld;
+              }
+
+              // reposition original child chain to start after inserted chain
+              const startForOriginalChild = snapX + draggedChain.length * horizSpacingWorld;
+              for (let i = 0; i < originalChildChain.length; i++) {
+                const oc = originalChildChain[i];
+                updates.set(oc.id, {
+                  x: startForOriginalChild + i * horizSpacingWorld,
+                  y: snapY,
+                  parentId: i === 0 ? lastDragged.id : originalChildChain[i - 1].id,
+                  childId: oc.childId ?? null,
+                });
+              }
+            }
+
+            applyUpdatesAndNormalize(updates);
+            playSnapSound();
+            return;
+          } else {
+            // simple attach to right of target (target has no child)
+            updates.set(target.id, { childId: firstDragged.id });
+
+            // position dragged chain starting at snapX
+            let nextX = snapX;
+            for (let i = 0; i < draggedChain.length; i++) {
+              const d = draggedChain[i];
+              updates.set(d.id, {
+                x: nextX,
+                y: snapY,
+                parentId: i === 0 ? target.id : draggedChain[i - 1].id,
+                childId: i < draggedChain.length - 1 ? draggedChain[i + 1].id : draggedChain[i].childId ?? null,
+              });
+              nextX += horizSpacingWorld;
+            }
+
+            applyUpdatesAndNormalize(updates);
+            playSnapSound();
+            return;
+          }
+        }
+
+        // handle insertBetween explicitly (target + its child)
+        if (best.kind === 'insertBetween') {
+          const target = best.target;
+          if (!target.childId) {
+            // nothing to insert between — skip
+            // (shouldn't happen, but safe guard)
+            return;
+          }
+          const child = blocksMap.get(target.childId!);
+          if (!child) return;
+
+          const updates = new Map<string, Partial<Block>>();
+          const firstDragged = draggedChain[0];
+          const lastDragged = draggedChain[draggedChain.length - 1];
+
+          // connect target -> firstDragged
+          updates.set(target.id, { childId: firstDragged.id });
+          // connect lastDragged -> child
+          updates.set(lastDragged.id, { childId: child.id });
+          // set child's parent to lastDragged
+          updates.set(child.id, { parentId: lastDragged.id });
+
+          // position dragged chain starting after target
+          const insertionX = target.x + horizSpacingWorld;
+          const insertionY = target.y;
+          let nextX = insertionX;
+          for (let i = 0; i < draggedChain.length; i++) {
+            const d = draggedChain[i];
+            updates.set(d.id, {
+              x: nextX,
+              y: insertionY,
+              parentId: i === 0 ? target.id : draggedChain[i - 1].id,
+              childId: i < draggedChain.length - 1 ? draggedChain[i + 1].id : draggedChain[i].childId ?? null,
+            });
+            nextX += horizSpacingWorld;
+          }
+
+          // shift the original child chain to start after the inserted chain
+          const originalChildChain = getChain(child.id);
+          const startForOriginalChild = insertionX + draggedChain.length * horizSpacingWorld;
+          for (let i = 0; i < originalChildChain.length; i++) {
+            const oc = originalChildChain[i];
+            updates.set(oc.id, {
+              x: startForOriginalChild + i * horizSpacingWorld,
+              y: insertionY,
+              parentId: i === 0 ? lastDragged.id : originalChildChain[i - 1].id,
+              childId: oc.childId ?? null,
+            });
+          }
+
+          applyUpdatesAndNormalize(updates);
+          playSnapSound();
+          return;
+        }
+      }
+
+      // DEFAULT fallback: try attach to a block that has no child (append)
+      // (green-flag is already handled above and will not fall through here)
+      const potentialTargets = blocks.filter((b) => !b.childId && !draggedIds.has(b.id));
       for (const targetBlock of potentialTargets) {
         const snapX = targetBlock.x + horizSpacingWorld;
         const snapY = targetBlock.y;
@@ -264,32 +516,32 @@ const App: React.FC = () => {
           Math.abs(blockToSnap.x - snapX) < blockWidthWorld * 0.75 &&
           Math.abs(blockToSnap.y - snapY) < blockHeightWorld * 0.75
         ) {
-          const chain = getChain(blockToSnap.id);
           const updates = new Map<string, Partial<Block>>();
+          const firstDragged = draggedChain[0];
 
-          updates.set(targetBlock.id, { childId: blockToSnap.id });
+          updates.set(targetBlock.id, { childId: firstDragged.id });
 
           let newX = snapX;
-          updates.set(blockToSnap.id, {
-            x: newX,
-            y: snapY,
-            parentId: targetBlock.id,
-          });
-
-          for (let i = 1; i < chain.length; i++) {
+          for (let i = 0; i < draggedChain.length; i++) {
+            const d = draggedChain[i];
+            updates.set(d.id, {
+              x: newX,
+              y: snapY,
+              parentId: i === 0 ? targetBlock.id : draggedChain[i - 1].id,
+              childId: i < draggedChain.length - 1 ? draggedChain[i + 1].id : d.childId ?? null,
+            });
             newX += horizSpacingWorld;
-            updates.set(chain[i].id, { x: newX, y: snapY });
           }
 
-          setBlocks((prev) =>
-            prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)),
-          );
+          applyUpdatesAndNormalize(updates);
           playSnapSound();
           return;
         }
       }
+
+      // If nothing matched, leave blocks where they are (no snap).
     },
-    [blocks, blocksMap, getChain, playSnapSound, HORIZONTAL_SPACING, BLOCK_WIDTH, BLOCK_HEIGHT],
+    [blocks, blocksMap, getChain, playSnapSound, HORIZONTAL_SPACING, BLOCK_WIDTH, BLOCK_HEIGHT, applyUpdatesAndNormalize],
   );
 
   const { handleDragStart, isDragging, draggedBlock } = useDragDrop({
@@ -304,7 +556,7 @@ const App: React.FC = () => {
     async (blockId: string) => {
       if (!isBluetoothConnected) {
         alert('You must connect to a device');
-        return;
+        // return;
       }
       const flag = blocksMap.get(blockId);
       if (flag && flag.childId) {

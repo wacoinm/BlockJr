@@ -94,9 +94,9 @@ const mapBlockToCommand = (block: Block, delayValueForAction?: number): string =
  *   If multiple consecutive delay blocks follow, their values are summed and applied to the action.
  * - speed-low and speed-high are fixed and DO NOT consume a following delay (delay remains standalone).
  * - Standalone delay blocks:
- *   - If the standalone delay occurs immediately after a speed block or at the start (no previous block),
- *     and that delay has another delay directly after it (2+ consecutive delays), the whole run of delays is IGNORED.
- *   - Otherwise single delays are encoded as delay(x).
+ *   - If the standalone delay occurs immediately after a speed block, it is ignored (no matter single or multiple).
+ *   - If at the start (no previous block) AND there are 2+ consecutive delays, the whole run of delays is ignored.
+ *   - Otherwise delays are encoded as delay(x).
  */
 export const executeBlocks = async (blocks: Block[]) => {
   if (!blocks || blocks.length === 0) {
@@ -132,7 +132,6 @@ export const executeBlocks = async (blocks: Block[]) => {
 
     // 1) If this block consumes delay(s), sum all consecutive delays after it and apply the sum
     if (consumesDelay.has(currentBlock.type)) {
-      // sum consecutive delays after currentBlock
       let sumDelay = 0;
       let j = i + 1;
       while (j < orderedBlocks.length && orderedBlocks[j].type === 'delay') {
@@ -144,17 +143,14 @@ export const executeBlocks = async (blocks: Block[]) => {
       if (sumDelay > 0) {
         commands.push(mapBlockToCommand(currentBlock, sumDelay));
       } else {
-        // no following delay => default 0
         commands.push(mapBlockToCommand(currentBlock, 0));
       }
-      // skip the action and all delays consumed
-      i = j;
+      i = j; // skip action + consumed delays
       continue;
     }
 
-    // 2) If current is a delay (standalone) - decide what to do based on prev and following delays
+    // 2) If current is a delay (standalone)
     if (currentBlock.type === 'delay') {
-      // find previous block if exists
       const prevBlock = i - 1 >= 0 ? orderedBlocks[i - 1] : undefined;
 
       // count how many consecutive delays starting from i
@@ -168,16 +164,19 @@ export const executeBlocks = async (blocks: Block[]) => {
         k++;
       }
 
-      // If prev is speed OR prev doesn't exist (start), AND there are 2+ consecutive delays => IGNORE entire run
-      if ((prevBlock === undefined || isSpeed(prevBlock.type)) && consecutiveCount >= 2) {
-        // skip all consecutive delays without emitting any delay command
+      // Rule: if prev is speed => ignore all consecutive delays
+      if (isSpeed(prevBlock?.type)) {
         i = k;
         continue;
       }
 
-      // Otherwise (single delay or previous not speed/exists) emit each delay as a standalone delay block
-      // We'll emit them individually (preserving their individual values)
-      // Note: if you prefer to collapse consecutive standalone delays into one, change this to emit delay(totalConsecutiveDelay)
+      // Rule: if at start and 2+ consecutive delays => ignore them
+      if (prevBlock === undefined && consecutiveCount >= 2) {
+        i = k;
+        continue;
+      }
+
+      // Otherwise, emit each delay as standalone
       for (let p = i; p < k; p++) {
         const dVal = typeof orderedBlocks[p].value === 'number' ? orderedBlocks[p].value! : 1;
         commands.push(mapBlockToCommand(orderedBlocks[p]!, dVal));
@@ -186,7 +185,7 @@ export const executeBlocks = async (blocks: Block[]) => {
       continue;
     }
 
-    // 3) Other blocks (including speed) — just map directly (speeds do not consume delay)
+    // 3) Other blocks (including speed) — just map directly
     commands.push(mapBlockToCommand(currentBlock));
     i += 1;
   }
@@ -194,7 +193,6 @@ export const executeBlocks = async (blocks: Block[]) => {
   const finalCommand = commands.join('_');
   console.log('Executing command:', finalCommand);
 
-  // Try to send via Bluetooth if connected
   try {
     const connected = await bluetoothService.isConnected();
     if (connected) {
@@ -204,7 +202,7 @@ export const executeBlocks = async (blocks: Block[]) => {
       console.log('Not connected to Bluetooth device — command not sent.');
     }
   } catch (e) {
-    // console.log(finalCommand)
+    console.log(finalCommand);
     console.error('Failed to send command over Bluetooth:', e);
   }
 };

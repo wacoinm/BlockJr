@@ -13,7 +13,9 @@ import {
   Lightbulb,
   LightbulbOff,
   Turtle,
-  Rabbit
+  Rabbit,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { Block } from '../types/Block';
 import { SoundContext } from '../App';
@@ -37,15 +39,16 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
   isPaletteBlock = false,
   style = {}
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempValue, setTempValue] = useState(block.value?.toString() || '1');
+  // kept a tiny state to keep hooks ordering stable (no textual input for kids)
+  const [_, set_] = useState(false);
   const playSnapSound = useContext(SoundContext);
 
   useEffect(() => {
-    if (block.value !== undefined) {
-      setTempValue(block.value.toString());
-    }
+    // no-op but keeps effect signature stable
+    set_((s) => s);
   }, [block.value]);
+
+  const clampDelay = (v: number) => Math.max(1, Math.min(10, v));
 
   const getBlockColor = (type: string) => {
     switch (type) {
@@ -119,24 +122,8 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
   const handleClick = () => {
     if (block.type === 'green-flag' && onGreenFlagClick) {
       onGreenFlagClick();
-    } else if (block.type === 'delay' && !isPaletteBlock) {
-      setIsEditing(true);
     }
-  };
-
-  const handleDelaySubmit = () => {
-    const value = parseInt(tempValue, 10) || 1;
-    onDelayChange?.(Math.max(1, Math.min(10, value)));
-    setIsEditing(false);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleDelaySubmit();
-    } else if (e.key === 'Escape') {
-      setTempValue(block.value?.toString() || '1');
-      setIsEditing(false);
-    }
+    // no numeric input for delay - kids use chevrons
   };
 
   const sizeClasses = isPaletteBlock
@@ -171,8 +158,70 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     ? `absolute -right-3 top-1/2 transform -translate-y-1/2 w-4 h-8 md:w-5 md:h-10 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`
     : `absolute -right-2 top-1/2 transform -translate-y-1/2 w-3 h-6 md:w-4 md:h-8 rounded-r-lg border-r-2 border-t-2 border-b-2 border-white/20 dark:border-slate-700 ${getNotchColor(block.type)}`;
 
+  // delay chevron button styles (small, same bg as delay block)
+  const delayBtnBase = `
+    absolute left-1/2 transform -translate-x-1/2
+    flex items-center justify-center
+    border-2 border-white/20 dark:border-slate-700
+    text-white cursor-pointer select-none
+    transition-all duration-150
+    active:scale-95
+  `;
+
+  // Top chevron: rounded on top-left & top-right only
+  const delayBtnUpClass = `${getBlockColor('delay')} ${delayBtnBase} rounded-t-lg rounded-b-none w-8 h-6 md:w-10 md:h-7`;
+
+  // Bottom chevron: rounded on bottom-left & bottom-right only (opposite of top)
+  const delayBtnDownClass = `${getBlockColor('delay')} ${delayBtnBase} rounded-b-lg rounded-t-none w-8 h-6 md:w-10 md:h-7`;
+
+  // handlers for chevrons
+  const handleDelayIncrease = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = typeof block.value === 'number' ? block.value : 1;
+    const next = clampDelay(current + 1);
+    onDelayChange?.(next);
+    playSnapSound?.();
+  };
+
+  const handleDelayDecrease = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = typeof block.value === 'number' ? block.value : 1;
+    const next = clampDelay(current - 1);
+    onDelayChange?.(next);
+    playSnapSound?.();
+  };
+
   return (
     <div className="relative group" style={style}>
+      {/* Delay chevrons (above and below) - only for real blocks, not palette */}
+      {block.type === 'delay' && !isPaletteBlock && (
+        <>
+          {/* Up chevron: placed slightly above the block (≈3px gap) */}
+          <button
+            onClick={handleDelayIncrease}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={delayBtnUpClass}
+            aria-label="increase delay"
+            style={{ bottom: '100%' /* small gap above block */ }}
+            title="Increase delay"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+
+          {/* Down chevron: placed slightly below the block (≈3px gap) */}
+          <button
+            onClick={handleDelayDecrease}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={delayBtnDownClass}
+            aria-label="decrease delay"
+            style={{ top: '100%' /* small gap below block */ }}
+            title="Decrease delay"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </>
+      )}
+
       <div
         className={`
           ${sizeClasses}
@@ -189,8 +238,17 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         role="button"
         tabIndex={0}
       >
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center relative">
           {getBlockIcon()}
+
+          {/* small bottom-right badge showing current number for delay */}
+          {block.type === 'delay' && (
+            <div className="absolute right-0 bottom-0 transform translate-x-1/4 translate-y-1/4">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-white text-yellow-600 dark:bg-slate-900 dark:text-yellow-400 flex items-center justify-center text-xs font-bold border-2 border-white/30">
+                {typeof block.value === 'number' ? block.value : 1}
+              </div>
+            </div>
+          )}
         </div>
 
         {block.type !== 'green-flag' && (
@@ -205,28 +263,6 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
           <div className={rightNotchBase} />
         )}
       </div>
-
-      {block.type === 'delay' && (
-        <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
-          {isEditing && !isPaletteBlock ? (
-            <input
-              type="number"
-              value={tempValue}
-              onChange={(e) => setTempValue(e.target.value)}
-              onBlur={handleDelaySubmit}
-              onKeyDown={handleKeyPress}
-              className="w-10 h-7 md:w-12 md:h-8 text-center border-2 border-yellow-400 rounded-lg bg-white text-gray-800 font-bold text-sm dark:bg-slate-800 dark:text-slate-200 dark:border-amber-600"
-              min="1"
-              max="10"
-              autoFocus
-            />
-          ) : (
-            <div className="w-8 h-8 md:w-8 md:h-8 bg-white rounded-lg border-2 border-yellow-400 flex items-center justify-center text-gray-800 font-bold text-sm shadow-sm dark:bg-slate-800 dark:text-slate-200 dark:border-amber-600">
-              {block.value || 1}
-            </div>
-          )}
-        </div>
-      )}
 
       {!isPaletteBlock && onRemove && (
         <button

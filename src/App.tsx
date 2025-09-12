@@ -194,11 +194,67 @@ const App: React.FC = () => {
       if (!blockToSnap) return;
 
       const chainIds = new Set(getChain(blockToSnap.id).map((b) => b.id));
-      const potentialTargets = blocks.filter((b) => !b.childId && !chainIds.has(b.id));
 
       const horizSpacingWorld = HORIZONTAL_SPACING;
       const blockWidthWorld = BLOCK_WIDTH;
       const blockHeightWorld = BLOCK_HEIGHT;
+
+      // SPECIAL CASE: green-flag snapping to the HEAD of an existing chain (become parent)
+      if (blockToSnap.type === 'green-flag') {
+        // potential targets are chain heads (no parent) and not part of the dragged chain
+        const potentialHeadTargets = blocks.filter(
+          (b) => b.parentId === null && !chainIds.has(b.id) && b.id !== blockToSnap.id,
+        );
+
+        for (const targetBlock of potentialHeadTargets) {
+          // place green flag to the left of the head
+          const snapX = targetBlock.x - horizSpacingWorld;
+          const snapY = targetBlock.y;
+
+          if (
+            Math.abs(blockToSnap.x - snapX) < blockWidthWorld * 0.75 &&
+            Math.abs(blockToSnap.y - snapY) < blockHeightWorld * 0.75
+          ) {
+            // connect green-flag as parent -> head
+            const updates = new Map<string, Partial<Block>>();
+
+            // green flag becomes parent (no parentId) and points to target as child
+            updates.set(blockToSnap.id, {
+              x: snapX,
+              y: snapY,
+              parentId: null,
+              childId: targetBlock.id,
+            });
+
+            // target's parent becomes the green flag
+            updates.set(targetBlock.id, { parentId: blockToSnap.id });
+
+            // reposition the entire target chain so it sits after the green flag
+            let newX = snapX + horizSpacingWorld;
+            const targetChain = getChain(targetBlock.id);
+            for (let i = 0; i < targetChain.length; i++) {
+              const t = targetChain[i];
+              // ensure parent/child are consistent for the shifted chain
+              updates.set(t.id, {
+                x: newX,
+                y: snapY,
+                parentId: i === 0 ? blockToSnap.id : targetChain[i - 1].id,
+                childId: t.childId ?? null,
+              });
+              newX += horizSpacingWorld;
+            }
+
+            setBlocks((prev) =>
+              prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)),
+            );
+            playSnapSound();
+            return;
+          }
+        }
+      }
+
+      // DEFAULT (existing) behavior: attach to the right of blocks that don't have a child
+      const potentialTargets = blocks.filter((b) => !b.childId && !chainIds.has(b.id));
 
       for (const targetBlock of potentialTargets) {
         const snapX = targetBlock.x + horizSpacingWorld;

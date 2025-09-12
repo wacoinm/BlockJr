@@ -2,7 +2,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { BlockComponent } from "./BlockComponent";
 import { Block } from "../types/Block";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ListFilter, Move, Wrench } from "lucide-react";
 
 interface BlockPaletteProps {
   onBlockDrag: (
@@ -37,6 +37,10 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   const TOGGLE_WIDTH = 34;
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
+  // animation timing constants
+  const PALETTE_TRANSITION_MS = 380;
+  const PALETTE_BUFFER_MS = 60;
+
   // Project -> types mapping
   const projectMap: Record<string, string[]> = {
     elevator: ["green-flag", "up", "down", "delay"],
@@ -60,7 +64,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
       return Array.from(new Set([...(projectMap[proj] || []), ...alwaysInclude]));
     } else if (proj && typeof proj === "string") {
       // project string provided but not in map => show everything (but keep alwaysInclude present)
-      // keep project-agnostic ordering: allTypes but ensure alwaysInclude at the end (unique)
       const unique = Array.from(new Set([...allTypes.filter((t) => !alwaysInclude.includes(t)), ...alwaysInclude]));
       return unique;
     } else {
@@ -69,10 +72,30 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     }
   };
 
-  // displayedTypes is the current list of block types shown in the palette
-  const [displayedTypes, setDisplayedTypes] = useState<string[]>(() => computeTypesForProject(selectedProject));
+  // Category config
+  type Category = "all" | "moves" | "utils";
+  const [category, setCategory] = useState<Category>("all");
 
-  // Measure palette height so toggle button matches it
+  const categorySets: Record<Category, Set<string>> = {
+    all: new Set(paletteBlocks.map((b) => b.type)),
+    moves: new Set(["forward", "backward", "clockwise", "countclockwise", "up", "down"]),
+    utils: new Set(["delay", "speed-low", "speed-high", "lamp-on", "lamp-off"]),
+  };
+
+  const applyCategoryFilter = (types: string[], cat: Category): string[] => {
+    if (cat === "all") return types;
+    const allowed = categorySets[cat];
+    return types.filter((t) => allowed.has(t));
+  };
+
+  // projectTypes: result of project filtering & ordering
+  const [projectTypes, setProjectTypes] = useState<string[]>(() => computeTypesForProject(selectedProject));
+  // displayedTypes: projectTypes after category filter (what is actually shown)
+  const [displayedTypes, setDisplayedTypes] = useState<string[]>(
+    () => applyCategoryFilter(computeTypesForProject(selectedProject), category)
+  );
+
+  // Measure palette height so toggle button and chooser can match it
   useEffect(() => {
     const measure = () => {
       if (paletteRef.current) {
@@ -94,25 +117,46 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
 
   // If selectedProject changes, animate palette close, swap types, then open
   useEffect(() => {
-    const nextTypes = computeTypesForProject(selectedProject);
+    const nextProjectTypes = computeTypesForProject(selectedProject);
 
     const equal =
-      nextTypes.length === displayedTypes.length &&
-      nextTypes.every((t, i) => t === displayedTypes[i]);
+      nextProjectTypes.length === projectTypes.length &&
+      nextProjectTypes.every((t, i) => t === projectTypes[i]);
     if (equal) return;
 
     // close palette, swap array after transition, then open
     setIsOpen(false);
-    const paletteTransitionMs = 380;
-    const buffer = 60;
     if (swapTimer.current) clearTimeout(swapTimer.current);
     swapTimer.current = setTimeout(() => {
-      setDisplayedTypes(nextTypes);
+      swapTimer.current = null;
+      setProjectTypes(nextProjectTypes);
+      // after project types updated, also update displayed types according to current category
+      const nextDisplayed = applyCategoryFilter(nextProjectTypes, category);
+      setDisplayedTypes(nextDisplayed);
       // ensure the re-open animation runs in the next frame
       requestAnimationFrame(() => setIsOpen(true));
+    }, PALETTE_TRANSITION_MS + PALETTE_BUFFER_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProject]);
+
+  // If category changes, animate palette close, swap displayed types, then open
+  useEffect(() => {
+    const nextDisplayed = applyCategoryFilter(projectTypes, category);
+
+    const equal =
+      nextDisplayed.length === displayedTypes.length &&
+      nextDisplayed.every((t, i) => t === displayedTypes[i]);
+    if (equal) return;
+
+    setIsOpen(false);
+    if (swapTimer.current) clearTimeout(swapTimer.current);
+    swapTimer.current = setTimeout(() => {
       swapTimer.current = null;
-    }, paletteTransitionMs + buffer);
-  }, [selectedProject, displayedTypes]);
+      setDisplayedTypes(nextDisplayed);
+      requestAnimationFrame(() => setIsOpen(true));
+    }, PALETTE_TRANSITION_MS + PALETTE_BUFFER_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
 
   const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -134,17 +178,34 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     setIsOpen((s) => !s);
   }, []);
 
+  const setCategoryAndAnimate = (cat: Category) => {
+    // clicking same category does nothing
+    if (cat === category) return;
+    setCategory(cat);
+  };
+
   const paletteTransform = isOpen ? "translateY(0)" : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
-  const paletteTransition = "transform 380ms cubic-bezier(.2,.9,.2,1)";
+  const paletteTransition = `transform ${PALETTE_TRANSITION_MS}ms cubic-bezier(.2,.9,.2,1)`;
 
   // Build filtered blocks in the order of displayedTypes
   const filteredBlocks: Block[] = displayedTypes
     .map((t) => typeMap[t])
     .filter((b): b is Block => !!b);
 
+  // small helper for icon button styles
+  const iconBtnBase =
+    "inline-flex items-center justify-center w-8 h-8 rounded-md cursor-pointer select-none transition-transform active:scale-95";
+  const iconSelectedInner = "rounded-md px-1.5 py-1";
+  const iconUnselectedInner = "";
+
+  // compute chooser bottom offset so it sits just above the palette
+  // when palette is open: place chooser above paletteHeight + 12
+  // when palette is closed: place chooser above the visible toggle area (approx TOGGLE_WIDTH) + 12
+  const chooserBottom = isOpen ? (paletteHeight ? paletteHeight + 12 : 84) : TOGGLE_WIDTH + 12;
+
   return (
     <>
-      {/* Toggle button */}
+      {/* Toggle button (left) */}
       <button
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close palette" : "Open palette"}
@@ -179,6 +240,93 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
         </div>
       </button>
 
+      {/* Category chooser - OUTSIDE palette with full border & bg */}
+      <div
+        aria-label="Palette category chooser"
+        role="tablist"
+        style={{
+          position: "fixed",
+          right: 5,
+          bottom: chooserBottom - 8,
+          zIndex: 60,
+        }}
+      >
+        <div
+          className={
+            "flex items-center space-x-2 px-3 py-2 rounded-lg shadow-sm " +
+            "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
+          }
+          style={{
+            minWidth: 120,
+            // subtle backdrop blur for nicer look on some UIs
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          {/* All */}
+          <button
+            aria-pressed={category === "all"}
+            title="All"
+            onClick={() => setCategoryAndAnimate("all")}
+            className={
+              iconBtnBase +
+              " " +
+              (category === "all" ? "bg-slate-100 dark:bg-slate-700" : "bg-transparent")
+            }
+            style={{
+              borderRadius: 10,
+              padding: 6,
+            }}
+          >
+            <ListFilter
+              size={16}
+              className={category === "all" ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}
+            />
+          </button>
+
+          {/* Moves */}
+          <button
+            aria-pressed={category === "moves"}
+            title="Moves"
+            onClick={() => setCategoryAndAnimate("moves")}
+            className={
+              iconBtnBase +
+              " " +
+              (category === "moves" ? "bg-slate-100 dark:bg-slate-700" : "bg-transparent")
+            }
+            style={{
+              borderRadius: 10,
+              padding: 6,
+            }}
+          >
+            <Move
+              size={16}
+              className={category === "moves" ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}
+            />
+          </button>
+
+          {/* Utils */}
+          <button
+            aria-pressed={category === "utils"}
+            title="Utils"
+            onClick={() => setCategoryAndAnimate("utils")}
+            className={
+              iconBtnBase +
+              " " +
+              (category === "utils" ? "bg-slate-100 dark:bg-slate-700" : "bg-transparent")
+            }
+            style={{
+              borderRadius: 10,
+              padding: 6,
+            }}
+          >
+            <Wrench
+              size={16}
+              className={category === "utils" ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}
+            />
+          </button>
+        </div>
+      </div>
+
       {/* Palette container */}
       <div
         className={
@@ -210,6 +358,8 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
             paddingRight: 18,
             // ensure touch scrolling is smooth
             WebkitOverflowScrolling: "touch" as any,
+            position: "relative",
+            whiteSpace: "nowrap", // ensure one row
           }}
         >
           <div style={{ minWidth: 8 }} />

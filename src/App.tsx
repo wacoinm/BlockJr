@@ -14,6 +14,7 @@ import { Block } from './types/Block';
 import { BlockPalette } from './components/BlockPalette';
 import { BluetoothConnector } from './components/BluetoothConnector';
 import { Workspace } from './components/Workspace';
+import WorkspaceControls from './components/WorkspaceControls';
 import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
 import {
   MousePointer2,
@@ -22,12 +23,8 @@ import {
   Monitor,
   Sun,
   Moon,
-  X,
   FolderOpenDot,
-  FolderKanban
 } from 'lucide-react';
-import Kamaan from '../public/icon.svg?react';
-import KamaanLight from "../public/icon-light.svg?react";
 import Header from './components/Header';
 import { SplashScreen } from '@capacitor/splash-screen';
 
@@ -43,7 +40,6 @@ const App: React.FC = () => {
   );
 
   // --- Capture history (temporary storage) ---
-  // array of Block[] snapshots
   const [captures, setCaptures] = useState<Block[][]>([]);
   const capturesRef = useRef<Block[][]>(captures);
   useEffect(() => {
@@ -612,7 +608,7 @@ const App: React.FC = () => {
     { key: '10m', label: '10m', value: 0.01 },
     { key: '1s', label: '1s', value: 1 },
   ];
-  const [unitIndex, setUnitIndex] = useState<number>(0); // default to first (100m)
+  const [unitIndex, setUnitIndex] = useState<number>(0); // default to first
   const unitValue = unitOptions[unitIndex].value;
   const unitLabel = unitOptions[unitIndex].label;
   const cycleUnit = useCallback(() => {
@@ -628,7 +624,6 @@ const App: React.FC = () => {
       const flag = blocksMap.get(blockId);
       if (flag && flag.childId) {
         const executionChain = getChain(flag.childId);
-        // pass unitValue (100, 10, or 1000) to the executor
         executeBlocks(executionChain, unitValue);
       }
     },
@@ -681,7 +676,7 @@ const App: React.FC = () => {
   // --- Select Project popup states & animation config ---
   const [selectVisible, setSelectVisible] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<string | null>("elevator");
+  const [selectedProject, setSelectedProject] = useState<string | null>('elevator');
 
   // animation timing (ms)
   const ITEM_STAGGER = 80;
@@ -830,151 +825,27 @@ const App: React.FC = () => {
           onConnectionChange={setIsBluetoothConnected}
         />
 
-        {/* Hamburger + animated FABs */}
-        <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-3">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((p) => !p)}
-            className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 transition-transform duration-200 hover:scale-105"
-          >
-            <div className="relative w-6 h-6">
-              {theme === 'dark' ? (
-                <Kamaan
-                  className={`absolute inset-0 w-6 h-6 scale-[200%] transform transition-all duration-300 ${
-                    menuOpen ? 'scale-0 rotate-90 opacity-0' : 'scale-100 opacity-100'
-                  }`}
-                />
-              ) : (
-                <KamaanLight
-                  className={`absolute inset-0 w-6 h-6 scale-[200%] transform transition-all duration-300 ${
-                    menuOpen ? 'scale-0 rotate-90 opacity-0' : 'scale-100 opacity-100'
-                  }`}
-                />
-              )}
-              
-              <X
-                className={`absolute inset-0 w-6 h-6 transform transition-all duration-300 ${
-                  menuOpen ? 'scale-100 rotate-90 opacity-100' : 'scale-0 opacity-0'
-                }`}
-              />
-            </div>
-          </button>
-
-          {fabItems.map((f, idx) => {
-            const delay = idx * 80;
-            return (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => {
-                  f.onClick();
-                }}
-                style={{ transitionDelay: `${delay}ms` }}
-                className={`
-                  w-12 h-12 rounded-full shadow-lg flex items-center justify-center
-                  transform transition-all duration-300
-                  ${
-                    menuOpen
-                      ? 'scale-100 opacity-100 translate-y-0'
-                      : 'scale-75 opacity-0 -translate-y-2 pointer-events-none'
-                  }
-                  ${
-                    f.key === 'interaction' && interactionMode === 'deleter'
-                      ? 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700'
-                      : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700'
-                  }
-                `}
-                aria-label={f.key === 'unit' ? `Unit: ${unitLabel}` : f.key}
-                title={f.key === 'unit' ? `Unit: ${unitLabel} (click to cycle)` : undefined}
-              >
-                {f.content}
-              </button>
-            );
-          })}
-        </div>
-
-        {selectVisible && (
-          <div
-            className="fixed inset-0 z-[88] pointer-events-auto"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) closeSelectPopup();
-            }}
-            aria-modal="true"
-            role="dialog"
-          >
-            <div
-              className={`absolute inset-0 bg-black transition-opacity`}
-              style={{
-                zIndex: 88,
-                transitionDuration: `${BASE_DURATION}ms`,
-                opacity: selectOpen ? 0.36 : 0,
-              }}
-            />
-
-            <div
-              className="absolute right-6 top-20"
-              style={{ zIndex: 90 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div
-                className={`relative w-64 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl p-4 transform origin-top-right`}
-                style={{
-                  transitionProperty: 'transform, opacity',
-                  transitionDuration: `${BASE_DURATION}ms`,
-                  transform: selectOpen ? 'translateY(0px) scale(1)' : 'translateY(6px) scale(0.96)',
-                  opacity: selectOpen ? 1 : 0,
-                }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className='flex gap-1 items-center'>
-                    <FolderKanban className='w-5 h-5' />
-                    <div className="text-sm font-semibold">Projects</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeSelectPopup();
-                    }}
-                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700"
-                    aria-label="Close select project"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  {projects.map((p, i) => {
-                    const openDelay = i * ITEM_STAGGER;
-                    const closeDelay = (projects.length - 1 - i) * ITEM_STAGGER;
-                    const delay = selectOpen ? openDelay : closeDelay;
-                    return (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => handleProjectSelect(p)}
-                        className="w-full text-left px-3 py-2 rounded-lg transform transition-all"
-                        style={{
-                          transitionProperty: 'transform, opacity',
-                          transitionDuration: `${ITEM_DURATION}ms`,
-                          transitionDelay: `${delay}ms`,
-                          transform: selectOpen ? 'translateY(0px) scale(1)' : 'translateY(-6px) scale(0.96)',
-                          opacity: selectOpen ? 1 : 0,
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        <div className="text-sm capitalize">{p}</div>
-                        {selectedProject === p && (
-                          <div className="text-xs text-slate-500">Selected</div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Workspace controls (hamburger, FABs, project popup, debug panel) */}
+        <WorkspaceControls
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          fabItems={fabItems}
+          selectVisible={selectVisible}
+          selectOpen={selectOpen}
+          closeSelectPopup={closeSelectPopup}
+          projects={projects}
+          selectedProject={selectedProject}
+          handleProjectSelect={handleProjectSelect}
+          ITEM_STAGGER={ITEM_STAGGER}
+          BASE_DURATION={BASE_DURATION}
+          ITEM_DURATION={ITEM_DURATION}
+          viewportWidth={viewportWidth}
+          zoom={zoom}
+          panX={pan.x}
+          panY={pan.y}
+          unitLabel={unitLabel}
+          theme={theme}
+        />
 
         <Workspace
           blocks={blocks}
@@ -992,20 +863,6 @@ const App: React.FC = () => {
           interactionMode={interactionMode}
         />
         <BlockPalette onBlockDrag={handleDragStart} selectedProject={selectedProject} />
-
-        <div className="fixed right-4 bottom-4 text-xs text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-900/80 px-3 py-2 rounded-md shadow-sm z-60">
-          <div>vw: {viewportWidth}px</div>
-          <div>zoom: {zoom.toFixed(2)}</div>
-          <div>
-            pan: {Math.round(pan.x)}, {Math.round(pan.y)}
-          </div>
-          <div className="mt-1 text-xs text-slate-500">
-            project: {selectedProject ?? 'none'}
-          </div>
-          <div className="mt-1 text-xs text-slate-500">
-            unit: {unitLabel}
-          </div>
-        </div>
       </div>
     </SoundContext.Provider>
   );

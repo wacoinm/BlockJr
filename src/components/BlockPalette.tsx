@@ -34,6 +34,13 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const [paletteHeight, setPaletteHeight] = useState<number>(0);
 
+  // New refs for press / move handling
+  const pointerStartY = useRef<number | null>(null);
+  const activeBlockRef = useRef<Block | null>(null);
+  const holdArmedRef = useRef<boolean>(false); // set true after hold timer fires
+  const dragStartedRef = useRef<boolean>(false); // set true once onBlockDrag is called
+  const movedTooFarBeforeHoldRef = useRef<boolean>(false); // cancel if user moves before hold completes
+
   const TOGGLE_WIDTH = 34;
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
@@ -112,7 +119,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     return () => {
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (swapTimer.current) clearTimeout(swapTimer.current);
+      removeDocumentListeners();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // If selectedProject changes, animate palette close, swap types, then open
@@ -158,20 +167,171 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
-    // small hold delay to start drag
-    holdTimer.current = setTimeout(() => {
-      holdTimer.current = null;
-      onBlockDrag(block, e as any);
-    }, 200);
+  // ---------- New logic: hold -> only start drag once pointer moves above palette ----------
+  // thresholds
+  const HOLD_MS = 10;
+  const MOVE_CANCEL_THRESHOLD = 8; // px: if moved this much before hold fires, cancel hold
+  const START_DRAG_OFFSET = 10; // px above palette top to start actual drag
+
+  // Helper: remove document listeners
+  const removeDocumentListeners = () => {
+    document.removeEventListener("touchmove", onDocumentTouchMove as any, { passive: false });
+    document.removeEventListener("touchend", onDocumentTouchEnd as any);
+    document.removeEventListener("touchcancel", onDocumentTouchEnd as any);
+    document.removeEventListener("mousemove", onDocumentMouseMove as any);
+    document.removeEventListener("mouseup", onDocumentMouseUp as any);
   };
 
-  const handlePressEnd = () => {
+  // Document-level handlers to observe pointer movement while holding
+  function onDocumentTouchMove(ev: TouchEvent) {
+    if (!ev.touches || ev.touches.length === 0) return;
+    const touch = ev.touches[0];
+    const y = touch.clientY;
+    const startY = pointerStartY.current;
+    if (startY == null) return;
+
+    // If hold not yet armed, cancel if moved too far (user is likely scrolling)
+    if (!holdArmedRef.current) {
+      if (Math.abs(y - startY) > MOVE_CANCEL_THRESHOLD) {
+        movedTooFarBeforeHoldRef.current = true;
+        if (holdTimer.current) {
+          clearTimeout(holdTimer.current);
+          holdTimer.current = null;
+        }
+        removeDocumentListeners();
+      }
+      return;
+    }
+
+    // If hold is armed but drag hasn't started: check if pointer moved above palette top to start drag
+    if (holdArmedRef.current && !dragStartedRef.current) {
+      const paletteTop = paletteRef.current?.getBoundingClientRect().top ?? Infinity;
+      if (y < paletteTop - START_DRAG_OFFSET) {
+        // start drag: call onBlockDrag with a synthetic React.TouchEvent wrapper if needed
+        dragStartedRef.current = true;
+        // Build a minimal React.TouchEvent-like object to send forward: use the original TouchEvent as legacy event
+        const synthetic = (ev as unknown) as React.TouchEvent;
+        if (activeBlockRef.current) {
+          onBlockDrag(activeBlockRef.current, synthetic);
+        }
+        // we can keep listening until touchend so parent can manage actual drag moves
+      }
+    }
+  }
+
+  function onDocumentTouchEnd(_ev: TouchEvent) {
+    // reset everything
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
     }
+    holdArmedRef.current = false;
+    dragStartedRef.current = false;
+    movedTooFarBeforeHoldRef.current = false;
+    pointerStartY.current = null;
+    activeBlockRef.current = null;
+    removeDocumentListeners();
+  }
+
+  function onDocumentMouseMove(ev: MouseEvent) {
+    const y = ev.clientY;
+    const startY = pointerStartY.current;
+    if (startY == null) return;
+
+    if (!holdArmedRef.current) {
+      if (Math.abs(y - startY) > MOVE_CANCEL_THRESHOLD) {
+        movedTooFarBeforeHoldRef.current = true;
+        if (holdTimer.current) {
+          clearTimeout(holdTimer.current);
+          holdTimer.current = null;
+        }
+        removeDocumentListeners();
+      }
+      return;
+    }
+
+    if (holdArmedRef.current && !dragStartedRef.current) {
+      const paletteTop = paletteRef.current?.getBoundingClientRect().top ?? Infinity;
+      if (y < paletteTop - START_DRAG_OFFSET) {
+        dragStartedRef.current = true;
+        const synthetic = (ev as unknown) as React.MouseEvent;
+        if (activeBlockRef.current) {
+          onBlockDrag(activeBlockRef.current, synthetic);
+        }
+      }
+    }
+  }
+
+  function onDocumentMouseUp(_ev: MouseEvent) {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    holdArmedRef.current = false;
+    dragStartedRef.current = false;
+    movedTooFarBeforeHoldRef.current = false;
+    pointerStartY.current = null;
+    activeBlockRef.current = null;
+    removeDocumentListeners();
+  }
+
+  // Start press (mouse or touch)
+  const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
+    // store active block (we will only trigger onBlockDrag if pointer moves above palette after hold)
+    activeBlockRef.current = block;
+    movedTooFarBeforeHoldRef.current = false;
+    dragStartedRef.current = false;
+    holdArmedRef.current = false;
+
+    // extract startY
+    let clientY: number | null = null;
+    if ("touches" in e && e.touches && e.touches.length > 0) {
+      clientY = e.touches[0].clientY;
+    } else if ("clientY" in e) {
+      clientY = (e as React.MouseEvent).clientY;
+    }
+    pointerStartY.current = clientY;
+
+    // attach document listeners (so we can observe movement even if pointer leaves element)
+    document.addEventListener("touchmove", onDocumentTouchMove as any, { passive: false });
+    document.addEventListener("touchend", onDocumentTouchEnd as any);
+    document.addEventListener("touchcancel", onDocumentTouchEnd as any);
+    document.addEventListener("mousemove", onDocumentMouseMove as any);
+    document.addEventListener("mouseup", onDocumentMouseUp as any);
+
+    // start hold timer -> after HOLD_MS we set holdArmedRef to true.
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+    }
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      // Only arm the hold if the pointer hasn't moved away before hold completed
+      if (!movedTooFarBeforeHoldRef.current) {
+        holdArmedRef.current = true;
+        // Note: we DO NOT call onBlockDrag here. We wait until user moves the pointer above paletteTop.
+        // This prevents accidental drags while holding and scrolling inside the palette.
+      } else {
+        // moved too far before hold; treat as cancellation
+        holdArmedRef.current = false;
+        // cleanup will occur from the move handlers or end handlers
+      }
+    }, HOLD_MS);
+  };
+
+  // End press (mouse or touch)
+  const handlePressEnd = () => {
+    // cancel any pending hold
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    // if drag already started, let parent handle mouseup/touchend for actual drop handling, but reset here as well
+    holdArmedRef.current = false;
+    dragStartedRef.current = false;
+    movedTooFarBeforeHoldRef.current = false;
+    pointerStartY.current = null;
+    activeBlockRef.current = null;
+    removeDocumentListeners();
   };
 
   const toggleOpen = useCallback(() => {

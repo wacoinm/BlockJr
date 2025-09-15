@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import Header from './components/Header';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { useCaptureHistory } from './hooks/useCaptureHistory';
 
 export const SoundContext = createContext(() => {});
 
@@ -39,71 +40,19 @@ const App: React.FC = () => {
     typeof window !== 'undefined' ? window.innerWidth : 1024,
   );
 
-  // --- Capture history (temporary storage) ---
-  const [captures, setCaptures] = useState<Block[][]>([]);
-  const capturesRef = useRef<Block[][]>(captures);
-  useEffect(() => {
-    capturesRef.current = captures;
-  }, [captures]);
-
-  const [captureIndex, setCaptureIndex] = useState<number>(-1);
-  const captureIndexRef = useRef<number>(-1);
-  useEffect(() => {
-    captureIndexRef.current = captureIndex;
-  }, [captureIndex]);
-
   const blocksRef = useRef<Block[]>(blocks);
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
 
-  const cloneSnapshot = (arr: Block[]) => arr.map((b) => ({ ...b }));
-  const snapshotKey = (arr: Block[]) => JSON.stringify(arr);
-
-  const submitCapture = useCallback((snapshot?: Block[]) => {
-    const snap = snapshot ? cloneSnapshot(snapshot) : cloneSnapshot(blocksRef.current);
-    setCaptures((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && snapshotKey(last) === snapshotKey(snap)) {
-        return prev;
-      }
-
-      // truncate any redo history beyond current index
-      const base = prev.slice(0, captureIndexRef.current + 1);
-      const next = [...base, snap];
-      const newIndex = next.length - 1;
-      captureIndexRef.current = newIndex;
-      setCaptureIndex(newIndex);
-      return next;
-    });
-  }, []);
-
-  // navigate prev/next using capturesRef to avoid stale closures
-  const goPrev = useCallback(() => {
-    const curIndex = captureIndexRef.current;
-    if (curIndex <= 0) return;
-    const newIndex = curIndex - 1;
-    const snap = capturesRef.current[newIndex];
-    if (!snap) return;
-    const cloned = cloneSnapshot(snap);
-    captureIndexRef.current = newIndex;
-    setCaptureIndex(newIndex);
-    setBlocks(cloned);
-    blocksRef.current = cloned;
-  }, []);
-
-  const goNext = useCallback(() => {
-    const curIndex = captureIndexRef.current;
-    if (curIndex >= capturesRef.current.length - 1) return;
-    const newIndex = curIndex + 1;
-    const snap = capturesRef.current[newIndex];
-    if (!snap) return;
-    const cloned = cloneSnapshot(snap);
-    captureIndexRef.current = newIndex;
-    setCaptureIndex(newIndex);
-    setBlocks(cloned);
-    blocksRef.current = cloned;
-  }, []);
+  // Use the extracted capture/history hook
+  const {
+    submitCapture,
+    goPrev,
+    goNext,
+    hasPrev,
+    hasNext,
+  } = useCaptureHistory(blocksRef, setBlocks);
 
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -805,10 +754,6 @@ const App: React.FC = () => {
     setSelectedProject(proj);
     closeSelectPopup();
   };
-
-  // header props for prev/next
-  const hasPrev = captureIndex > 0;
-  const hasNext = captureIndex < captures.length - 1;
 
   return (
     <SoundContext.Provider value={playSnapSound}>

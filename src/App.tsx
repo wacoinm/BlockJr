@@ -608,9 +608,9 @@ const App: React.FC = () => {
 
   // --- Unit selector additions ---
   const unitOptions = [
-    { key: '100m', label: '100m', value: 100 },
-    { key: '10m', label: '10m', value: 10 },
-    { key: '1s', label: '1s', value: 1000 },
+    { key: '100m', label: '100m', value: 0.1 },
+    { key: '10m', label: '10m', value: 0.01 },
+    { key: '1s', label: '1s', value: 1 },
   ];
   const [unitIndex, setUnitIndex] = useState<number>(0); // default to first (100m)
   const unitValue = unitOptions[unitIndex].value;

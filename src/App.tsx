@@ -10,11 +10,15 @@ import React, {
 import { useSnapSound } from './utils/soundEffects';
 import { executeBlocks } from './utils/blockExecutor';
 import { Block } from './types/Block';
-import { BlockPalette } from './components/BlockPalette';
-import { BluetoothConnector } from './components/BluetoothConnector';
-import { Workspace } from './components/Workspace';
-import WorkspaceControls from './components/WorkspaceControls';
-import { ensureBluetoothPermissions } from './utils/ensureBluetoothPermissions';
+import Header from './components/Header';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { useCaptureHistory } from './hooks/useCaptureHistory';
+import useBlockDragDrop from './hooks/useBlockDragDrop';
+import usePanZoom from './hooks/usePanZoom';
+import useTheme from './hooks/useTheme';
+import useProjects from './hooks/useProjects';
+import useUnits from './hooks/useUnits';
+import AppShell, { PointerEventLike } from './components/AppShell';
 import {
   MousePointer2,
   Trash2,
@@ -24,45 +28,69 @@ import {
   Moon,
   FolderOpenDot,
 } from 'lucide-react';
-import Header from './components/Header';
-import { SplashScreen } from '@capacitor/splash-screen';
-import { useCaptureHistory } from './hooks/useCaptureHistory';
-import useBlockDragDrop from './hooks/useBlockDragDrop';
-import usePanZoom from './hooks/usePanZoom';
 
-export const SoundContext = createContext(() => {});
+export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
+  // blocks + history
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
-  const playSnapSound = useSnapSound();
-  const blocksMap = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks]);
-  const [viewportWidth, setViewportWidth] = useState<number>(
-    typeof window !== 'undefined' ? window.innerWidth : 1024,
-  );
-
   const blocksRef = useRef<Block[]>(blocks);
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
 
-  // Use the extracted capture/history hook
-  const {
-    submitCapture,
-    goPrev,
-    goNext,
-    hasPrev,
-    hasNext,
-  } = useCaptureHistory(blocksRef, setBlocks);
+  const { submitCapture, goPrev, goNext, hasPrev, hasNext } = useCaptureHistory(blocksRef, setBlocks);
 
+  // bluetooth connection state
+  const [isBluetoothConnected, setIsBluetoothConnected] = useState<boolean>(false);
+
+  // other global UI state
+  const [viewportWidth, setViewportWidth] = useState<number>(
+    typeof window !== 'undefined' ? window.innerWidth : 1024,
+  );
+
+  // sound
+  const playSnapSound = useSnapSound();
+
+  // derived map of blocks for O(1) lookup
+  const blocksMap = useMemo(() => new Map<string, Block>(blocks.map((b) => [b.id, b])), [blocks]);
+
+  // attempt to call ensureBluetoothPermissions if module exists (dynamic import to avoid build-time error)
   useEffect(() => {
-    ensureBluetoothPermissions().catch((err) => console.error(err));
+    let mounted = true;
+    (async () => {
+      try {
+        // dynamic import avoids compile error if file missing
+        // expected export: export function ensureBluetoothPermissions(): Promise<void>
+        // if not present, this will throw and be caught below
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = await import('./utils/ensureBluetoothPermissions');
+        if (!mounted) return;
+        if (typeof mod.ensureBluetoothPermissions === 'function') {
+          await mod.ensureBluetoothPermissions();
+        }
+      } catch (err) {
+        console.warn('ensureBluetoothPermissions not available or failed:', err);
+      }
+    })();
+
     const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener('resize', onResize);
-    SplashScreen.hide().catch(err => {
-      console.warn('Failed to hide splash screen:', err);
-    });
-    return () => window.removeEventListener('resize', onResize);
+
+    // hide splash if capacitor present
+    void (async () => {
+      try {
+        await SplashScreen.hide();
+      } catch (err) {
+        // not critical
+        console.warn('Failed to hide splash screen:', err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   const isMobile = viewportWidth < 768;
@@ -71,54 +99,53 @@ const App: React.FC = () => {
   const HORIZONTAL_GAP = isMobile ? -2 : 2;
   const HORIZONTAL_SPACING = BLOCK_WIDTH + HORIZONTAL_GAP;
 
-  // --- usePanZoom hook (pan & zoom encapsulated) ---
+  // pan & zoom (hook)
   const { pan, zoom, screenToWorld, zoomBy, panBy } = usePanZoom({ x: 0, y: 0 }, 1);
 
+  // helper functions
   const getChain = useCallback(
     (startBlockId: string): Block[] => {
       const chain: Block[] = [];
       let currentBlock = blocksMap.get(startBlockId);
       while (currentBlock) {
         chain.push(currentBlock);
-        currentBlock = currentBlock.childId
-          ? blocksMap.get(currentBlock.childId)
-          : undefined;
+        currentBlock = currentBlock.childId ? blocksMap.get(currentBlock.childId) : undefined;
       }
       return chain;
     },
     [blocksMap],
   );
 
-  const getClientXY = useCallback(
-    (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
-      if ('touches' in e && e.touches && e.touches.length > 0) {
-        const t = e.touches[0];
-        return { clientX: t.clientX, clientY: t.clientY };
-      }
-      if ('clientX' in e && 'clientY' in e) {
-        return {
-          clientX: (e as React.MouseEvent | React.PointerEvent).clientX,
-          clientY: (e as React.MouseEvent | React.PointerEvent).clientY,
-        };
-      }
-      return { clientX: 0, clientY: 0 };
-    },
-    [],
-  );
+  const getClientXY = useCallback((e: PointerEventLike) => {
+    if ('touches' in e && e.touches && e.touches.length > 0) {
+      const t = e.touches[0];
+      return { clientX: t.clientX, clientY: t.clientY };
+    }
+    if ('clientX' in e && 'clientY' in e) {
+      // mouse or pointer event
+      return {
+        clientX: (e as React.MouseEvent).clientX,
+        clientY: (e as React.MouseEvent).clientY,
+      };
+    }
+    return { clientX: 0, clientY: 0 };
+  }, []);
 
+  // apply updates + normalize chains/positions
   const applyUpdatesAndNormalize = useCallback(
-    (updates: Map<string, Partial<Block>>, capture: boolean = true) => {
+    (updates: Map<string, Partial<Block>>, capture = true) => {
       setBlocks((prev) => {
+        // merge updates
         let merged = prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : { ...b }));
 
+        // recompute childId from parentId relationships
         const parentToChild = new Map<string, string>();
         for (const b of merged) {
-          if (b.parentId) {
-            parentToChild.set(b.parentId, b.id);
-          }
+          if (b.parentId) parentToChild.set(b.parentId, b.id);
         }
         merged = merged.map((b) => ({ ...b, childId: parentToChild.get(b.id) ?? null }));
 
+        // normalize head chains horizontal spacing
         const heads = merged.filter((b) => b.parentId == null);
         for (const head of heads) {
           const headIndex = merged.findIndex((m) => m.id === head.id);
@@ -149,7 +176,7 @@ const App: React.FC = () => {
     [HORIZONTAL_SPACING, submitCapture],
   );
 
-  // --- useBlockDragDrop hook ---
+  // block drag/drop hook (typed)
   const { handleDragStart, isDragging, draggedBlock } = useBlockDragDrop({
     blocksRef,
     setBlocks,
@@ -165,23 +192,26 @@ const App: React.FC = () => {
     getClientXY,
   });
 
-  // --- Unit selector additions ---
-  const unitOptions = [
-    { key: '100m', label: '100m', value: 0.1 },
-    { key: '10m', label: '10m', value: 0.01 },
-    { key: '1s', label: '1s', value: 1 },
-  ];
-  const [unitIndex, setUnitIndex] = useState<number>(0); // default to first
-  const unitValue = unitOptions[unitIndex].value;
-  const unitLabel = unitOptions[unitIndex].label;
-  const cycleUnit = useCallback(() => {
-    setUnitIndex((i) => (i + 1) % unitOptions.length);
-  }, []);
+  // units / projects / theme hooks (typed)
+  const { unitLabel, unitValue, cycleUnit } = useUnits();
+  const {
+    selectVisible,
+    selectOpen,
+    selectedProject,
+    openSelectPopup,
+    closeSelectPopup,
+    handleProjectSelect,
+    ITEM_STAGGER,
+    BASE_DURATION,
+    ITEM_DURATION,
+  } = useProjects('elevator');
+  const { theme, cycleTheme } = useTheme('system');
 
-  // Green flag execution — passes unitValue to executor
+  // actions: green flag
   const handleGreenFlagClick = useCallback(
     async (blockId: string) => {
       if (!isBluetoothConnected) {
+        // keep the original behavior but don't block execution
         alert('You must connect to a device');
       }
       const flag = blocksMap.get(blockId);
@@ -193,14 +223,14 @@ const App: React.FC = () => {
     [blocksMap, getChain, isBluetoothConnected, unitValue],
   );
 
-  const handleDelayChange = useCallback((blockId: string, value: number) => {
-    setBlocks((prev) =>
-      prev.map((block) => (block.id === blockId ? { ...block, value } : block)),
-    );
-    // capture change (dedupe will skip if no real change)
-    // we schedule a microtask to ensure blocksRef updated first
-    setTimeout(() => submitCapture(), 0);
-  }, [submitCapture]);
+  const handleDelayChange = useCallback(
+    (blockId: string, value: number) => {
+      setBlocks((prev) => prev.map((block) => (block.id === blockId ? { ...block, value } : block)));
+      // schedule capture microtask
+      setTimeout(() => submitCapture(), 0);
+    },
+    [submitCapture],
+  );
 
   const handleBlockRemove = useCallback(
     (blockId: string) => {
@@ -215,9 +245,7 @@ const App: React.FC = () => {
       if (blockToRemove.parentId) {
         const parent = blocksMap.get(blockToRemove.parentId);
         if (parent) {
-          newBlocks = newBlocks.map((b) =>
-            b.id === parent.id ? { ...b, childId: null } : b,
-          );
+          newBlocks = newBlocks.map((b) => (b.id === parent.id ? { ...b, childId: null } : b));
         }
       }
 
@@ -229,88 +257,16 @@ const App: React.FC = () => {
       });
       playSnapSound();
     },
-    [blocksMap, getChain, playSnapSound, submitCapture, blocks],
+    [blocks, blocksMap, getChain, playSnapSound, submitCapture],
   );
 
-  const [interactionMode, setInteractionMode] =
-    useState<'runner' | 'deleter'>('runner');
-  const [bluetoothOpen, setBluetoothOpen] = useState(false);
+  // UI state
+  const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>('runner');
+  const [bluetoothOpen, setBluetoothOpen] = useState<boolean>(false);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
 
-  // --- Select Project popup states & animation config ---
-  const [selectVisible, setSelectVisible] = useState(false);
-  const [selectOpen, setSelectOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<string | null>('elevator');
-
-  // animation timing (ms)
-  const ITEM_STAGGER = 80;
-  const BASE_DURATION = 220;
-  const ITEM_DURATION = 180;
-  const totalCloseDelay = BASE_DURATION + ITEM_STAGGER * 2 + 40;
-
-  const openSelectPopup = useCallback(() => {
-    setSelectVisible(true);
-    requestAnimationFrame(() => {
-      setSelectOpen(true);
-    });
-  }, []);
-
-  const closeSelectPopup = useCallback(() => {
-    setSelectOpen(false);
-    // unmount after animation + stagger
-    setTimeout(() => {
-      setSelectVisible(false);
-    }, totalCloseDelay);
-  }, [totalCloseDelay]);
-
-  // keyboard ESC to close
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selectVisible) closeSelectPopup();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectVisible, closeSelectPopup]);
-
-  // theme
-  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(() => {
-    try {
-      return (localStorage.getItem('theme') as 'system' | 'light' | 'dark') ?? 'system';
-    } catch {
-      return 'system';
-    }
-  });
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
-    const apply = () => {
-      if (theme === 'dark') document.documentElement.classList.add('dark');
-      else if (theme === 'light') document.documentElement.classList.remove('dark');
-      else {
-        mq?.matches
-          ? document.documentElement.classList.add('dark')
-          : document.documentElement.classList.remove('dark');
-      }
-    };
-    apply();
-    if (theme === 'system' && mq) {
-      const handler = () => apply();
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
-    }
-  }, [theme]);
-  const cycleTheme = () => {
-    const next =
-      theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
-    setTheme(next);
-    try {
-      localStorage.setItem('theme', next);
-    } catch { /* empty */ }
-  };
-
-  // Hamburger state
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  // FAB items (added 'unit' FAB last — text label, click to cycle unit)
-  const fabItems = [
+  // FAB items (typed)
+  const fabItems: Array<{ key: string; onClick: () => void; content: React.ReactNode }> = [
     {
       key: 'bluetooth',
       onClick: () => setBluetoothOpen((p) => !p),
@@ -319,27 +275,12 @@ const App: React.FC = () => {
     {
       key: 'theme',
       onClick: cycleTheme,
-      content:
-        theme === 'system' ? (
-          <Monitor className="w-6 h-6" />
-        ) : theme === 'light' ? (
-          <Sun className="w-6 h-6" />
-        ) : (
-          <Moon className="w-6 h-6" />
-        ),
+      content: theme === 'system' ? <Monitor className="w-6 h-6" /> : theme === 'light' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />,
     },
     {
       key: 'interaction',
-      onClick: () =>
-        setInteractionMode((prev) =>
-          prev === 'runner' ? 'deleter' : 'runner',
-        ),
-      content:
-        interactionMode === 'runner' ? (
-          <MousePointer2 className="w-6 h-6" />
-        ) : (
-          <Trash2 className="w-6 h-6" />
-        ),
+      onClick: () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner')),
+      content: interactionMode === 'runner' ? <MousePointer2 className="w-6 h-6" /> : <Trash2 className="w-6 h-6" />,
     },
     {
       key: 'selectProject',
@@ -351,41 +292,31 @@ const App: React.FC = () => {
     },
     {
       key: 'unit',
-      onClick: () => {
-        cycleUnit();
-      },
-      content: (
-        <div className="text-xs font-semibold select-none pointer-events-none">
-          {unitLabel}
-        </div>
-      ),
+      onClick: cycleUnit,
+      content: <div className="text-xs font-semibold select-none pointer-events-none">{unitLabel}</div>,
     },
   ];
 
   const projects = ['elevator', 'bulldozer', 'lift truck'];
 
-  const handleProjectSelect = (proj: string) => {
-    setSelectedProject(proj);
-    closeSelectPopup();
-  };
-
   return (
     <SoundContext.Provider value={playSnapSound}>
-      <Header
-        initialCollapsed={false}
-        hasPrev={hasPrev}
-        hasNext={hasNext}
-        onPrev={goPrev}
-        onNext={goNext}
-      />
+      <Header initialCollapsed={false} hasPrev={hasPrev} hasNext={hasNext} onPrev={goPrev} onNext={goNext} />
       <div className="h-screen w-screen overflow-hidden relative">
-        <BluetoothConnector
-          open={bluetoothOpen}
-          onConnectionChange={setIsBluetoothConnected}
-        />
-
-        {/* Workspace controls (hamburger, FABs, project popup, debug panel) */}
-        <WorkspaceControls
+        <AppShell
+          blocks={blocks}
+          isDragging={isDragging}
+          draggedBlockId={draggedBlock?.id}
+          viewportWidth={viewportWidth}
+          panX={pan.x}
+          panY={pan.y}
+          zoom={zoom}
+          onPan={panBy}
+          onZoom={zoomBy}
+          onGreenFlagClick={handleGreenFlagClick}
+          onDelayChange={handleDelayChange}
+          onBlockRemove={handleBlockRemove}
+          onBlockDragStart={handleDragStart}
           menuOpen={menuOpen}
           setMenuOpen={setMenuOpen}
           fabItems={fabItems}
@@ -398,30 +329,13 @@ const App: React.FC = () => {
           ITEM_STAGGER={ITEM_STAGGER}
           BASE_DURATION={BASE_DURATION}
           ITEM_DURATION={ITEM_DURATION}
-          viewportWidth={viewportWidth}
-          zoom={zoom}
-          panX={pan.x}
-          panY={pan.y}
           unitLabel={unitLabel}
           theme={theme}
-        />
-
-        <Workspace
-          blocks={blocks}
-          isDragging={isDragging}
-          draggedBlockId={draggedBlock?.id}
-          onGreenFlagClick={handleGreenFlagClick}
-          onDelayChange={handleDelayChange}
-          onBlockRemove={handleBlockRemove}
-          onBlockDragStart={handleDragStart}
-          panX={pan.x}
-          panY={pan.y}
-          zoom={zoom}
-          onPan={panBy}
-          onZoom={zoomBy}
+          bluetoothOpen={bluetoothOpen}
+          setBluetoothOpen={setBluetoothOpen}
+          onBluetoothConnectionChange={setIsBluetoothConnected}
           interactionMode={interactionMode}
         />
-        <BlockPalette onBlockDrag={handleDragStart} selectedProject={selectedProject} />
       </div>
     </SoundContext.Provider>
   );

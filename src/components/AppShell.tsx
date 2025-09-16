@@ -1,19 +1,26 @@
 // src/components/AppShell.tsx
-import React from 'react';
-import { Block } from '../types/Block';
-import { BluetoothConnector } from './BluetoothConnector';
-import WorkspaceControls from './WorkspaceControls';
-import { Workspace } from './Workspace';
-import { BlockPalette } from './BlockPalette';
+import React from "react";
+import { Block } from "../types/Block";
+import { BluetoothConnector } from "./BluetoothConnector";
+import WorkspaceControls from "./WorkspaceControls";
+import { Workspace } from "./Workspace";
+import { BlockPalette } from "./BlockPalette";
 
-export type FabItem = { key: string; onClick: () => void; content: React.ReactNode };
+export type FabItem = {
+  key: string;
+  onClick: () => void;
+  content: React.ReactNode;
+};
 
 export type PointerEventLike =
   | React.MouseEvent
   | React.PointerEvent
   | React.TouchEvent;
 
-export type OnBlockDragStart = (block: Block, e: PointerEventLike) => Block | void;
+export type OnBlockDragStart = (
+  block: Block,
+  e: PointerEventLike
+) => Block | void;
 
 export type AppShellProps = {
   blocks: Block[];
@@ -48,14 +55,14 @@ export type AppShellProps = {
   BASE_DURATION: number;
   ITEM_DURATION: number;
   unitLabel: string;
-  theme: 'system' | 'light' | 'dark';
+  theme: "system" | "light" | "dark";
 
   // bluetooth
   bluetoothOpen: boolean;
   setBluetoothOpen: (open: boolean) => void;
   onBluetoothConnectionChange: (connected: boolean) => void;
 
-  interactionMode: 'runner' | 'deleter';
+  interactionMode: "runner" | "deleter";
 };
 
 export default function AppShell(props: AppShellProps) {
@@ -95,7 +102,12 @@ export default function AppShell(props: AppShellProps) {
 
   return (
     <>
-      <BluetoothConnector open={bluetoothOpen} onConnectionChange={onBluetoothConnectionChange} />
+      <BluetoothConnector
+        open={bluetoothOpen}
+        onConnectionChange={onBluetoothConnectionChange}
+        isMenuOpen={bluetoothOpen}
+        setIsMenuOpen={setBluetoothOpen}
+      />
 
       <WorkspaceControls
         menuOpen={menuOpen}
@@ -134,7 +146,10 @@ export default function AppShell(props: AppShellProps) {
         interactionMode={interactionMode}
       />
 
-      <BlockPalette onBlockDrag={(block, e) => onBlockDragStart(block, e)} selectedProject={selectedProject ?? ''} />
+      <BlockPalette
+        onBlockDrag={(block, e) => onBlockDragStart(block, e)}
+        selectedProject={selectedProject ?? ""}
+      />
     </>
   );
 }

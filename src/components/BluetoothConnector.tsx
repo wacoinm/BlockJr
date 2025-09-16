@@ -14,13 +14,14 @@ interface DeviceItem {
 interface BluetoothConnectorProps {
   onConnectionChange?: (isConnected: boolean) => void;
   open?: boolean; // optional prop to allow parent to control
-}
+  isMenuOpen: boolean;
+  setIsMenuOpen: (open: boolean) => void;
+} 
 
 type ScanError = Error | { message?: string } | string | null | undefined;
 
-export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange, open }) => {
+export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange, open, isMenuOpen, setIsMenuOpen }) => {
   const isNative = Capacitor.getPlatform() !== 'web';
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [nearbyDevices, setNearbyDevices] = useState<DeviceItem[]>([]);

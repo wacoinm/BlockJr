@@ -1,5 +1,5 @@
 // src/components/Header.tsx
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback /*, useEffect, useRef */ } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface HeaderProps {
@@ -9,7 +9,7 @@ export interface HeaderProps {
   onPrev?: () => void;
   onNext?: () => void;
   className?: string;
-  autoCloseDelay?: number; // ms, default 10000
+  // autoCloseDelay?: number; // ms, default 10000
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -19,11 +19,12 @@ const Header: React.FC<HeaderProps> = ({
   onPrev,
   onNext,
   className = '',
-  autoCloseDelay = 60000,
+  // autoCloseDelay = 60000,
 }) => {
   const [collapsed, setCollapsed] = useState<boolean>(initialCollapsed);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  /*
   const resetAutoCloseTimer = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (!collapsed) {
@@ -39,6 +40,7 @@ const Header: React.FC<HeaderProps> = ({
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [collapsed, resetAutoCloseTimer]);
+  */
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((c) => !c);
@@ -48,20 +50,20 @@ const Header: React.FC<HeaderProps> = ({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!hasPrev) return;
-      resetAutoCloseTimer();
+      // resetAutoCloseTimer();
       onPrev?.();
     },
-    [hasPrev, onPrev, resetAutoCloseTimer],
+    [hasPrev, onPrev],
   );
 
   const handleNext = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!hasNext) return;
-      resetAutoCloseTimer();
+      // resetAutoCloseTimer();
       onNext?.();
     },
-    [hasNext, onNext, resetAutoCloseTimer],
+    [hasNext, onNext],
   );
 
   const handleToggle = useCallback(

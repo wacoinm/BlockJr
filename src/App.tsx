@@ -28,6 +28,7 @@ import Header from './components/Header';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { useCaptureHistory } from './hooks/useCaptureHistory';
 import useBlockDragDrop from './hooks/useBlockDragDrop';
+import usePanZoom from './hooks/usePanZoom';
 
 export const SoundContext = createContext(() => {});
 
@@ -70,37 +71,8 @@ const App: React.FC = () => {
   const HORIZONTAL_GAP = isMobile ? -2 : 2;
   const HORIZONTAL_SPACING = BLOCK_WIDTH + HORIZONTAL_GAP;
 
-  // Pan & zoom
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-
-  const screenToWorld = useCallback(
-    (sx: number, sy: number) => ({
-      x: (sx - pan.x) / zoom,
-      y: (sy - pan.y) / zoom,
-    }),
-    [pan, zoom],
-  );
-
-  const zoomBy = useCallback(
-    (factor: number, cx?: number, cy?: number) => {
-      const newZoom = Math.max(0.2, Math.min(3, zoom * factor));
-      if (cx == null || cy == null) {
-        cx = window.innerWidth / 2;
-        cy = window.innerHeight / 2;
-      }
-      const worldUnderPointer = screenToWorld(cx, cy);
-      const newPanX = cx - worldUnderPointer.x * newZoom;
-      const newPanY = cy - worldUnderPointer.y * newZoom;
-      setZoom(newZoom);
-      setPan({ x: newPanX, y: newPanY });
-    },
-    [zoom, screenToWorld],
-  );
-
-  const panBy = useCallback((dx: number, dy: number) => {
-    setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
-  }, []);
+  // --- usePanZoom hook (pan & zoom encapsulated) ---
+  const { pan, zoom, screenToWorld, zoomBy, panBy } = usePanZoom({ x: 0, y: 0 }, 1);
 
   const getChain = useCallback(
     (startBlockId: string): Block[] => {

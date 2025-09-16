@@ -12,7 +12,7 @@ export type FabItem = {
 interface WorkspaceControlsProps {
   // top-right menu / FAB
   menuOpen: boolean;
-  setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setMenuOpen: (open: boolean) => void;
   fabItems: FabItem[];
 
   // project select popup

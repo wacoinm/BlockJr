@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, {
   useState,
   useCallback,
@@ -266,6 +265,7 @@ const App: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
 
   // FAB items (typed)
+  // NOTE: interaction item removed from fab and placed as a left-side floating control (see below)
   const fabItems: Array<{ key: string; onClick: () => void; content: React.ReactNode }> = [
     {
       key: 'bluetooth',
@@ -276,11 +276,6 @@ const App: React.FC = () => {
       key: 'theme',
       onClick: cycleTheme,
       content: theme === 'system' ? <Monitor className="w-6 h-6" /> : theme === 'light' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />,
-    },
-    {
-      key: 'interaction',
-      onClick: () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner')),
-      content: interactionMode === 'runner' ? <MousePointer2 className="w-6 h-6" /> : <Trash2 className="w-6 h-6" />,
     },
     {
       key: 'selectProject',
@@ -298,10 +293,45 @@ const App: React.FC = () => {
   ];
 
   const projects = ['elevator', 'bulldozer', 'lift truck'];
+  const LEFT_TOGGLE_LEFT = 6; // px - offset to avoid overlapping the palette toggle at left:0
+  const LEFT_TOGGLE_BOTTOM = 84; // px - aligns roughly with the palette chooser bottom when closed
+  const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));
 
   return (
     <SoundContext.Provider value={playSnapSound}>
       <Header initialCollapsed={false} hasPrev={hasPrev} hasNext={hasNext} onPrev={goPrev} onNext={goNext} />
+
+     {/* left-side interaction button (moved out of hamburger FAB) */}
+    <div
+      style={{
+        position: 'fixed',
+        left: LEFT_TOGGLE_LEFT,
+        bottom: LEFT_TOGGLE_BOTTOM,
+        zIndex: 70,
+      }}
+    >
+      <button
+        aria-pressed={interactionMode === 'deleter'}
+        onClick={toggleInteraction}
+        className={`
+          inline-flex items-center justify-center
+          w-12 h-12 rounded-full shadow-lg
+          cursor-pointer select-none
+          transition-transform duration-200 hover:scale-105 active:scale-95
+          bg-white dark:bg-slate-800
+          text-gray-700 dark:text-slate-100
+          hover:bg-gray-50 dark:hover:bg-slate-700
+        `}
+        title={interactionMode === 'runner' ? 'Switch to delete mode' : 'Switch to run mode'}
+      >
+        {interactionMode === 'runner' ? (
+          <MousePointer2 className="w-5 h-5" />
+        ) : (
+          <Trash2 className="w-5 h-5" />
+        )}
+      </button>
+    </div>
+
       <div className="h-screen w-screen overflow-hidden relative">
         <AppShell
           blocks={blocks}

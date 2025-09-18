@@ -1,32 +1,7 @@
 // ./utils/blockExecutor.ts
-import { toast } from 'react-toastify';
 import bluetoothService from './bluetoothService';
 import { Block } from '../types/Block';
-
-/**
- * Safe alert helper:
- * - Uses window.alert when available (browser).
- * - Falls back to console.log / console.error otherwise.
- */
-const showAlert = (msg: string, isError = false) => {
-  try {
-    const text = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
-    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-      toast.info(text);
-      return;
-    }
-  } catch {
-    // ignore
-  }
-
-  if (isError) {
-    // eslint-disable-next-line no-console
-    console.error('ALERT (error):', msg);
-  } else {
-    // eslint-disable-next-line no-console
-    console.log('ALERT:', msg);
-  }
-};
+import { toast } from 'react-toastify'; // show small toast messages for errors
 
 /**
  * Build an ordered list of blocks to execute.
@@ -133,10 +108,10 @@ const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 1
  *   - If at the start (no previous block) AND there are 2+ consecutive delays, the whole run of delays is ignored.
  *   - Otherwise delays are encoded as delay(x) where x is block.value * unit
  *
- * Additional enforced rules requested:
- * 1) Execution MUST start with a speed block (speed-low or speed-high). Otherwise show an error and abort.
- * 2) Every move that consumes delays (forward/backward/up/down/clockwise/countclockwise/lamp-on/lamp-off) MUST be immediately followed by a delay block. Otherwise show an error and abort.
- * 3) No delay block is allowed immediately after ANY speed block. If a speed is followed by delay => show an error and abort.
+ * Single additional rule (ENFORCED):
+ * - If a consuming move block (up/down/forward/backward/clockwise/countclockwise/lamp-on/lamp-off)
+ *   is immediately followed by a speed block (speed-low or speed-high) — with no intervening blocks —
+ *   show a small toast error and abort execution.
  *
  * New: accepts optional `unit` parameter (milliseconds per unit). For:
  * - 100m => pass 100
@@ -145,11 +120,14 @@ const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 1
  */
 export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
   if (!blocks || blocks.length === 0) {
-    showAlert('Execution chain is empty.');
+    console.log('Execution chain is empty.');
     return;
   }
 
   const orderedBlocks = buildExecutionOrder(blocks);
+
+  const commands: string[] = [];
+  let i = 0;
 
   // set of types that consume the following delay(s) as a parameter (in units)
   const consumesDelay = new Set<Block['type']>([
@@ -165,48 +143,21 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
 
   const isSpeed = (t: Block['type'] | undefined) => t === 'speed-low' || t === 'speed-high';
 
-  // --- Validation according to user's rules (show errors as alert and abort) ---
-  const errors: string[] = [];
-
-  // 1) Start must be a speed block
-  if (orderedBlocks.length === 0 || !isSpeed(orderedBlocks[0].type)) {
-    errors.push('Error: in start must start via set speeds! (first block must be speed-low or speed-high).');
-  }
-
-  // 2) After any speed, there must NOT be a delay immediately after
+  // === ENFORCE EXACTLY ONE RULE: if a move is IMMEDIATELY followed by speed => show toast and abort
   for (let idx = 0; idx < orderedBlocks.length - 1; idx++) {
-    const b = orderedBlocks[idx];
+    const curr = orderedBlocks[idx];
     const next = orderedBlocks[idx + 1];
-    if (isSpeed(b.type) && next && next.type === 'delay') {
-      errors.push(`Error: after speed did not set delay — speed at index ${idx} is followed by a delay at index ${idx + 1}.`);
+    if (consumesDelay.has(curr.type) && isSpeed(next.type)) {
+      // small toast error and abort
+      toast.error('A move block cannot be immediately followed by a speed block.');
+      // also log details for debugging
+      // eslint-disable-next-line no-console
+      console.error(
+        `Validation error: move '${curr.type}' at index ${idx} is immediately followed by speed '${next.type}' at index ${idx + 1}.`
+      );
+      return;
     }
   }
-
-  // 3) Every move that consumes delays must be immediately followed by a delay block
-  for (let idx = 0; idx < orderedBlocks.length; idx++) {
-    const b = orderedBlocks[idx];
-    if (consumesDelay.has(b.type)) {
-      const next = orderedBlocks[idx + 1];
-      if (!next || next.type !== 'delay') {
-        errors.push(
-          `Error: move '${b.type}' at index ${idx} must be immediately followed by a delay block (e.g. delay(1)).`
-        );
-      }
-    }
-  }
-
-  if (errors.length > 0) {
-    // Show all errors in a single alert (and log them)
-    showAlert(errors.join('\n'), true);
-    // also log for diagnostics
-    // eslint-disable-next-line no-console
-    console.error('Validation errors before execution:', errors);
-    return;
-  }
-
-  // --- Build commands from validated orderedBlocks --------------------------------
-  const commands: string[] = [];
-  let i = 0;
 
   while (i < orderedBlocks.length) {
     const currentBlock = orderedBlocks[i];

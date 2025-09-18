@@ -47,7 +47,6 @@ export default function BatteryGauge({
       try {
         await bluetoothService.initialize();
       } catch (e) {
-        // initialization may be a no-op on web; ignore errors
         console.warn('[BatteryGauge] bluetooth initialize failed', e);
       }
 
@@ -88,7 +87,7 @@ export default function BatteryGauge({
         } catch { /* ignore */ }
       })();
     };
-  }, [percentage]); // restart effect if parent-provided percentage changes
+  }, [percentage]);
 
   // Decide which percentage to display:
   // - explicit `percentage` prop (if not null)

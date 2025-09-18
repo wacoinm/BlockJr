@@ -2,15 +2,18 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Block } from '../types/Block';
 import { BlockComponent } from './BlockComponent';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import type { RootState } from '../store';
+import { updateBlock as updateBlockAction, removeBlock as removeBlockAction } from '../store/slices/blocksSlice';
 
 interface WorkspaceProps {
-  blocks: Block[];
-  isDragging: boolean;
-  draggedBlockId: string | undefined;
-  onGreenFlagClick: (blockId: string) => void;
-  onDelayChange: (blockId: string, value: number) => void;
-  onBlockRemove: (blockId: string) => void;
-  onBlockDragStart: (block: Block, e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => void;
+  blocks?: Block[]; // now optional — we prefer store when not provided
+  isDragging?: boolean;
+  draggedBlockId?: string;
+  onGreenFlagClick?: (blockId: string) => void;
+  onDelayChange?: (blockId: string, value: number) => void;
+  onBlockRemove?: (blockId: string) => void;
+  onBlockDragStart?: (block: Block, e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => void;
   onPan?: (dx: number, dy: number) => void;
   panX?: number;
   panY?: number;
@@ -26,25 +29,17 @@ interface WorkspaceProps {
   interactionMode?: 'runner' | 'deleter';
 }
 
-export const Workspace: React.FC<WorkspaceProps> = ({
-  blocks,
-  isDragging,
-  draggedBlockId,
-  onGreenFlagClick,
-  onDelayChange,
-  onBlockRemove,
-  onBlockDragStart,
-  onPan,
-  panX = 0,
-  panY = 0,
-  zoom = 1,
-  onZoom,
-  bottomInsetPx = 120,
-  gridCellSize = 72,
-  pinchSensitivity = 0.5,
-  pinchMaxStep = 1.12,
-  interactionMode = 'runner',
-}) => {
+export const Workspace: React.FC<WorkspaceProps> = (props) => {
+  const dispatch = useAppDispatch();
+
+  // --- Hooks (unconditional) ---
+  // Prefer store blocks when parent doesn't pass blocks prop.
+  const reduxBlocks = useAppSelector((s: RootState) => (s.blocks ? s.blocks.blocks : undefined));
+  const reduxPan = useAppSelector((s: RootState) => (s.panZoom ? s.panZoom.pan : { x: 0, y: 0 }));
+  const reduxZoom = useAppSelector((s: RootState) => (s.panZoom ? s.panZoom.zoom : 1));
+  const reduxInteractionMode = useAppSelector((s: RootState) => (s.interaction ? (s.interaction.mode ?? s.interaction.interactionMode) : undefined));
+
+  // other hooks
   const panState = useRef<{ active: boolean; lastX: number; lastY: number; pointerId?: number | null }>({
     active: false,
     lastX: 0,
@@ -53,7 +48,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   });
 
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-
   const pinch = useRef<{ active: boolean; lastDist: number } | null>(null);
 
   const [isGrabbing, setIsGrabbing] = useState(false);
@@ -67,6 +61,50 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     return () => obs.disconnect();
   }, []);
 
+  // --- Derived props (prefer explicit props, fall back to redux) ---
+  const {
+    blocks: blocksProp,
+    isDragging = false,
+    draggedBlockId,
+    onGreenFlagClick,
+    onDelayChange: onDelayChangeProp,
+    onBlockRemove: onBlockRemoveProp,
+    onBlockDragStart,
+    onPan: onPanProp,
+    panX: panXProp,
+    panY: panYProp,
+    zoom: zoomProp,
+    onZoom: onZoomProp,
+    bottomInsetPx = 120,
+    gridCellSize = 72,
+    pinchSensitivity = 0.5,
+    pinchMaxStep = 1.12,
+    interactionMode: interactionModeProp,
+  } = props;
+
+  const blocks = blocksProp ?? reduxBlocks ?? [];
+  const panX = typeof panXProp === 'number' ? panXProp : reduxPan.x ?? 0;
+  const panY = typeof panYProp === 'number' ? panYProp : reduxPan.y ?? 0;
+  const zoom = typeof zoomProp === 'number' ? zoomProp : reduxZoom ?? 1;
+  const interactionMode = interactionModeProp ?? reduxInteractionMode ?? 'runner';
+
+  // local fallback handlers that dispatch to store when parent didn't pass handlers
+  const onDelayChangeDefault = (blockId: string, value: number) => {
+    const b = blocks.find((bb) => bb.id === blockId);
+    if (!b) return;
+    dispatch(updateBlockAction({ ...b, value }));
+  };
+  const onBlockRemoveDefault = (blockId: string) => {
+    // Note: the original app removed chains; here we remove single block — consider wiring chain removal logic in a thunk
+    dispatch(removeBlockAction(blockId));
+  };
+
+  const onPan = onPanProp ?? (() => {});
+  const onZoom = onZoomProp ?? (() => {});
+  const _onDelayChange = onDelayChangeProp ?? onDelayChangeDefault;
+  const _onBlockRemove = onBlockRemoveProp ?? onBlockRemoveDefault;
+
+  // --- helpers used for pinch/pan ---
   const getDistance = (a: { x: number; y: number }, b: { x: number; y: number }) => {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
@@ -100,7 +138,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
       const iter = pointers.current.values();
       const p1 = iter.next().value as { x: number; y: number } | undefined;
       const p2 = iter.next().value as { x: number; y: number } | undefined;
-      if (!p1 || !p2) return; // <-- TS-safe check
+      if (!p1 || !p2) return;
 
       const startDist = getDistance(p1, p2) || 1;
       pinch.current = { active: true, lastDist: startDist };
@@ -128,7 +166,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
       const clamped = Math.max(1 / pinchMaxStep, Math.min(pinchMaxStep, adjusted));
       const center = getCenter(p1, p2);
 
-      onZoom?.(clamped, center.x, center.y);
+      onZoom(clamped, center.x, center.y);
       pinch.current.lastDist = currentDist;
       e.preventDefault();
       return;
@@ -142,7 +180,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     panState.current.lastX = e.clientX;
     panState.current.lastY = e.clientY;
     if (dx === 0 && dy === 0) return;
-    onPan?.(dx, dy);
+    onPan(dx, dy);
     e.preventDefault();
   };
 
@@ -188,14 +226,14 @@ export const Workspace: React.FC<WorkspaceProps> = ({
     if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-    onZoom?.(factor, e.clientX, e.clientY);
+    onZoom(factor, e.clientX, e.clientY);
   };
 
-  const handleZoomIn = () => onZoom?.(1.12);
-  const handleZoomOut = () => onZoom?.(1 / 1.12);
+  const handleZoomIn = () => onZoom(1.12);
+  const handleZoomOut = () => onZoom(1 / 1.12);
   const handleZoomReset = () => {
     if (zoom === 1) return;
-    onZoom?.(1 / zoom);
+    onZoom(1 / zoom);
   };
 
   const GRID_EXTENT = useMemo(() => 200_000, []);
@@ -281,19 +319,19 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                   if (interactionMode === 'deleter') {
                     try { e.stopPropagation(); } catch { /* empty */ }
                     try { e.preventDefault(); } catch { /* empty */ }
-                    onBlockRemove(block.id);
+                    _onBlockRemove(block.id);
                     return;
                   }
                   // Otherwise, forward to the drag start handler (which will call your hook)
-                  onBlockDragStart(block, e);
+                  onBlockDragStart?.(block, e);
                 }}
               >
                 <BlockComponent
                   block={block}
-                  onDragStart={(e) => onBlockDragStart(block, e)}
-                  onGreenFlagClick={block.type === 'green-flag' ? () => onGreenFlagClick(block.id) : undefined}
-                  onDelayChange={block.type === 'delay' ? (value) => onDelayChange(block.id, value) : undefined}
-                  onRemove={() => onBlockRemove(block.id)}
+                  onDragStart={(e) => onBlockDragStart?.(block, e)}
+                  onGreenFlagClick={block.type === 'green-flag' ? () => onGreenFlagClick?.(block.id) : undefined}
+                  onDelayChange={block.type === 'delay' ? (value) => _onDelayChange(block.id, value) : undefined}
+                  onRemove={() => _onBlockRemove(block.id)}
                 />
               </div>
             );

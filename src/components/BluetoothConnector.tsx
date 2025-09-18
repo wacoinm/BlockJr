@@ -5,6 +5,11 @@ import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { ensureBluetoothPermissions } from '../utils/ensureBluetoothPermissions';
 import bluetoothService from '../utils/bluetoothService';
 import { Bluetooth, BluetoothConnected } from 'lucide-react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import type { RootState } from '../store';
+// Optional: if you have a ui slice that manages bluetooth modal open state,
+// import the action here. If not, this component will still accept props.
+import { setBluetoothOpen as setBluetoothOpenAction } from '../store/slices/interactionSlice';
 
 interface DeviceItem {
   id: string;
@@ -14,13 +19,30 @@ interface DeviceItem {
 interface BluetoothConnectorProps {
   onConnectionChange?: (isConnected: boolean) => void;
   open?: boolean; // optional prop to allow parent to control
-  isMenuOpen: boolean;
-  setIsMenuOpen: (open: boolean) => void;
-} 
+  isMenuOpen?: boolean;
+  setIsMenuOpen?: (open: boolean) => void;
+}
 
 type ScanError = Error | { message?: string } | string | null | undefined;
 
-export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnectionChange, open, isMenuOpen, setIsMenuOpen }) => {
+export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => {
+  const { onConnectionChange, open: openProp, isMenuOpen: isMenuOpenProp, setIsMenuOpen: setIsMenuOpenProp } = props;
+  const dispatch = useAppDispatch();
+
+  // --- hooks unconditionally ---
+  const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? s.ui.bluetoothOpen : undefined));
+
+  // fallback derived values (prefer props)
+  const isMenuOpen = typeof isMenuOpenProp === 'boolean' ? isMenuOpenProp : (typeof openProp === 'boolean' ? openProp : reduxBluetoothOpen ?? false);
+  const setIsMenuOpen = setIsMenuOpenProp ?? ((open: boolean) => {
+    // try dispatching ui slice action if available; otherwise no-op
+    try {
+      dispatch(setBluetoothOpenAction(open));
+    } catch {
+      // noop if action not available
+    }
+  });
+
   const isNative = Capacitor.getPlatform() !== 'web';
   const [isConnected, setIsConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -29,8 +51,10 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
   const [lastConnectedDevice, setLastConnectedDevice] = useState<DeviceItem | null>(null);
 
   useEffect(() => {
-    if (typeof open === 'boolean') setIsMenuOpen(open);
-  }, [open]);
+    if (typeof openProp === 'boolean') setIsMenuOpen(openProp);
+    // intentionally not depending on setIsMenuOpen to avoid unnecessary re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openProp]);
 
   async function isLocationAvailable(timeout = 3000): Promise<boolean> {
     if (!isNative) return true;
@@ -176,7 +200,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
     } finally {
       setIsBusy(false);
     }
-  }, [isBusy, onConnectionChange]);
+  }, [isBusy, onConnectionChange, setIsMenuOpen]);
 
   const handleDisconnect = useCallback(async () => {
     if (isBusy) return;
@@ -448,7 +472,6 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
               transform: 'translateY(0)',
               opacity: 1,
             }}
-            // small inline style for ARIA friendly scroll and sizing
           >
             <div className="px-4 py-2 bt-header" style={{ borderColor: document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,0.06)' : '#f3f4f6' }}>
               <h3
@@ -504,7 +527,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = ({ onConnec
               )}
 
               {/* Connected / Disconnect */}
-              <div style={{ padding: '0 12px' }} className="bt-stagger-item" style={{ animationDelay: delayFor(2) as any }}>
+              <div style={{ padding: '0 12px' }} className="bt-stagger-item" /* style animated */>
                 {isConnected ? (
                   <button onClick={handleDisconnect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-red-600 dark:text-red-400 rounded-md">
                     Disconnect

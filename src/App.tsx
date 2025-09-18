@@ -28,6 +28,8 @@ import {
   Moon,
   FolderOpenDot,
 } from 'lucide-react';
+import { toast } from 'react-toastify';
+
 import { useAppSelector } from './store/hooks';
 import type { RootState } from './store';
 
@@ -215,7 +217,7 @@ const App: React.FC = () => {
     async (blockId: string) => {
       if (!isBluetoothConnected) {
         // keep the original behavior but don't block execution
-        alert('You must connect to a device');
+        toast.info('You must connect to a device');
       }
       const flag = blocksMap.get(blockId);
       if (flag && flag.childId) {

@@ -1,4 +1,5 @@
 // ./utils/blockExecutor.ts
+import { toast } from 'react-toastify';
 import bluetoothService from './bluetoothService';
 import { Block } from '../types/Block';
 
@@ -11,7 +12,7 @@ const showAlert = (msg: string, isError = false) => {
   try {
     const text = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-      window.alert(text);
+      toast.info(text);
       return;
     }
   } catch {

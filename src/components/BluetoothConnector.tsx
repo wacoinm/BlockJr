@@ -10,6 +10,7 @@ import type { RootState } from '../store';
 // Optional: if you have a ui slice that manages bluetooth modal open state,
 // import the action here. If not, this component will still accept props.
 import { setBluetoothOpen as setBluetoothOpenAction } from '../store/slices/interactionSlice';
+import { toast } from 'react-toastify';
 
 interface DeviceItem {
   id: string;
@@ -151,7 +152,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
       setLastConnectedDevice(device);
       onConnectionChange?.(true);
       setStatusMessage(`Connected to ${device.name ?? device.id}`);
-      alert(`Connected to ${device.name ?? device.id}`);
+      toast.success(`Connected to ${device.name ?? device.id}`);
 
       try {
         await bluetoothService.startDataListener((s) => {
@@ -168,7 +169,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
           setLastConnectedDevice(null);
           onConnectionChange?.(false);
           setStatusMessage('Disconnected from device.');
-          alert('Disconnected from device.');
+          toast.success('Disconnected from device.');
           bluetoothService.stopDataListener().catch(() => {});
           bluetoothService.stopEnabledListener().catch(() => {});
           bluetoothService.stopDisconnectListener().catch(() => {});
@@ -185,7 +186,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
             setIsConnected(false);
             setLastConnectedDevice(null);
             onConnectionChange?.(false);
-            alert('Bluetooth turned OFF on device.');
+            toast.warn('Bluetooth turned OFF on device.');
           }
         });
       } catch (e) {
@@ -196,7 +197,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
     } catch (err) {
       console.error('handleConnect error', err);
       setStatusMessage('Connection error. See console.');
-      alert('Connection error: ' + String(err));
+      toast.error('Connection error: ' + String(err));
     } finally {
       setIsBusy(false);
     }
@@ -219,11 +220,11 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
       setLastConnectedDevice(null);
       onConnectionChange?.(false);
       setStatusMessage('Disconnected.');
-      alert('Disconnected from device.');
+      toast.info('Disconnected from device.');
     } catch (e) {
       console.warn('Disconnect failed', e);
       setStatusMessage('Disconnect failed. See console.');
-      alert('Disconnect failed: ' + String(e));
+      toast.error('Disconnect failed: ' + String(e));
     } finally {
       setIsBusy(false);
     }
@@ -233,11 +234,11 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
     try {
       await BluetoothSerial.enable();
       setStatusMessage(null);
-      alert('Bluetooth enabled.');
+      toast.info('Bluetooth enabled.');
     } catch (e) {
       console.error('Failed to enable Bluetooth', e);
       setStatusMessage('Failed to enable Bluetooth.');
-      alert('Failed to enable Bluetooth: ' + String(e));
+      toast.error('Failed to enable Bluetooth: ' + String(e));
     }
   };
 
@@ -252,7 +253,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
           setLastConnectedDevice(null);
           onConnectionChange?.(false);
           setStatusMessage('Connection lost.');
-          alert('Connection lost. Please reconnect.');
+          toast.warn('Connection lost. Please reconnect.');
         }
       } catch (e) {
         console.warn('Periodic connection check failed', e);
@@ -260,7 +261,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
         setLastConnectedDevice(null);
         onConnectionChange?.(false);
         setStatusMessage('Connection check failed. See console.');
-        alert('Connection lost due to check failure: ' + String(e));
+        toast.error('Connection lost due to check failure: ' + String(e));
       }
     };
 
@@ -298,20 +299,20 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
           setNearbyDevices(devices);
           if (!devices || devices.length === 0) {
             setStatusMessage('No devices found.');
-            alert('No Bluetooth devices found.');
+            toast.info('No Bluetooth devices found.');
           } else {
             setStatusMessage(null);
           }
         } catch (e: unknown) {
           if (e instanceof Error) {
             await diagnoseScanFailure(e);
-            alert('Scan failed: ' + e.message);
+            toast.warn('Scan failed: ' + e.message);
           } else if (typeof e === 'string') {
             await diagnoseScanFailure(e);
-            alert('Scan failed: ' + e);
+            toast.warn('Scan failed: ' + e);
           } else {
             await diagnoseScanFailure({ message: 'Unknown error' });
-            alert('Scan failed: Unknown error');
+            toast.error('Scan failed: Unknown error');
           }
         }
         setIsBusy(false);
@@ -329,7 +330,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
           setLastConnectedDevice(null);
           onConnectionChange?.(false);
           setStatusMessage('Connection lost.');
-          alert('Connection lost. Please reconnect.');
+          toast.warn('Connection lost. Please reconnect.');
         }
       };
       checkConn();

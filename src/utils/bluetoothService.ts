@@ -1,6 +1,7 @@
 // src/utils/bluetoothService.ts
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
+import { toast } from 'react-toastify';
 
 const isNative = Capacitor.getPlatform() !== 'web';
 let connectedDeviceId: string | null = null;
@@ -129,7 +130,7 @@ async function connect(deviceId: string): Promise<boolean> {
       const msg = error instanceof Error ? error.message : String(error ?? 'Unknown');
       // keep using alert as original code did
       // eslint-disable-next-line no-alert
-      alert('[BT] Connection failed: ' + msg);
+      toast.error('[BT] Connection failed: ' + msg);
     } catch {
       // ignore alert errors
     }

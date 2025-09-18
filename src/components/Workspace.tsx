@@ -5,6 +5,7 @@ import { BlockComponent } from './BlockComponent';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import type { RootState } from '../store';
 import { updateBlock as updateBlockAction, removeBlock as removeBlockAction } from '../store/slices/blocksSlice';
+import BatteryGauge from './BatteryGauge';
 
 interface WorkspaceProps {
   blocks?: Block[]; // now optional — we prefer store when not provided
@@ -285,6 +286,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
           <button onClick={handleZoomOut} className="w-8 h-8 rounded-md border text-sm" aria-label="Zoom out">−</button>
           <button onClick={handleZoomReset} className="w-8 h-8 rounded-md border text-sm" aria-label="Reset zoom">⤾</button>
         </div>
+        <BatteryGauge size={46} className='mt-2' strokeWidth={1} />
       </div>
 
       <div

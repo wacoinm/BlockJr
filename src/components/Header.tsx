@@ -1,6 +1,7 @@
-// src/components/Header.tsx
-import React, { useState, useCallback /*, useEffect, useRef */ } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { undo as undoAction, redo as redoAction } from '../store/slices/historySlice';
 
 export interface HeaderProps {
   initialCollapsed?: boolean;
@@ -9,38 +10,28 @@ export interface HeaderProps {
   onPrev?: () => void;
   onNext?: () => void;
   className?: string;
-  // autoCloseDelay?: number; // ms, default 10000
 }
 
 const Header: React.FC<HeaderProps> = ({
   initialCollapsed = false,
-  hasPrev = true,
-  hasNext = true,
+  hasPrev: hasPrevProp,
+  hasNext: hasNextProp,
   onPrev,
   onNext,
   className = '',
-  // autoCloseDelay = 60000,
 }) => {
+  const dispatch = useAppDispatch();
+
+  // if parent passed hasPrev/hasNext, prefer those; otherwise derive from history slice
+  const historyIndex = useAppSelector((s) => s.history.index);
+  const historySnapshots = useAppSelector((s) => s.history.snapshots);
+  const derivedHasPrev = historyIndex > 0;
+  const derivedHasNext = historyIndex < historySnapshots.length - 1;
+
+  const hasPrev = typeof hasPrevProp === 'boolean' ? hasPrevProp : derivedHasPrev;
+  const hasNext = typeof hasNextProp === 'boolean' ? hasNextProp : derivedHasNext;
+
   const [collapsed, setCollapsed] = useState<boolean>(initialCollapsed);
-  // const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  /*
-  const resetAutoCloseTimer = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (!collapsed) {
-      timeoutRef.current = setTimeout(() => {
-        setCollapsed(true);
-      }, autoCloseDelay);
-    }
-  }, [collapsed, autoCloseDelay]);
-
-  useEffect(() => {
-    resetAutoCloseTimer();
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [collapsed, resetAutoCloseTimer]);
-  */
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((c) => !c);
@@ -50,20 +41,26 @@ const Header: React.FC<HeaderProps> = ({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!hasPrev) return;
-      // resetAutoCloseTimer();
-      onPrev?.();
+      if (onPrev) {
+        onPrev();
+      } else {
+        dispatch(undoAction());
+      }
     },
-    [hasPrev, onPrev],
+    [hasPrev, onPrev, dispatch],
   );
 
   const handleNext = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!hasNext) return;
-      // resetAutoCloseTimer();
-      onNext?.();
+      if (onNext) {
+        onNext();
+      } else {
+        dispatch(redoAction());
+      }
     },
-    [hasNext, onNext],
+    [hasNext, onNext, dispatch],
   );
 
   const handleToggle = useCallback(

@@ -1,4 +1,3 @@
-// src/components/BlockComponent.tsx
 import React, { useState, useContext, useEffect } from 'react';
 import {
   ArrowBigUpDash,
@@ -19,9 +18,13 @@ import {
 } from 'lucide-react';
 import { Block } from '../types/Block';
 import { SoundContext } from '../App';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import type { RootState } from '../store';
+import { updateBlock as updateBlockAction, removeBlock as removeBlockAction } from '../store/slices/blocksSlice';
 
 interface BlockComponentProps {
-  block: Block;
+  block?: Block; // optional: read from store by id if only id provided
+  blockId?: string;
   onDragStart?: (e: React.MouseEvent | React.TouchEvent) => void;
   onGreenFlagClick?: () => void;
   onDelayChange?: (value: number) => void;
@@ -30,8 +33,11 @@ interface BlockComponentProps {
   style?: React.CSSProperties;
 }
 
+const clampDelay = (v: number) => Math.max(1, Math.min(10, v));
+
 export const BlockComponent: React.FC<BlockComponentProps> = ({
-  block,
+  block: blockProp,
+  blockId,
   onDragStart,
   onGreenFlagClick,
   onDelayChange,
@@ -39,16 +45,24 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
   isPaletteBlock = false,
   style = {}
 }) => {
-  // kept a tiny state to keep hooks ordering stable (no textual input for kids)
-  const [_, set_] = useState(false);
+  const dispatch = useAppDispatch();
   const playSnapSound = useContext(SoundContext);
 
-  useEffect(() => {
-    // no-op but keeps effect signature stable
-    set_((s) => s);
-  }, [block.value]);
+  // ---- hooks must be unconditional (moved here) ----
+  const [_, set_] = useState(false);
 
-  const clampDelay = (v: number) => Math.max(1, Math.min(10, v));
+  // read from store unconditionally (selector param typed)
+  const blockFromStore = useAppSelector((s: RootState) =>
+    blockId ? s.blocks.blocks.find((b) => b.id === blockId) : undefined
+  );
+
+  // effect uses optional chaining, safe even if block is undefined
+  useEffect(() => {
+    set_((s) => s); // no-op to preserve hook ordering
+  }, []); // keep dependency simple; block.value isn't required for ordering
+
+  const block = blockProp ?? blockFromStore;
+  if (!block) return null;
 
   const getBlockColor = (type: string) => {
     switch (type) {
@@ -120,10 +134,9 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
   };
 
   const handleClick = () => {
-    if (block.type === 'green-flag' && onGreenFlagClick) {
-      onGreenFlagClick();
+    if (block.type === 'green-flag') {
+      if (onGreenFlagClick) onGreenFlagClick();
     }
-    // no numeric input for delay - kids use chevrons
   };
 
   const sizeClasses = isPaletteBlock
@@ -168,18 +181,19 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     active:scale-95
   `;
 
-  // Top chevron: rounded on top-left & top-right only
   const delayBtnUpClass = `${getBlockColor('delay')} ${delayBtnBase} rounded-t-lg rounded-b-none w-8 h-6 md:w-10 md:h-7`;
-
-  // Bottom chevron: rounded on bottom-left & bottom-right only (opposite of top)
   const delayBtnDownClass = `${getBlockColor('delay')} ${delayBtnBase} rounded-b-lg rounded-t-none w-8 h-6 md:w-10 md:h-7`;
 
-  // handlers for chevrons
+  // handlers for chevrons (use prop handlers when provided; otherwise dispatch update)
   const handleDelayIncrease = (e: React.MouseEvent) => {
     e.stopPropagation();
     const current = typeof block.value === 'number' ? block.value : 1;
     const next = clampDelay(current + 1);
-    onDelayChange?.(next);
+    if (onDelayChange) {
+      onDelayChange(next);
+    } else {
+      dispatch(updateBlockAction({ ...block, value: next }));
+    }
     playSnapSound?.();
   };
 
@@ -187,7 +201,20 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     e.stopPropagation();
     const current = typeof block.value === 'number' ? block.value : 1;
     const next = clampDelay(current - 1);
-    onDelayChange?.(next);
+    if (onDelayChange) {
+      onDelayChange(next);
+    } else {
+      dispatch(updateBlockAction({ ...block, value: next }));
+    }
+    playSnapSound?.();
+  };
+
+  const handleRemove = () => {
+    if (onRemove) {
+      onRemove();
+    } else {
+      dispatch(removeBlockAction(block.id));
+    }
     playSnapSound?.();
   };
 
@@ -196,25 +223,23 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
       {/* Delay chevrons (above and below) - only for real blocks, not palette */}
       {block.type === 'delay' && !isPaletteBlock && (
         <>
-          {/* Up chevron: placed slightly above the block (≈3px gap) */}
           <button
             onClick={handleDelayIncrease}
             onMouseDown={(e) => e.stopPropagation()}
             className={delayBtnUpClass}
             aria-label="increase delay"
-            style={{ bottom: '100%' /* small gap above block */ }}
+            style={{ bottom: '100%' }}
             title="Increase delay"
           >
             <ChevronUp className="w-4 h-4" />
           </button>
 
-          {/* Down chevron: placed slightly below the block (≈3px gap) */}
           <button
             onClick={handleDelayDecrease}
             onMouseDown={(e) => e.stopPropagation()}
             className={delayBtnDownClass}
             aria-label="decrease delay"
-            style={{ top: '100%' /* small gap below block */ }}
+            style={{ top: '100%' }}
             title="Decrease delay"
           >
             <ChevronDown className="w-4 h-4" />
@@ -241,7 +266,6 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         <div className="flex items-center justify-center relative">
           {getBlockIcon()}
 
-          {/* small bottom-right badge showing current number for delay */}
           {block.type === 'delay' && (
             <div className="absolute right-0 bottom-0 transform translate-x-1/4 translate-y-1/4">
               <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-white text-yellow-600 dark:bg-slate-900 dark:text-yellow-400 flex items-center justify-center text-xs font-bold border-2 border-white/30">
@@ -264,12 +288,11 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         )}
       </div>
 
-      {!isPaletteBlock && onRemove && (
+      {!isPaletteBlock && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onRemove();
-            playSnapSound();
+            handleRemove();
           }}
           className="absolute -top-2 -right-2 w-5 h-5 md:w-6 md:h-6 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
           aria-label="remove block"

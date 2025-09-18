@@ -3,6 +3,18 @@ import { X, FolderKanban } from 'lucide-react';
 import Kamaan from '../../public/icon.svg?react';
 import KamaanLight from '../../public/icon-light.svg?react';
 
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import {
+  setMenuOpen as setMenuOpenAction,
+  toggleMode as toggleModeAction,
+} from '../store/slices/interactionSlice';
+import {
+  setSelectVisible as setSelectVisibleAction,
+  setSelectOpen as setSelectOpenAction,
+  selectProject as selectProjectAction,
+} from '../store/slices/projectsSlice';
+import useUnits from '../hooks/useUnits';
+
 export type FabItem = {
   key: string;
   onClick: () => void;
@@ -10,55 +22,111 @@ export type FabItem = {
 };
 
 interface WorkspaceControlsProps {
-  // top-right menu / FAB
-  menuOpen: boolean;
-  setMenuOpen: (open: boolean) => void;
-  fabItems: FabItem[];
+  // top-right menu / FAB (still supported as props for gradual migration)
+  menuOpen?: boolean;
+  setMenuOpen?: (open: boolean) => void;
+  fabItems?: FabItem[];
 
   // project select popup
-  selectVisible: boolean;
-  selectOpen: boolean;
-  closeSelectPopup: () => void;
-  projects: string[];
-  selectedProject: string | null;
-  handleProjectSelect: (proj: string) => void;
+  selectVisible?: boolean;
+  selectOpen?: boolean;
+  closeSelectPopup?: () => void;
+  projects?: string[];
+  selectedProject?: string | null;
+  handleProjectSelect?: (proj: string) => void;
 
   // animation timing values used for the popup
-  ITEM_STAGGER: number;
-  BASE_DURATION: number;
-  ITEM_DURATION: number;
+  ITEM_STAGGER?: number;
+  BASE_DURATION?: number;
+  ITEM_DURATION?: number;
 
   // bottom-right debug
-  viewportWidth: number;
-  zoom: number;
-  panX: number;
-  panY: number;
-  unitLabel: string;
+  viewportWidth?: number;
+  zoom?: number;
+  panX?: number;
+  panY?: number;
+  unitLabel?: string;
 
   // theme (used to pick icon)
-  theme: 'system' | 'light' | 'dark';
+  theme?: 'system' | 'light' | 'dark';
 }
 
-const WorkspaceControls: React.FC<WorkspaceControlsProps> = ({
-  menuOpen,
-  setMenuOpen,
-  fabItems,
-  selectVisible,
-  selectOpen,
-  closeSelectPopup,
-  projects,
-  selectedProject,
-  handleProjectSelect,
-  ITEM_STAGGER,
-  BASE_DURATION,
-  ITEM_DURATION,
-  viewportWidth,
-  zoom,
-  panX,
-  panY,
-  unitLabel,
-  theme,
-}) => {
+const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
+  const dispatch = useAppDispatch();
+
+  // ---- call hooks unconditionally (fixes rules-of-hooks) ----
+  const reduxMenuOpen = useAppSelector((s) => s.interaction.menuOpen);
+  const reduxSelectVisible = useAppSelector((s) => s.projects.selectVisible);
+  const reduxSelectOpen = useAppSelector((s) => s.projects.selectOpen);
+  const reduxProjects = useAppSelector((s) => s.projects.projects);
+  const reduxSelectedProject = useAppSelector((s) => s.projects.selectedProject);
+  const reduxZoom = useAppSelector((s) => s.panZoom.zoom);
+  const reduxPan = useAppSelector((s) => s.panZoom.pan);
+  const reduxUi = useAppSelector((s) => s.ui); // may be undefined if ui slice not present
+
+  // call hook unconditionally
+  const hookUnits = useUnits();
+
+  // ---- derive final values (hooks called already) ----
+  const menuOpen = typeof props.menuOpen === 'boolean' ? props.menuOpen : reduxMenuOpen;
+  const setMenuOpen = props.setMenuOpen ?? ((open: boolean) => dispatch(setMenuOpenAction(open)));
+
+  const selectVisible = typeof props.selectVisible === 'boolean' ? props.selectVisible : reduxSelectVisible;
+  const selectOpen = typeof props.selectOpen === 'boolean' ? props.selectOpen : reduxSelectOpen;
+  const projects = props.projects ?? reduxProjects;
+  const selectedProject = props.selectedProject ?? reduxSelectedProject;
+  const handleProjectSelect = props.handleProjectSelect ?? ((p: string) => dispatch(selectProjectAction(p)));
+
+  const ITEM_STAGGER = props.ITEM_STAGGER ?? 40;
+  const BASE_DURATION = props.BASE_DURATION ?? 180;
+  const ITEM_DURATION = props.ITEM_DURATION ?? 220;
+
+  const viewportWidth = props.viewportWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const zoom = props.zoom ?? reduxZoom;
+  const panX = props.panX ?? reduxPan.x;
+  const panY = props.panY ?? reduxPan.y;
+
+  const unitLabel = props.unitLabel ?? hookUnits.unitLabel;
+  const cycleUnit = hookUnits.cycleUnit;
+
+  const theme = props.theme ?? (reduxUi ? reduxUi.theme : 'system');
+
+  // fabItems: if parent passed custom ones, use them. Otherwise provide reasonable defaults
+  const defaultFabItems: FabItem[] = [
+    {
+      key: 'bluetooth',
+      onClick: () => dispatch(setMenuOpenAction(!menuOpen)),
+      content: <div className="w-6 h-6">🔵</div>,
+    },
+    {
+      key: 'theme',
+      onClick: () => dispatch(toggleModeAction()), // placeholder - replace with setTheme if you add ui thunks
+      content:
+        theme === 'system' ? (
+          <div className="w-6 h-6">🖥️</div>
+        ) : theme === 'light' ? (
+          <div className="w-6 h-6">☀️</div>
+        ) : (
+          <div className="w-6 h-6">🌙</div>
+        ),
+    },
+    {
+      key: 'selectProject',
+      onClick: () => {
+        if (!selectVisible) dispatch(setSelectVisibleAction(true));
+        dispatch(setSelectOpenAction(!selectOpen));
+      },
+      content: <div className="w-6 h-6">📁</div>,
+    },
+    {
+      key: 'unit',
+      onClick: cycleUnit,
+      content: <div className="text-xs font-semibold select-none pointer-events-none">{unitLabel}</div>,
+    },
+  ];
+
+  const fabItems = props.fabItems ?? defaultFabItems;
+
   return (
     <>
       {/* Hamburger + animated FABs */}
@@ -129,7 +197,10 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = ({
         <div
           className="fixed inset-0 z-[88] pointer-events-auto"
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeSelectPopup();
+            if (e.target === e.currentTarget) {
+              if (props.closeSelectPopup) props.closeSelectPopup();
+              else dispatch(setSelectVisibleAction(false));
+            }
           }}
           aria-modal="true"
           role="dialog"
@@ -166,7 +237,11 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    closeSelectPopup();
+                    if (props.closeSelectPopup) props.closeSelectPopup();
+                    else {
+                      dispatch(setSelectOpenAction(false));
+                      dispatch(setSelectVisibleAction(false));
+                    }
                   }}
                   className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700"
                   aria-label="Close select project"
@@ -184,7 +259,14 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = ({
                     <button
                       key={p}
                       type="button"
-                      onClick={() => handleProjectSelect(p)}
+                      onClick={() => {
+                        handleProjectSelect(p);
+                        if (props.closeSelectPopup) props.closeSelectPopup();
+                        else {
+                          dispatch(setSelectOpenAction(false));
+                          dispatch(setSelectVisibleAction(false));
+                        }
+                      }}
                       className="w-full text-left px-3 py-2 rounded-lg transform transition-all"
                       style={{
                         transitionProperty: 'transform, opacity',

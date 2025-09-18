@@ -3,9 +3,11 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { BlockComponent } from "./BlockComponent";
 import { Block } from "../types/Block";
 import { ChevronDown, ListFilter, Move, Wrench } from "lucide-react";
+import { useAppSelector } from "../store/hooks";
+import type { RootState } from "../store";
 
 interface BlockPaletteProps {
-  onBlockDrag: (
+  onBlockDrag?: (
     block: Block,
     event: React.MouseEvent | React.TouchEvent | React.DragEvent
   ) => void;
@@ -15,20 +17,112 @@ interface BlockPaletteProps {
 // Palette blocks (all blocks are present here)
 const paletteBlocks: Block[] = [
   { id: "up-template", type: "up", x: 0, y: 0, parentId: null, childId: null },
-  { id: "down-template", type: "down", x: 0, y: 0, parentId: null, childId: null },
-  { id: "forward-template", type: "forward", x: 0, y: 0, parentId: null, childId: null },
-  { id: "backward-template", type: "backward", x: 0, y: 0, parentId: null, childId: null },
-  { id: "clockwise-template", type: "clockwise", x: 0, y: 0, parentId: null, childId: null },
-  { id: "countclockwise-template", type: "countclockwise", x: 0, y: 0, parentId: null, childId: null },
-  { id: "delay-template", type: "delay", value: 1, x: 0, y: 0, parentId: null, childId: null },
-  { id: "green-flag-template", type: "green-flag", x: 0, y: 0, parentId: null, childId: null },
-  { id: "lamp-on-template", type: "lamp-on", x: 0, y: 0, parentId: null, childId: null },
-  { id: "lamp-off-template", type: "lamp-off", x: 0, y: 0, parentId: null, childId: null },
-  { id: "speed-low-template", type: "speed-low", x: 0, y: 0, parentId: null, childId: null },
-  { id: "speed-high-template", type: "speed-high", x: 0, y: 0, parentId: null, childId: null },
+  {
+    id: "down-template",
+    type: "down",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "forward-template",
+    type: "forward",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "backward-template",
+    type: "backward",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "clockwise-template",
+    type: "clockwise",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "countclockwise-template",
+    type: "countclockwise",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "delay-template",
+    type: "delay",
+    value: 1,
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "green-flag-template",
+    type: "green-flag",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "lamp-on-template",
+    type: "lamp-on",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "lamp-off-template",
+    type: "lamp-off",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "speed-low-template",
+    type: "speed-low",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
+  {
+    id: "speed-high-template",
+    type: "speed-high",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
 ];
 
-export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selectedProject }) => {
+export const BlockPalette: React.FC<BlockPaletteProps> = ({
+  onBlockDrag,
+  selectedProject: selectedProjectProp,
+}) => {
+  // ALWAYS call hooks at top (avoid conditional hooks)
+  const reduxSelectedProject = useAppSelector((s: RootState) =>
+    s.projects ? s.projects.selectedProject : null
+  );
+
+  // prefer prop, else redux
+  const selectedProject =
+    typeof selectedProjectProp !== "undefined"
+      ? selectedProjectProp
+      : reduxSelectedProject ?? null;
+
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
@@ -51,8 +145,24 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   // Project -> types mapping
   const projectMap: Record<string, string[]> = {
     elevator: ["green-flag", "up", "down", "delay"],
-    bulldozer: ["green-flag", "forward", "backward", "clockwise", "countclockwise", "delay"],
-    "lift truck": ["green-flag", "forward", "backward", "clockwise", "countclockwise", "up", "down", "delay"],
+    bulldozer: [
+      "green-flag",
+      "forward",
+      "backward",
+      "clockwise",
+      "countclockwise",
+      "delay",
+    ],
+    "lift truck": [
+      "green-flag",
+      "forward",
+      "backward",
+      "clockwise",
+      "countclockwise",
+      "up",
+      "down",
+      "delay",
+    ],
   };
 
   const alwaysInclude = ["speed-low", "speed-high", "lamp-on", "lamp-off"];
@@ -68,10 +178,17 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
 
     if (proj && projectMap[proj]) {
       // project-specific ordering, but ensure alwaysInclude are appended once
-      return Array.from(new Set([...(projectMap[proj] || []), ...alwaysInclude]));
+      return Array.from(
+        new Set([...(projectMap[proj] || []), ...alwaysInclude])
+      );
     } else if (proj && typeof proj === "string") {
       // project string provided but not in map => show everything (but keep alwaysInclude present)
-      const unique = Array.from(new Set([...allTypes.filter((t) => !alwaysInclude.includes(t)), ...alwaysInclude]));
+      const unique = Array.from(
+        new Set([
+          ...allTypes.filter((t) => !alwaysInclude.includes(t)),
+          ...alwaysInclude,
+        ])
+      );
       return unique;
     } else {
       // no project selected: show all types (original order)
@@ -85,7 +202,14 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
 
   const categorySets: Record<Category, Set<string>> = {
     all: new Set(paletteBlocks.map((b) => b.type)),
-    moves: new Set(["forward", "backward", "clockwise", "countclockwise", "up", "down"]),
+    moves: new Set([
+      "forward",
+      "backward",
+      "clockwise",
+      "countclockwise",
+      "up",
+      "down",
+    ]),
     utils: new Set(["delay", "speed-low", "speed-high", "lamp-on", "lamp-off"]),
   };
 
@@ -96,10 +220,12 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   };
 
   // projectTypes: result of project filtering & ordering
-  const [projectTypes, setProjectTypes] = useState<string[]>(() => computeTypesForProject(selectedProject));
+  const [projectTypes, setProjectTypes] = useState<string[]>(() =>
+    computeTypesForProject(selectedProject)
+  );
   // displayedTypes: projectTypes after category filter (what is actually shown)
-  const [displayedTypes, setDisplayedTypes] = useState<string[]>(
-    () => applyCategoryFilter(computeTypesForProject(selectedProject), category)
+  const [displayedTypes, setDisplayedTypes] = useState<string[]>(() =>
+    applyCategoryFilter(computeTypesForProject(selectedProject), category)
   );
 
   // Measure palette height so toggle button and chooser can match it
@@ -175,7 +301,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
 
   // Helper: remove document listeners
   const removeDocumentListeners = () => {
-    document.removeEventListener("touchmove", onDocumentTouchMove as any, { passive: false });
+    document.removeEventListener("touchmove", onDocumentTouchMove as any, {
+      passive: false,
+    });
     document.removeEventListener("touchend", onDocumentTouchEnd as any);
     document.removeEventListener("touchcancel", onDocumentTouchEnd as any);
     document.removeEventListener("mousemove", onDocumentMouseMove as any);
@@ -205,14 +333,14 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
 
     // If hold is armed but drag hasn't started: check if pointer moved above palette top to start drag
     if (holdArmedRef.current && !dragStartedRef.current) {
-      const paletteTop = paletteRef.current?.getBoundingClientRect().top ?? Infinity;
+      const paletteTop =
+        paletteRef.current?.getBoundingClientRect().top ?? Infinity;
       if (y < paletteTop - START_DRAG_OFFSET) {
         // start drag: call onBlockDrag with a synthetic React.TouchEvent wrapper if needed
         dragStartedRef.current = true;
-        // Build a minimal React.TouchEvent-like object to send forward: use the original TouchEvent as legacy event
-        const synthetic = (ev as unknown) as React.TouchEvent;
+        const synthetic = ev as unknown as React.TouchEvent;
         if (activeBlockRef.current) {
-          onBlockDrag(activeBlockRef.current, synthetic);
+          (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
         }
         // we can keep listening until touchend so parent can manage actual drag moves
       }
@@ -251,12 +379,13 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     }
 
     if (holdArmedRef.current && !dragStartedRef.current) {
-      const paletteTop = paletteRef.current?.getBoundingClientRect().top ?? Infinity;
+      const paletteTop =
+        paletteRef.current?.getBoundingClientRect().top ?? Infinity;
       if (y < paletteTop - START_DRAG_OFFSET) {
         dragStartedRef.current = true;
-        const synthetic = (ev as unknown) as React.MouseEvent;
+        const synthetic = ev as unknown as React.MouseEvent;
         if (activeBlockRef.current) {
-          onBlockDrag(activeBlockRef.current, synthetic);
+          (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
         }
       }
     }
@@ -276,7 +405,10 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   }
 
   // Start press (mouse or touch)
-  const handlePressStart = (block: Block, e: React.MouseEvent | React.TouchEvent) => {
+  const handlePressStart = (
+    block: Block,
+    e: React.MouseEvent | React.TouchEvent
+  ) => {
     // store active block (we will only trigger onBlockDrag if pointer moves above palette after hold)
     activeBlockRef.current = block;
     movedTooFarBeforeHoldRef.current = false;
@@ -293,7 +425,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     pointerStartY.current = clientY;
 
     // attach document listeners (so we can observe movement even if pointer leaves element)
-    document.addEventListener("touchmove", onDocumentTouchMove as any, { passive: false });
+    document.addEventListener("touchmove", onDocumentTouchMove as any, {
+      passive: false,
+    });
     document.addEventListener("touchend", onDocumentTouchEnd as any);
     document.addEventListener("touchcancel", onDocumentTouchEnd as any);
     document.addEventListener("mousemove", onDocumentMouseMove as any);
@@ -309,7 +443,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
       if (!movedTooFarBeforeHoldRef.current) {
         holdArmedRef.current = true;
         // Note: we DO NOT call onBlockDrag here. We wait until user moves the pointer above paletteTop.
-        // This prevents accidental drags while holding and scrolling inside the palette.
       } else {
         // moved too far before hold; treat as cancellation
         holdArmedRef.current = false;
@@ -344,7 +477,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
     setCategory(cat);
   };
 
-  const paletteTransform = isOpen ? "translateY(0)" : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
+  const paletteTransform = isOpen
+    ? "translateY(0)"
+    : `translateY(calc(100% - ${TOGGLE_WIDTH}px))`;
   const paletteTransition = `transform ${PALETTE_TRANSITION_MS}ms cubic-bezier(.2,.9,.2,1)`;
 
   // Build filtered blocks in the order of displayedTypes
@@ -355,13 +490,12 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
   // small helper for icon button styles
   const iconBtnBase =
     "inline-flex items-center justify-center w-8 h-8 rounded-md cursor-pointer select-none transition-transform active:scale-95";
-  const iconSelectedInner = "rounded-md px-1.5 py-1";
-  const iconUnselectedInner = "";
-
   // compute chooser bottom offset so it sits just above the palette
-  // when palette is open: place chooser above paletteHeight + 12
-  // when palette is closed: place chooser above the visible toggle area (approx TOGGLE_WIDTH) + 12
-  const chooserBottom = isOpen ? (paletteHeight ? paletteHeight + 12 : 84) : TOGGLE_WIDTH + 12;
+  const chooserBottom = isOpen
+    ? paletteHeight
+      ? paletteHeight + 12
+      : 84
+    : TOGGLE_WIDTH + 12;
 
   return (
     <>
@@ -387,7 +521,8 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
             height: (paletteHeight || 72) - 12,
             backdropFilter: "blur(6px)",
             boxShadow: "0 6px 20px rgba(2,6,23,0.08)",
-            transition: "transform 260ms cubic-bezier(.2,.9,.2,1), background 200ms",
+            transition:
+              "transform 260ms cubic-bezier(.2,.9,.2,1), background 200ms",
           }}
         >
           <ChevronDown
@@ -418,7 +553,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
           }
           style={{
             minWidth: 120,
-            // subtle backdrop blur for nicer look on some UIs
             backdropFilter: "blur(6px)",
           }}
         >
@@ -430,7 +564,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
             className={
               iconBtnBase +
               " " +
-              (category === "all" ? "bg-slate-100 dark:bg-slate-700" : "bg-transparent")
+              (category === "all"
+                ? "bg-slate-100 dark:bg-slate-700"
+                : "bg-transparent")
             }
             style={{
               borderRadius: 10,
@@ -439,7 +575,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
           >
             <ListFilter
               size={16}
-              className={category === "all" ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}
+              className={
+                category === "all"
+                  ? "text-slate-900 dark:text-slate-100"
+                  : "text-slate-500 dark:text-slate-400"
+              }
             />
           </button>
 
@@ -451,7 +591,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
             className={
               iconBtnBase +
               " " +
-              (category === "moves" ? "bg-slate-100 dark:bg-slate-700" : "bg-transparent")
+              (category === "moves"
+                ? "bg-slate-100 dark:bg-slate-700"
+                : "bg-transparent")
             }
             style={{
               borderRadius: 10,
@@ -460,7 +602,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
           >
             <Move
               size={16}
-              className={category === "moves" ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}
+              className={
+                category === "moves"
+                  ? "text-slate-900 dark:text-slate-100"
+                  : "text-slate-500 dark:text-slate-400"
+              }
             />
           </button>
 
@@ -472,7 +618,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
             className={
               iconBtnBase +
               " " +
-              (category === "utils" ? "bg-slate-100 dark:bg-slate-700" : "bg-transparent")
+              (category === "utils"
+                ? "bg-slate-100 dark:bg-slate-700"
+                : "bg-transparent")
             }
             style={{
               borderRadius: 10,
@@ -481,7 +629,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
           >
             <Wrench
               size={16}
-              className={category === "utils" ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"}
+              className={
+                category === "utils"
+                  ? "text-slate-900 dark:text-slate-100"
+                  : "text-slate-500 dark:text-slate-400"
+              }
             />
           </button>
         </div>
@@ -499,12 +651,6 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
           transition: paletteTransition,
         }}
       >
-        {/* 
-          Inner scroll area:
-          - always allow horizontal scrolling (overflow-x-auto) on all sizes including desktop
-          - add extra left/right padding so blocks can scroll partially into view
-          - keep items inline with flex, and prevent wrapping
-        */}
         <div
           ref={paletteRef}
           className={
@@ -512,14 +658,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onBlockDrag, selecte
             "xs:justify-start md:justify-start ml-1"
           }
           style={{
-            // Add extra horizontal padding so user can scroll blocks slightly off-edge.
-            // Adjust values if you want more/less 'peek' space.
             paddingLeft: 18,
             paddingRight: 18,
-            // ensure touch scrolling is smooth
             WebkitOverflowScrolling: "touch" as any,
             position: "relative",
-            whiteSpace: "nowrap", // ensure one row
+            whiteSpace: "nowrap",
           }}
         >
           <div style={{ minWidth: 8 }} />

@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, {
   useState,
   useCallback,
@@ -27,11 +28,17 @@ import {
   Moon,
   FolderOpenDot,
 } from 'lucide-react';
+import { useAppSelector } from './store/hooks';
+import type { RootState } from './store';
 
 export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
-  // blocks + history
+  // Unconditional redux selectors (so components can gradually be moved to store)
+  const reduxInteractionMode = useAppSelector((s: RootState) => (s.ui ? s.ui.interactionMode : undefined));
+  const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? s.ui.bluetoothOpen : undefined));
+
+  // blocks + history (local for now; you can move to redux later)
   const [blocks, setBlocks] = useState<Block[]>([]);
   const blocksRef = useRef<Block[]>(blocks);
   useEffect(() => {
@@ -40,7 +47,7 @@ const App: React.FC = () => {
 
   const { submitCapture, goPrev, goNext, hasPrev, hasNext } = useCaptureHistory(blocksRef, setBlocks);
 
-  // bluetooth connection state
+  // bluetooth connection state (local for now)
   const [isBluetoothConnected, setIsBluetoothConnected] = useState<boolean>(false);
 
   // other global UI state
@@ -60,9 +67,6 @@ const App: React.FC = () => {
     (async () => {
       try {
         // dynamic import avoids compile error if file missing
-        // expected export: export function ensureBluetoothPermissions(): Promise<void>
-        // if not present, this will throw and be caught below
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const mod = await import('./utils/ensureBluetoothPermissions');
         if (!mounted) return;
         if (typeof mod.ensureBluetoothPermissions === 'function') {
@@ -259,13 +263,25 @@ const App: React.FC = () => {
     [blocks, blocksMap, getChain, playSnapSound, submitCapture],
   );
 
-  // UI state
-  const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>('runner');
-  const [bluetoothOpen, setBluetoothOpen] = useState<boolean>(false);
+  // UI state (local for now)
+  const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>(reduxInteractionMode ?? 'runner');
+  const [bluetoothOpen, setBluetoothOpen] = useState<boolean>(reduxBluetoothOpen ?? false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
 
+  // sync redux -> local if redux changes (non-destructive)
+  useEffect(() => {
+    if (reduxInteractionMode && reduxInteractionMode !== interactionMode) {
+      setInteractionMode(reduxInteractionMode);
+    }
+  }, [reduxInteractionMode]);
+
+  useEffect(() => {
+    if (typeof reduxBluetoothOpen === "boolean" && reduxBluetoothOpen !== bluetoothOpen) {
+      setBluetoothOpen(reduxBluetoothOpen);
+    }
+  }, [reduxBluetoothOpen]);
+
   // FAB items (typed)
-  // NOTE: interaction item removed from fab and placed as a left-side floating control (see below)
   const fabItems: Array<{ key: string; onClick: () => void; content: React.ReactNode }> = [
     {
       key: 'bluetooth',
@@ -301,36 +317,36 @@ const App: React.FC = () => {
     <SoundContext.Provider value={playSnapSound}>
       <Header initialCollapsed={false} hasPrev={hasPrev} hasNext={hasNext} onPrev={goPrev} onNext={goNext} />
 
-     {/* left-side interaction button (moved out of hamburger FAB) */}
-    <div
-      style={{
-        position: 'fixed',
-        left: LEFT_TOGGLE_LEFT,
-        bottom: LEFT_TOGGLE_BOTTOM,
-        zIndex: 70,
-      }}
-    >
-      <button
-        aria-pressed={interactionMode === 'deleter'}
-        onClick={toggleInteraction}
-        className={`
-          inline-flex items-center justify-center
-          w-12 h-12 rounded-full shadow-lg
-          cursor-pointer select-none
-          transition-transform duration-200 hover:scale-105 active:scale-95
-          bg-white dark:bg-slate-800
-          text-gray-700 dark:text-slate-100
-          hover:bg-gray-50 dark:hover:bg-slate-700
-        `}
-        title={interactionMode === 'runner' ? 'Switch to delete mode' : 'Switch to run mode'}
+      {/* left-side interaction button */}
+      <div
+        style={{
+          position: 'fixed',
+          left: LEFT_TOGGLE_LEFT,
+          bottom: LEFT_TOGGLE_BOTTOM,
+          zIndex: 70,
+        }}
       >
-        {interactionMode === 'runner' ? (
-          <MousePointer2 className="w-5 h-5" />
-        ) : (
-          <Trash2 className="w-5 h-5" />
-        )}
-      </button>
-    </div>
+        <button
+          aria-pressed={interactionMode === 'deleter'}
+          onClick={toggleInteraction}
+          className={`
+            inline-flex items-center justify-center
+            w-12 h-12 rounded-full shadow-lg
+            cursor-pointer select-none
+            transition-transform duration-200 hover:scale-105 active:scale-95
+            bg-white dark:bg-slate-800
+            text-gray-700 dark:text-slate-100
+            hover:bg-gray-50 dark:hover:bg-slate-700
+          `}
+          title={interactionMode === 'runner' ? 'Switch to delete mode' : 'Switch to run mode'}
+        >
+          {interactionMode === 'runner' ? (
+            <MousePointer2 className="w-5 h-5" />
+          ) : (
+            <Trash2 className="w-5 h-5" />
+          )}
+        </button>
+      </div>
 
       <div className="h-screen w-screen overflow-hidden relative">
         <AppShell

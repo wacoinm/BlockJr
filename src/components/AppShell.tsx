@@ -5,6 +5,8 @@ import { BluetoothConnector } from "./BluetoothConnector";
 import WorkspaceControls from "./WorkspaceControls";
 import { Workspace } from "./Workspace";
 import { BlockPalette } from "./BlockPalette";
+import { useAppSelector } from "../store/hooks";
+import type { RootState } from "../store";
 
 export type FabItem = {
   key: string;
@@ -42,14 +44,14 @@ export type AppShellProps = {
   onBlockDragStart: OnBlockDragStart;
 
   // controls / UI
-  menuOpen: boolean;
-  setMenuOpen: (open: boolean) => void;
+  menuOpen?: boolean;
+  setMenuOpen?: (open: boolean) => void;
   fabItems: FabItem[];
-  selectVisible: boolean;
-  selectOpen: boolean;
-  closeSelectPopup: () => void;
+  selectVisible?: boolean;
+  selectOpen?: boolean;
+  closeSelectPopup?: () => void;
   projects: string[];
-  selectedProject: string | null;
+  selectedProject?: string | null;
   handleProjectSelect: (proj: string) => void;
   ITEM_STAGGER: number;
   BASE_DURATION: number;
@@ -58,14 +60,21 @@ export type AppShellProps = {
   theme: "system" | "light" | "dark";
 
   // bluetooth
-  bluetoothOpen: boolean;
-  setBluetoothOpen: (open: boolean) => void;
-  onBluetoothConnectionChange: (connected: boolean) => void;
+  bluetoothOpen?: boolean;
+  setBluetoothOpen?: (open: boolean) => void;
+  onBluetoothConnectionChange?: (connected: boolean) => void;
 
-  interactionMode: "runner" | "deleter";
+  interactionMode?: "runner" | "deleter";
 };
 
 export default function AppShell(props: AppShellProps) {
+  // Unconditional hooks (read-only selectors)
+  const reduxSelectedProject = useAppSelector((s: RootState) => (s.projects ? s.projects.selectedProject : null));
+  const reduxMenuOpen = useAppSelector((s: RootState) => (s.ui ? s.ui.menuOpen : undefined));
+  const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? s.ui.bluetoothOpen : undefined));
+  const reduxInteractionMode = useAppSelector((s: RootState) => (s.ui ? s.ui.interactionMode : undefined));
+
+  // prefer props when provided, else fall back to redux or defaults
   const {
     blocks,
     isDragging,
@@ -80,25 +89,26 @@ export default function AppShell(props: AppShellProps) {
     onDelayChange,
     onBlockRemove,
     onBlockDragStart,
-    menuOpen,
-    setMenuOpen,
     fabItems,
-    selectVisible,
-    selectOpen,
-    closeSelectPopup,
     projects,
-    selectedProject,
     handleProjectSelect,
     ITEM_STAGGER,
     BASE_DURATION,
     ITEM_DURATION,
     unitLabel,
     theme,
-    bluetoothOpen,
-    setBluetoothOpen,
-    onBluetoothConnectionChange,
-    interactionMode,
   } = props;
+
+  const menuOpen = typeof props.menuOpen === "boolean" ? props.menuOpen : reduxMenuOpen ?? false;
+  const setMenuOpen = props.setMenuOpen ?? (() => {});
+  const selectVisible = typeof props.selectVisible === "boolean" ? props.selectVisible : false;
+  const selectOpen = typeof props.selectOpen === "boolean" ? props.selectOpen : false;
+  const closeSelectPopup = props.closeSelectPopup ?? (() => {});
+  const selectedProject = typeof props.selectedProject !== "undefined" ? props.selectedProject : reduxSelectedProject ?? null;
+  const bluetoothOpen = typeof props.bluetoothOpen === "boolean" ? props.bluetoothOpen : reduxBluetoothOpen ?? false;
+  const setBluetoothOpen = props.setBluetoothOpen ?? (() => {});
+  const onBluetoothConnectionChange = props.onBluetoothConnectionChange ?? (() => {});
+  const interactionMode = typeof props.interactionMode !== "undefined" ? props.interactionMode : reduxInteractionMode ?? "runner";
 
   return (
     <>

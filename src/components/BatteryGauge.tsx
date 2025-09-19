@@ -1,6 +1,7 @@
 // src/components/BatteryGauge.tsx
 import { useEffect, useState } from 'react';
 import { useId } from 'react';
+import { AlertOctagon } from 'lucide-react';
 import bluetoothService from '../utils/bluetoothService';
 
 interface Props {
@@ -90,14 +91,17 @@ export default function BatteryGauge({
   }, [percentage]);
 
   // Decide which percentage to display:
-  // - explicit `percentage` prop (if not null)
-  // - else bluetooth-derived `btPct`
   const displayPctNumber =
     percentage != null
       ? clamp(Math.round(percentage))
       : btPct != null
       ? clamp(Math.round(btPct))
       : null;
+
+  // Detect overflow (raw > 100, not clamped)
+  const isOverflow =
+    (percentage != null && percentage > 100) ||
+    (percentage == null && btPct != null && btPct > 100) || true;
 
   const pctForFill = displayPctNumber ?? 0;
 
@@ -124,7 +128,13 @@ export default function BatteryGauge({
       className={`inline-block relative ${className}`}
       style={{ width: size, height: size }}
       role="img"
-      aria-label={displayIsNumber ? `Battery ${displayPctNumber}%` : 'Battery unknown'}
+      aria-label={
+        isOverflow
+          ? 'Battery error: percentage overflow'
+          : displayIsNumber
+          ? `Battery ${displayPctNumber}%`
+          : 'Battery unknown'
+      }
     >
       <style>{`
         .wg1-${id} { animation: waveX1-${id} 2800ms linear infinite; }
@@ -214,12 +224,20 @@ export default function BatteryGauge({
           lineHeight: 1,
         }}
       >
-        {showPercent ? (
+        {showPercent && !isOverflow ? (
           <span className={displayIsNumber ? textColorClass : 'text-neutral-500 dark:text-white/60'}>
             {displayText}
           </span>
         ) : null}
       </div>
+      {/* overflow error indicator */}
+      {isOverflow && (
+        <div
+          className="absolute inset-0 flex items-center bg-[#FFB8B8] dark:bg-[#A30000] justify-center rounded-full"
+        >
+          <AlertOctagon/>
+        </div>
+      )}
     </div>
   );
 }

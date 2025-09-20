@@ -1,8 +1,9 @@
 // src/components/BatteryGauge.tsx
-import { useEffect, useState } from 'react';
-import { useId } from 'react';
-import { AlertOctagon } from 'lucide-react';
-import bluetoothService from '../utils/bluetoothService';
+import { useEffect, useState } from "react";
+import { useId } from "react";
+import { AlertOctagon } from "lucide-react";
+import bluetoothService from "../utils/bluetoothService";
+import SampleDialogue from "../tests/BatteryCheck.test";
 
 interface Props {
   percentage?: number | null;
@@ -19,7 +20,7 @@ export default function BatteryGauge({
   size = 48,
   strokeWidth = 2,
   showPercent = true,
-  className = '',
+  className = "",
 }: Props) {
   const id = useId();
   const clipId = `clip-${id}`;
@@ -33,10 +34,14 @@ export default function BatteryGauge({
       (async () => {
         try {
           await bluetoothService.stopDataListener();
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         try {
           await bluetoothService.stopDisconnectListener();
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       })();
       return;
     }
@@ -48,7 +53,7 @@ export default function BatteryGauge({
       try {
         await bluetoothService.initialize();
       } catch (e) {
-        console.warn('[BatteryGauge] bluetooth initialize failed', e);
+        console.warn("[BatteryGauge] bluetooth initialize failed", e);
       }
 
       try {
@@ -64,7 +69,7 @@ export default function BatteryGauge({
           setBtPct((prev) => (prev === clamped ? prev : clamped));
         });
       } catch (e) {
-        console.warn('[BatteryGauge] startDataListener failed', e);
+        console.warn("[BatteryGauge] startDataListener failed", e);
       }
 
       try {
@@ -73,7 +78,7 @@ export default function BatteryGauge({
           setBtPct(null);
         });
       } catch (e) {
-        console.warn('[BatteryGauge] startDisconnectListener failed', e);
+        console.warn("[BatteryGauge] startDisconnectListener failed", e);
       }
     })();
 
@@ -82,10 +87,14 @@ export default function BatteryGauge({
       (async () => {
         try {
           await bluetoothService.stopDataListener();
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         try {
           await bluetoothService.stopDisconnectListener();
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       })();
     };
   }, [percentage]);
@@ -101,7 +110,8 @@ export default function BatteryGauge({
   // Detect overflow (raw > 100, not clamped)
   const isOverflow =
     (percentage != null && percentage > 100) ||
-    (percentage == null && btPct != null && btPct > 100) || true;
+    (percentage == null && btPct != null && btPct > 100) ||
+    true;
 
   const pctForFill = displayPctNumber ?? 0;
 
@@ -113,131 +123,154 @@ export default function BatteryGauge({
   const topOfCircle = center - radius;
   const waveTranslateY = fillTopY - topOfCircle;
 
-  const green = '#34d399';
+  const green = "#34d399";
 
-  const displayIsNumber = typeof displayPctNumber === 'number' && !Number.isNaN(displayPctNumber);
-  const displayText = displayIsNumber ? `${displayPctNumber}%` : 'Load';
+  const displayIsNumber =
+    typeof displayPctNumber === "number" && !Number.isNaN(displayPctNumber);
+  const displayText = displayIsNumber ? `${displayPctNumber}%` : "Load";
 
   const textColorClass =
     displayIsNumber && displayPctNumber < 20
-      ? 'text-red-500'
-      : 'text-neutral-900 dark:text-white';
+      ? "text-red-500"
+      : "text-neutral-900 dark:text-white";
 
   return (
-    <div
-      className={`inline-block relative ${className}`}
-      style={{ width: size, height: size }}
-      role="img"
-      aria-label={
-        isOverflow
-          ? 'Battery error: percentage overflow'
-          : displayIsNumber
-          ? `Battery ${displayPctNumber}%`
-          : 'Battery unknown'
-      }
-    >
-      <style>{`
+    <SampleDialogue>
+      <div
+        className={`inline-block relative ${className}`}
+        style={{ width: size, height: size }}
+        role="img"
+        aria-label={
+          isOverflow
+            ? "Battery error: percentage overflow"
+            : displayIsNumber
+            ? `Battery ${displayPctNumber}%`
+            : "Battery unknown"
+        }
+      >
+        <style>{`
         .wg1-${id} { animation: waveX1-${id} 2800ms linear infinite; }
         .wg2-${id} { animation: waveX2-${id} 4200ms linear infinite reverse; opacity:0.85; }
 
-        @keyframes waveX1-${id} { from { transform: translateX(0) } to { transform: translateX(-${size * 0.45}px) } }
-        @keyframes waveX2-${id} { from { transform: translateX(0) } to { transform: translateX(-${size * 0.28}px) } }
+        @keyframes waveX1-${id} { from { transform: translateX(0) } to { transform: translateX(-${
+          size * 0.45
+        }px) } }
+        @keyframes waveX2-${id} { from { transform: translateX(0) } to { transform: translateX(-${
+          size * 0.28
+        }px) } }
 
         .wave-container-${id} { transition: transform 520ms cubic-bezier(.2,.9,.2,1); will-change: transform; }
         .fill-rect-${id} { transition: height 520ms cubic-bezier(.2,.9,.2,1), y 520ms cubic-bezier(.2,.9,.2,1); }
         .pct-${id} { transition: color 180ms; font-weight:600; -webkit-font-smoothing:antialiased; }
       `}</style>
 
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="presentation">
-        <defs>
-          <clipPath id={clipId}>
-            <circle cx={center} cy={center} r={radius} />
-          </clipPath>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          role="presentation"
+        >
+          <defs>
+            <clipPath id={clipId}>
+              <circle cx={center} cy={center} r={radius} />
+            </clipPath>
 
-          <path
-            id={waveId}
-            d={`
+            <path
+              id={waveId}
+              d={`
               M 0 ${size * 0.58}
-              C ${size * 0.18} ${size * 0.52}, ${size * 0.32} ${size * 0.64}, ${size * 0.5} ${size * 0.58}
-              C ${size * 0.68} ${size * 0.52}, ${size * 0.82} ${size * 0.64}, ${size} ${size * 0.58}
+              C ${size * 0.18} ${size * 0.52}, ${size * 0.32} ${size * 0.64}, ${
+                size * 0.5
+              } ${size * 0.58}
+              C ${size * 0.68} ${size * 0.52}, ${size * 0.82} ${
+                size * 0.64
+              }, ${size} ${size * 0.58}
               L ${size} ${size} L 0 ${size} Z
             `}
-            fill={green}
-          />
-        </defs>
+              fill={green}
+            />
+          </defs>
 
-        {/* outer ring */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          className="stroke-neutral-400 dark:stroke-white/10"
-          strokeWidth={strokeWidth}
-          fill="transparent"
-        />
-
-        {/* clipped fill */}
-        <g clipPath={`url(#${clipId})`}>
-          <rect
-            className={`fill-rect-${id}`}
-            x={center - radius}
-            y={fillTopY}
-            width={radius * 2}
-            height={fillHeight}
-            fill={green}
-            opacity={0.92}
+          {/* outer ring */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            className="stroke-neutral-400 dark:stroke-white/10"
+            strokeWidth={strokeWidth}
+            fill="transparent"
           />
 
-          <g
-            className={`wave-container-${id}`}
-            style={{ transform: `translateY(${waveTranslateY}px)` }}
-          >
-            <g className={`wg1-${id}`} style={{ transform: `translateX(0)` }}>
-              <use href={`#${waveId}`} x={-size * 0.55} />
-              <use href={`#${waveId}`} x={-size * 0.05} />
-              <use href={`#${waveId}`} x={size * 0.45} />
-            </g>
+          {/* clipped fill */}
+          <g clipPath={`url(#${clipId})`}>
+            <rect
+              className={`fill-rect-${id}`}
+              x={center - radius}
+              y={fillTopY}
+              width={radius * 2}
+              height={fillHeight}
+              fill={green}
+              opacity={0.92}
+            />
 
-            <g className={`wg2-${id}`} style={{ transform: `translateX(0)`, opacity: 0.95 }}>
-              <use href={`#${waveId}`} x={-size * 0.35} y={2} />
-              <use href={`#${waveId}`} x={size * 0.15} y={2} />
-              <use href={`#${waveId}`} x={size * 0.65} y={2} />
+            <g
+              className={`wave-container-${id}`}
+              style={{ transform: `translateY(${waveTranslateY}px)` }}
+            >
+              <g className={`wg1-${id}`} style={{ transform: `translateX(0)` }}>
+                <use href={`#${waveId}`} x={-size * 0.55} />
+                <use href={`#${waveId}`} x={-size * 0.05} />
+                <use href={`#${waveId}`} x={size * 0.45} />
+              </g>
+
+              <g
+                className={`wg2-${id}`}
+                style={{ transform: `translateX(0)`, opacity: 0.95 }}
+              >
+                <use href={`#${waveId}`} x={-size * 0.35} y={2} />
+                <use href={`#${waveId}`} x={size * 0.15} y={2} />
+                <use href={`#${waveId}`} x={size * 0.65} y={2} />
+              </g>
             </g>
           </g>
-        </g>
 
-        {/* inner glossy overlay */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius - strokeWidth * 1.05}
-          className="fill-white/5 dark:fill-white/5 stroke-white/5 dark:stroke-white/5"
-          strokeWidth={0.4}
-        />
-      </svg>
+          {/* inner glossy overlay */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius - strokeWidth * 1.05}
+            className="fill-white/5 dark:fill-white/5 stroke-white/5 dark:stroke-white/5"
+            strokeWidth={0.4}
+          />
+        </svg>
 
-      {/* percentage text */}
-      <div
-        className={`pct-${id} absolute inset-0 flex items-center justify-center pointer-events-none font-bold`}
-        style={{
-          fontSize: Math.max(13, size * 0.26),
-          lineHeight: 1,
-        }}
-      >
-        {showPercent && !isOverflow ? (
-          <span className={displayIsNumber ? textColorClass : 'text-neutral-500 dark:text-white/60'}>
-            {displayText}
-          </span>
-        ) : null}
-      </div>
-      {/* overflow error indicator */}
-      {isOverflow && (
+        {/* percentage text */}
         <div
-          className="absolute inset-0 flex items-center bg-[#FFB8B8] dark:bg-[#A30000] justify-center rounded-full"
+          className={`pct-${id} absolute inset-0 flex items-center justify-center pointer-events-none font-bold`}
+          style={{
+            fontSize: Math.max(13, size * 0.26),
+            lineHeight: 1,
+          }}
         >
-          <AlertOctagon/>
+          {showPercent && !isOverflow ? (
+            <span
+              className={
+                displayIsNumber
+                  ? textColorClass
+                  : "text-neutral-500 dark:text-white/60"
+              }
+            >
+              {displayText}
+            </span>
+          ) : null}
         </div>
-      )}
-    </div>
+        {/* overflow error indicator */}
+        {isOverflow && (
+          <div className="absolute inset-0 flex items-center bg-[#FFB8B8] dark:bg-[#A30000] justify-center rounded-full">
+            <AlertOctagon />
+          </div>
+        )}
+      </div>
+    </SampleDialogue>
   );
 }

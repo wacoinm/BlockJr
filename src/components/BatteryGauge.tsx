@@ -110,8 +110,7 @@ export default function BatteryGauge({
   // Detect overflow (raw > 100, not clamped)
   const isOverflow =
     (percentage != null && percentage > 100) ||
-    (percentage == null && btPct != null && btPct > 100) ||
-    true;
+    (percentage == null && btPct != null && btPct > 100);
 
   const pctForFill = displayPctNumber ?? 0;
 

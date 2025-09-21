@@ -11,6 +11,9 @@ importers:
       '@capacitor-community/bluetooth-le':
         specifier: ^7.1.1
         version: 7.2.0(@capacitor/core@7.4.3)
+      '@capacitor-community/safe-area':
+        specifier: 6.0.0-alpha.1
+        version: 6.0.0-alpha.1(@capacitor/core@7.4.3)
       '@capacitor/android':
         specifier: ^7.4.2
         version: 7.4.3(@capacitor/core@7.4.3)
@@ -206,6 +209,11 @@ packages:
     resolution: {integrity: sha512-eBM0Ia6C68YKqYbGjy6xgjaBrCvfH9EICn77EqxpR3Pu9yniRGTlCuZQdcCAonLwp16uuyAh/5tESxkkVJMccA==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capacitor-community/safe-area@6.0.0-alpha.1':
+    resolution: {integrity: sha512-ndZbXCDY7rQK0KMBCAIIITe8T9tdeN7KMfJyat9OnjCdQ6SJ6L1GPLdCDE1CY+sPsP2j91IXq/c8mgjAdI7WSQ==}
+    peerDependencies:
+      '@capacitor/core': ^6.0.0
 
   '@capacitor/android@7.4.3':
     resolution: {integrity: sha512-VpjvnOcmYGPLgvXRhe3CGLs62Cg7sxOyp77NddCr+Y06qqgnoaj6OGeBVTc2DZlqZ6bSmh15JvFu82pkvmdgfQ==}
@@ -3274,6 +3282,10 @@ snapshots:
     dependencies:
       '@capacitor/core': 7.4.3
       '@types/web-bluetooth': 0.0.20
+
+  '@capacitor-community/safe-area@6.0.0-alpha.1(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
 
   '@capacitor/android@7.4.3(@capacitor/core@7.4.3)':
     dependencies:

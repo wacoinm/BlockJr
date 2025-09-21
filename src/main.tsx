@@ -2,6 +2,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
+import SafeLayout from "./layouts/SafeLayout";
 import ToastContain from "./ToastContain";
 import { DialogueProvider } from "dialogue-story";
 import App from "./App";
@@ -25,7 +26,9 @@ root.render(
         }}
         rtl={true}
       >
-        <App />
+        <SafeLayout>
+          <App />
+        </SafeLayout>
         <ToastContain />
       </DialogueProvider>
     </Provider>

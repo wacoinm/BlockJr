@@ -7,7 +7,6 @@ import React, {
   useEffect,
   useRef,
 } from 'react';
-import '@capacitor-community/safe-area';
 import { useSnapSound } from './utils/soundEffects';
 import { executeBlocks } from './utils/blockExecutor';
 import { Block } from './types/Block';

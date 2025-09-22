@@ -130,7 +130,7 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
   return (
     <>
       {/* Hamburger + animated FABs */}
-      <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-3">
+      <div className="absolute [top:calc(1rem+var(--safe-area-inset-top))] right-4 z-50 flex flex-col items-end gap-3">
         {/* Hamburger (rounded) */}
         <button
           type="button"
@@ -291,7 +291,7 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
       )}
 
       {/* bottom-right debug panel */}
-      <div className="fixed right-4 bottom-4 text-xs text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-900/80 px-3 py-2 rounded-md shadow-sm z-60">
+      <div className="fixed right-4 [bottom:calc(1rem+var(--safe-area-inset-bottom))] text-xs text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-900/80 px-3 py-2 rounded-md shadow-sm z-60">
         <div>vw: {viewportWidth}px</div>
         <div>zoom: {zoom.toFixed(2)}</div>
         <div>

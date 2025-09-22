@@ -73,7 +73,7 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <div
-      className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ${className}`}
+      className={`fixed [top:calc(var(--safe-area-inset-top)+1rem)] left-1/2 transform -translate-x-1/2 z-50 ${className}`}
     >
       <div
         className={`flex items-center gap-2 rounded-full px-3 py-1 shadow-md

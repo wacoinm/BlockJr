@@ -246,7 +246,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
   const gridStyle: React.CSSProperties = {
     position: 'absolute',
     left: -half,
-    top: -half,
+    top: `calc(${-half}px + var(--safe-area-inset-top))`,
     width: GRID_EXTENT,
     height: GRID_EXTENT,
     pointerEvents: 'none',
@@ -275,7 +275,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
       />
 
       {/* Zoom helper buttons - style respects dark mode */}
-      <div style={{ position: 'absolute', left: 10, top: 10, zIndex: 80 }}>
+      <div style={{ position: 'absolute', left: 10, zIndex: 80 }} className='[top:calc(10px+var(--safe-area-inset-top))]'>
         <div className="flex flex-col gap-2 p-2 rounded-lg shadow"
              style={{
                backgroundColor: isDark ? 'rgba(9,12,20,0.7)' : 'rgba(255,255,255,0.92)',
@@ -310,7 +310,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
                 className="absolute"
                 style={{
                   left: block.x,
-                  top: block.y,
+                  top: `calc(${block.y}px + var(--safe-area-inset-top))`,
                   transition: isCurrentlyDragged ? 'none' : 'left 150ms ease-out, top 150ms ease-out',
                   zIndex: isCurrentlyDragged ? 200 : 100,
                   pointerEvents: 'auto',

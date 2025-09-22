@@ -312,7 +312,7 @@ const App: React.FC = () => {
 
   const projects = ['elevator', 'bulldozer', 'lift truck'];
   const LEFT_TOGGLE_LEFT = 6; // px - offset to avoid overlapping the palette toggle at left:0
-  const LEFT_TOGGLE_BOTTOM = 84; // px - aligns roughly with the palette chooser bottom when closed
+  const LEFT_TOGGLE_BOTTOM = 88; // px - aligns roughly with the palette chooser bottom when closed
   const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));
 
   return (
@@ -324,7 +324,7 @@ const App: React.FC = () => {
         style={{
           position: 'fixed',
           left: LEFT_TOGGLE_LEFT,
-          bottom: LEFT_TOGGLE_BOTTOM,
+          bottom: `calc(${LEFT_TOGGLE_BOTTOM}px + var(--safe-area-inset-bottom))`,
           zIndex: 70,
         }}
       >

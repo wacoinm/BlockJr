@@ -33,6 +33,8 @@ import { toast } from 'react-toastify';
 import { useAppSelector } from './store/hooks';
 import type { RootState } from './store';
 
+import { computeHorizStep, GAP_BETWEEN_BLOCKS } from './constants/spacing';
+
 export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
@@ -101,8 +103,13 @@ const App: React.FC = () => {
   const isMobile = viewportWidth < 768;
   const BLOCK_WIDTH = isMobile ? 48 : 64;
   const BLOCK_HEIGHT = isMobile ? 48 : 64;
-  const HORIZONTAL_GAP = isMobile ? -2 : 2;
-  const HORIZONTAL_SPACING = BLOCK_WIDTH + HORIZONTAL_GAP;
+
+  // NOTE: we no longer compute HORIZONTAL_SPACING here as BLOCK_WIDTH + gap.
+  // Instead we keep a single canonical value GAP_BETWEEN_BLOCKS in src/constants/spacing
+  // and compute horizStep where needed via computeHorizStep(BLOCK_WIDTH, GAP_BETWEEN_BLOCKS).
+  // (useBlockDragDrop expects HORIZONTAL_SPACING to be either a gap or a full step;
+  // we pass the gap for canonical behavior).
+  const HORIZONTAL_SPACING = GAP_BETWEEN_BLOCKS;
 
   // pan & zoom (hook)
   const { pan, zoom, screenToWorld, zoomBy, panBy } = usePanZoom({ x: 0, y: 0 }, 1);
@@ -152,6 +159,10 @@ const App: React.FC = () => {
 
         // normalize head chains horizontal spacing
         const heads = merged.filter((b) => b.parentId == null);
+
+        // compute canonical horiz step here using centralized spacing constants
+        const horizStep = computeHorizStep(BLOCK_WIDTH, GAP_BETWEEN_BLOCKS);
+
         for (const head of heads) {
           const headIndex = merged.findIndex((m) => m.id === head.id);
           if (headIndex === -1) continue;
@@ -163,7 +174,7 @@ const App: React.FC = () => {
             const i = merged.findIndex((m) => m.id === cur.id);
             if (i === -1) break;
             merged[i] = { ...merged[i], x: currX, y };
-            currX += HORIZONTAL_SPACING;
+            currX += horizStep;
             if (!merged[i].childId) break;
             cur = merged.find((m) => m.id === merged[i].childId) as Block | undefined;
           }
@@ -178,7 +189,7 @@ const App: React.FC = () => {
         return merged;
       });
     },
-    [HORIZONTAL_SPACING, submitCapture],
+    [BLOCK_WIDTH, GAP_BETWEEN_BLOCKS, submitCapture],
   );
 
   // block drag/drop hook (typed)
@@ -193,8 +204,8 @@ const App: React.FC = () => {
     playSnapSound,
     BLOCK_WIDTH,
     BLOCK_HEIGHT,
-    HORIZONTAL_SPACING,
-    getClientXY,
+    HORIZONTAL_SPACING, // pass the canonical gap; hook will compute final step via computeHorizStep
+    getClientXY
   });
 
   // units / projects / theme hooks (typed)

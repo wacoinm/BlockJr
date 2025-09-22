@@ -6,6 +6,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import type { RootState } from '../store';
 import { updateBlock as updateBlockAction, removeBlock as removeBlockAction } from '../store/slices/blocksSlice';
 import BatteryGauge from './BatteryGauge';
+import { computeHorizStep, DEFAULT_BLOCK_WIDTH, GAP_BETWEEN_BLOCKS } from '../constants/spacing';
 
 interface WorkspaceProps {
   blocks?: Block[]; // now optional — we prefer store when not provided
@@ -258,6 +259,80 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
     willChange: 'transform, background-position',
   };
 
+  //
+  // ----------------- NEW: visual spacing pass (display-only) -----------------
+  //
+  // Build a displayX map so that chains never visually overlap. We don't mutate blocks[].
+  // We compute an effective horizontal step (horizStep) using centralized computeHorizStep and the canonical GAP_BETWEEN_BLOCKS.
+  //
+  const displayXById = useMemo(() => {
+    const map = new Map<string, number>();
+
+    // fast lookup
+    const blocksMap = new Map<string, Block>(blocks.map((b) => [b.id, b]));
+
+    // compute horizStep using centralized rule:
+    // - pass DEFAULT_BLOCK_WIDTH (fallback) and the canonical GAP_BETWEEN_BLOCKS so Workspace honors that constant.
+    const horizStep = computeHorizStep(DEFAULT_BLOCK_WIDTH, GAP_BETWEEN_BLOCKS);
+
+    // find heads (parentId === null)
+    const heads = blocks.filter((b) => b.parentId == null);
+
+    // For deterministic ordering, sort heads by their stored x
+    heads.sort((a, b) => a.x - b.x);
+
+    const visited = new Set<string>();
+
+    for (const head of heads) {
+      // if already processed via another head (defensive), skip
+      if (visited.has(head.id)) {
+        continue;
+      }
+
+      // walk chain from head following childId
+      let chain: Block[] = [];
+      let cur: Block | undefined = head;
+      const cycleGuard = new Set<string>();
+      while (cur && !cycleGuard.has(cur.id)) {
+        chain.push(cur);
+        cycleGuard.add(cur.id);
+        if (!cur.childId) break;
+        const next = blocksMap.get(cur.childId);
+        if (!next) break;
+        cur = next;
+      }
+
+      // compute displayed positions for this chain
+      if (chain.length === 0) continue;
+      // start at the head's stored x (don't move head left)
+      let currX = chain[0].x;
+      map.set(chain[0].id, currX);
+      visited.add(chain[0].id);
+
+      for (let i = 1; i < chain.length; i++) {
+        const b = chain[i];
+        // place child at least horizStep to the right of previous displayed position
+        const nextX = Math.max(b.x, currX + horizStep);
+        map.set(b.id, nextX);
+        visited.add(b.id);
+        currX = nextX;
+      }
+    }
+
+    // For any block not visited (orphaned, or part of cycles), fallback to stored x
+    for (const b of blocks) {
+      if (!visited.has(b.id)) {
+        map.set(b.id, b.x);
+      }
+    }
+
+    return map;
+  }, [blocks, gridCellSize]);
+
+  //
+  // ----------------- end spacing pass -----------------
+  //
+
   return (
     <div
       className="w-full h-full absolute top-0 left-0"
@@ -304,12 +379,16 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           {blocks.map((block) => {
             const isCurrentlyDragged = isDragging && draggedBlockId === block.id;
+
+            // Use computed displayX (never undefined because we default fallback to b.x)
+            const displayLeft = displayXById.get(block.id) ?? block.x;
+
             return (
               <div
                 key={block.id}
                 className="absolute"
                 style={{
-                  left: block.x,
+                  left: displayLeft,
                   top: `calc(${block.y}px + var(--safe-area-inset-top))`,
                   transition: isCurrentlyDragged ? 'none' : 'left 150ms ease-out, top 150ms ease-out',
                   zIndex: isCurrentlyDragged ? 200 : 100,

@@ -1,6 +1,8 @@
+// src/hooks/useBlockDragDrop.ts
 import React, { useRef, useCallback } from 'react';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { Block } from '../types/Block';
+import { computeHorizStep } from '../constants/spacing';
 
 type UseBlockDragDropParams = {
   blocksRef: React.MutableRefObject<Block[]>;
@@ -13,7 +15,7 @@ type UseBlockDragDropParams = {
   playSnapSound: () => void;
   BLOCK_WIDTH: number;
   BLOCK_HEIGHT: number;
-  HORIZONTAL_SPACING: number;
+  HORIZONTAL_SPACING: number | undefined | null; // caller can pass a "gap" or a full "step"
   getClientXY: (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => { clientX: number; clientY: number };
 };
 
@@ -122,19 +124,20 @@ export function useBlockDragDrop({
       const baseY = pointerWorld.y - dragOffsetRef.current.y;
 
       const updates = new Map<string, Partial<Block>>();
-      let currentX = baseX;
+
+      // compute effective horizontal step (distance between block origins)
+      const horizStep = computeHorizStep(BLOCK_WIDTH, HORIZONTAL_SPACING ?? undefined);
 
       updates.set(chain[0].id, { x: baseX, y: baseY, parentId: null });
 
-      const horizSpacingWorld = HORIZONTAL_SPACING;
       for (let i = 1; i < chain.length; i++) {
-        currentX += horizSpacingWorld;
-        updates.set(chain[i].id, { x: currentX, y: baseY });
+        const x = baseX + i * horizStep;
+        updates.set(chain[i].id, { x, y: baseY });
       }
 
       setBlocks((prev) => prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)));
     },
-    [getChain, screenToWorld, HORIZONTAL_SPACING, setBlocks],
+    [getChain, screenToWorld, HORIZONTAL_SPACING, BLOCK_WIDTH, setBlocks],
   );
 
   const handleDrop = useCallback(
@@ -154,11 +157,12 @@ export function useBlockDragDrop({
       }
       const draggedIds = new Set(draggedChain.map((b) => b.id));
 
-      const horizSpacingWorld = HORIZONTAL_SPACING;
+      // Effective horizStep (distance between origins)
+      const horizStep = computeHorizStep(BLOCK_WIDTH, HORIZONTAL_SPACING ?? undefined);
       const blockWidthWorld = BLOCK_WIDTH;
       const blockHeightWorld = BLOCK_HEIGHT;
 
-      // thresholds
+      // thresholds (unchanged)
       const centerThreshold = blockWidthWorld * 0.75;
       const gapThreshold = blockWidthWorld * 0.75;
 
@@ -169,7 +173,7 @@ export function useBlockDragDrop({
         );
 
         for (const targetBlock of potentialHeadTargets) {
-          const snapX = targetBlock.x - horizSpacingWorld;
+          const snapX = targetBlock.x - horizStep;
           const snapY = targetBlock.y;
           if (
             Math.abs(blockToSnap.x - snapX) < gapThreshold &&
@@ -185,7 +189,7 @@ export function useBlockDragDrop({
             });
             updates.set(targetBlock.id, { parentId: blockToSnap.id });
 
-            let newX = snapX + horizSpacingWorld;
+            let newX = snapX + horizStep;
             const targetChain = getChain(targetBlock.id);
             for (let i = 0; i < targetChain.length; i++) {
               const t = targetChain[i];
@@ -195,7 +199,7 @@ export function useBlockDragDrop({
                 parentId: i === 0 ? blockToSnap.id : targetChain[i - 1].id,
                 childId: t.childId ?? null,
               });
-              newX += horizSpacingWorld;
+              newX += horizStep;
             }
 
             applyUpdatesAndNormalize(updates, true);
@@ -228,7 +232,7 @@ export function useBlockDragDrop({
 
         // if target has a child we can consider insertion point (gap right after target)
         if (target.childId) {
-          const gapX = target.x + horizSpacingWorld;
+          const gapX = target.x + horizStep;
           const gapY = target.y;
           const gapDistX = Math.abs(blockToSnap.x - gapX);
           const gapDistY = Math.abs(blockToSnap.y - gapY);
@@ -249,7 +253,7 @@ export function useBlockDragDrop({
           const lastDragged = draggedChain[draggedChain.length - 1];
           const updates = new Map<string, Partial<Block>>();
 
-          const snapX = target.x + horizSpacingWorld;
+          const snapX = target.x + horizStep;
           const snapY = target.y;
 
           if (target.childId) {
@@ -268,7 +272,7 @@ export function useBlockDragDrop({
                       ? draggedChain[i + 1].id
                       : draggedChain[i].childId ?? null,
                 });
-                nextX += horizSpacingWorld;
+                nextX += horizStep;
               }
             } else {
               const originalChildChain = getChain(originalChild.id);
@@ -288,14 +292,14 @@ export function useBlockDragDrop({
                       ? draggedChain[i + 1].id
                       : draggedChain[i].childId ?? null,
                 });
-                nextX += horizSpacingWorld;
+                nextX += horizStep;
               }
 
-              const startForOriginalChild = snapX + draggedChain.length * horizSpacingWorld;
+              const startForOriginalChild = snapX + draggedChain.length * horizStep;
               for (let i = 0; i < originalChildChain.length; i++) {
                 const oc = originalChildChain[i];
                 updates.set(oc.id, {
-                  x: startForOriginalChild + i * horizSpacingWorld,
+                  x: startForOriginalChild + i * horizStep,
                   y: snapY,
                   parentId: i === 0 ? lastDragged.id : originalChildChain[i - 1].id,
                   childId: oc.childId ?? null,
@@ -321,7 +325,7 @@ export function useBlockDragDrop({
                     ? draggedChain[i + 1].id
                     : draggedChain[i].childId ?? null,
               });
-              nextX += horizSpacingWorld;
+              nextX += horizStep;
             }
 
             applyUpdatesAndNormalize(updates, true);
@@ -351,7 +355,7 @@ export function useBlockDragDrop({
           updates.set(lastDragged.id, { childId: child.id });
           updates.set(child.id, { parentId: lastDragged.id });
 
-          const insertionX = target.x + horizSpacingWorld;
+          const insertionX = target.x + horizStep;
           const insertionY = target.y;
           let nextX = insertionX;
           for (let i = 0; i < draggedChain.length; i++) {
@@ -365,15 +369,15 @@ export function useBlockDragDrop({
                   ? draggedChain[i + 1].id
                   : draggedChain[i].childId ?? null,
             });
-            nextX += horizSpacingWorld;
+            nextX += horizStep;
           }
 
           const originalChildChain = getChain(child.id);
-          const startForOriginalChild = insertionX + draggedChain.length * horizSpacingWorld;
+          const startForOriginalChild = insertionX + draggedChain.length * horizStep;
           for (let i = 0; i < originalChildChain.length; i++) {
             const oc = originalChildChain[i];
             updates.set(oc.id, {
-              x: startForOriginalChild + i * horizSpacingWorld,
+              x: startForOriginalChild + i * horizStep,
               y: insertionY,
               parentId: i === 0 ? lastDragged.id : originalChildChain[i - 1].id,
               childId: oc.childId ?? null,
@@ -388,7 +392,7 @@ export function useBlockDragDrop({
 
       const potentialTargets = blocks.filter((b) => !b.childId && !draggedIds.has(b.id));
       for (const targetBlock of potentialTargets) {
-        const snapX = targetBlock.x + horizSpacingWorld;
+        const snapX = targetBlock.x + horizStep;
         const snapY = targetBlock.y;
 
         if (
@@ -412,7 +416,7 @@ export function useBlockDragDrop({
                   ? draggedChain[i + 1].id
                   : d.childId ?? null,
             });
-            newX += horizSpacingWorld;
+            newX += horizStep;
           }
 
           applyUpdatesAndNormalize(updates, true);

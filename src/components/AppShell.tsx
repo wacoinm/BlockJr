@@ -65,6 +65,8 @@ export type AppShellProps = {
   onBluetoothConnectionChange?: (connected: boolean) => void;
 
   interactionMode?: "runner" | "deleter";
+  blockPaletteBottom?: number;
+  setBlockPaletteBottom?: (n: number) => void;
 };
 
 export default function AppShell(props: AppShellProps) {
@@ -97,6 +99,8 @@ export default function AppShell(props: AppShellProps) {
     ITEM_DURATION,
     unitLabel,
     theme,
+    blockPaletteBottom,
+    setBlockPaletteBottom,
   } = props;
 
   const menuOpen = typeof props.menuOpen === "boolean" ? props.menuOpen : reduxMenuOpen ?? false;
@@ -159,6 +163,8 @@ export default function AppShell(props: AppShellProps) {
       <BlockPalette
         onBlockDrag={(block, e) => onBlockDragStart(block, e)}
         selectedProject={selectedProject ?? ""}
+        blockPaletteBottom={blockPaletteBottom}
+        setBlockPaletteBottom={setBlockPaletteBottom}
       />
     </>
   );

@@ -12,6 +12,10 @@ interface BlockPaletteProps {
     event: React.MouseEvent | React.TouchEvent | React.DragEvent
   ) => void;
   selectedProject?: string | null;
+
+  // NEW: optional shared bottom position so parent can align UI
+  blockPaletteBottom?: number;
+  setBlockPaletteBottom?: (n: number) => void;
 }
 
 // Palette blocks (all blocks are present here)
@@ -111,6 +115,8 @@ const paletteBlocks: Block[] = [
 export const BlockPalette: React.FC<BlockPaletteProps> = ({
   onBlockDrag,
   selectedProject: selectedProjectProp,
+  blockPaletteBottom,
+  setBlockPaletteBottom,
 }) => {
   // ALWAYS call hooks at top (avoid conditional hooks)
   const reduxSelectedProject = useAppSelector((s: RootState) =>
@@ -496,6 +502,14 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       ? paletteHeight + 12
       : 84
     : TOGGLE_WIDTH + 12;
+
+  // NEW: report chooserBottom to parent so other UI (like left toggle) can align
+  useEffect(() => {
+    if (typeof setBlockPaletteBottom === "function") {
+      // pass an integer px value to keep things simple
+      setBlockPaletteBottom(Math.round(chooserBottom));
+    }
+  }, [chooserBottom, setBlockPaletteBottom]);
 
   return (
     <>

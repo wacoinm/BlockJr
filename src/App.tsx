@@ -269,6 +269,7 @@ const App: React.FC = () => {
   const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>(reduxInteractionMode ?? 'runner');
   const [bluetoothOpen, setBluetoothOpen] = useState<boolean>(reduxBluetoothOpen ?? false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [blockPaletteBottom, setBlockPaletteBottom] = useState<number>(88);
 
   // sync redux -> local if redux changes (non-destructive)
   useEffect(() => {
@@ -312,7 +313,8 @@ const App: React.FC = () => {
 
   const projects = ['elevator', 'bulldozer', 'lift truck'];
   const LEFT_TOGGLE_LEFT = 6; // px - offset to avoid overlapping the palette toggle at left:0
-  const LEFT_TOGGLE_BOTTOM = 88; // px - aligns roughly with the palette chooser bottom when closed
+  // use dynamic state-controlled bottom offset
+  const LEFT_TOGGLE_BOTTOM = blockPaletteBottom; // px - aligns roughly with the palette chooser bottom when closed
   const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));
 
   return (
@@ -383,6 +385,8 @@ const App: React.FC = () => {
           setBluetoothOpen={setBluetoothOpen}
           onBluetoothConnectionChange={setIsBluetoothConnected}
           interactionMode={interactionMode}
+          blockPaletteBottom={blockPaletteBottom}
+          setBlockPaletteBottom={setBlockPaletteBottom}
         />
       </div>
     </SoundContext.Provider>

@@ -413,6 +413,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
                   onGreenFlagClick={block.type === 'green-flag' ? () => onGreenFlagClick?.(block.id) : undefined}
                   onDelayChange={block.type === 'delay' ? (value) => _onDelayChange(block.id, value) : undefined}
                   onRemove={() => _onBlockRemove(block.id)}
+                  style={{ width: 100, height: 100 }}
                 />
               </div>
             );

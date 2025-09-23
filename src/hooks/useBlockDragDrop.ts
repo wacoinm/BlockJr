@@ -2,7 +2,7 @@
 import React, { useRef, useCallback } from 'react';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { Block } from '../types/Block';
-import { computeHorizStep } from '../constants/spacing';
+import { computeHorizStep, computeSnapThreshold } from '../constants/spacing';
 
 type UseBlockDragDropParams = {
   blocksRef: React.MutableRefObject<Block[]>;
@@ -19,10 +19,6 @@ type UseBlockDragDropParams = {
   getClientXY: (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => { clientX: number; clientY: number };
 };
 
-/**
- * Hook that encapsulates block drag & drop logic.
- * Returns handleDragStart, isDragging and draggedBlock which mirror your previous usage.
- */
 export function useBlockDragDrop({
   blocksRef,
   setBlocks,
@@ -162,9 +158,9 @@ export function useBlockDragDrop({
       const blockWidthWorld = BLOCK_WIDTH;
       const blockHeightWorld = BLOCK_HEIGHT;
 
-      // thresholds (unchanged)
-      const centerThreshold = blockWidthWorld * 0.75;
-      const gapThreshold = blockWidthWorld * 0.75;
+      // NEW: thresholds using centralized snap computation
+      const centerThreshold = computeSnapThreshold(blockWidthWorld);
+      const gapThreshold = computeSnapThreshold(blockWidthWorld);
 
       // FIRST: if green-flag special case => attach as parent of a head ONLY
       if (blockToSnap.type === 'green-flag') {
@@ -396,7 +392,7 @@ export function useBlockDragDrop({
         const snapY = targetBlock.y;
 
         if (
-          Math.abs(blockToSnap.x - snapX) < blockWidthWorld * 0.75 &&
+          Math.abs(blockToSnap.x - snapX) < centerThreshold &&
           Math.abs(blockToSnap.y - snapY) < blockHeightWorld * 0.75
         ) {
           const updates = new Map<string, Partial<Block>>();
@@ -425,8 +421,6 @@ export function useBlockDragDrop({
         }
       }
 
-      // If nothing matched, leave blocks where they are (no snap).
-      // But we still want to capture the final moved positions (dedupe prevents duplicates)
       submitCapture();
     },
     [
@@ -442,7 +436,6 @@ export function useBlockDragDrop({
     ],
   );
 
-  // wire into the low-level drag-drop hook
   const { handleDragStart, isDragging, draggedBlock } = useDragDrop({
     onDragStart: handleBlockDragStart,
     onDrag: handleBlockDrag,

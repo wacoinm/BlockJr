@@ -1,10 +1,11 @@
 // src/main.tsx
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router/dom";
 import { Provider } from "react-redux";
 import ToastContain from "./ToastContain";
 import { DialogueProvider } from "dialogue-story";
-import App from "./App";
+import router from "./router";
 import { store } from "./store";
 import "dialogue-story/style.css";
 import "./index.css";
@@ -26,7 +27,7 @@ root.render(
         }}
         rtl={true}
       >
-        <App />
+        <RouterProvider router={router} />
         <ToastContain />
       </DialogueProvider>
     </Provider>

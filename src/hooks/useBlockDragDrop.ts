@@ -35,6 +35,24 @@ export function useBlockDragDrop({
 }: UseBlockDragDropParams) {
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Helper: get per-block width if available on block (fallback to workspace BLOCK_WIDTH)
+  const getBlockWidth = useCallback(
+    (b: Block | { width?: number; size?: number } | undefined) => {
+      if (!b) return BLOCK_WIDTH;
+      const anyB = b as any;
+      if (anyB && typeof anyB.width === 'number' && !isNaN(anyB.width)) return anyB.width;
+      if (anyB && typeof anyB.size === 'number' && !isNaN(anyB.size)) return anyB.size;
+      return BLOCK_WIDTH;
+    },
+    [BLOCK_WIDTH],
+  );
+
+  // rotate chain so index becomes head (keeps order)
+  const rotateChain = useCallback((arr: Block[], startIndex: number) => {
+    if (startIndex <= 0) return arr.slice();
+    return arr.slice(startIndex).concat(arr.slice(0, startIndex));
+  }, []);
+
   const handleBlockDragStart = useCallback(
     (block: Block, e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
       const { clientX, clientY } = getClientXY(e);
@@ -44,15 +62,21 @@ export function useBlockDragDrop({
 
       // If dragging from palette (template)
       if (block.id.endsWith('-template')) {
+        // set drag offset to workspace block dims
         dragOffsetRef.current = { x: BLOCK_WIDTH / 2, y: BLOCK_HEIGHT / 2 };
-        const newBlock: Block = {
+        // create a new block instance — attach width so snapping works according to workspace width
+        const newBlock: Block & { width?: number } = {
           ...block,
           id: `${block.type}-${Date.now()}`,
           x: pointerWorld.x - dragOffsetRef.current.x,
           y: pointerWorld.y - dragOffsetRef.current.y,
           parentId: null,
           childId: null,
-        };
+          // IMPORTANT: store the logical/visual width on the block so snap uses it
+          // consumer should also pass this size into BlockComponent when rendering.
+          ...(typeof (block as any).width === 'undefined' ? { width: BLOCK_WIDTH } : {}),
+        } as Block & { width?: number };
+
         setBlocks((prev) => {
           const next = [...prev, newBlock];
           blocksRef.current = next;
@@ -62,7 +86,7 @@ export function useBlockDragDrop({
         return newBlock;
       }
 
-      // Normal block drag start
+      // Normal block drag start (drag offset is pointer - block pos)
       dragOffsetRef.current = { x: pointerWorld.x - block.x, y: pointerWorld.y - block.y };
 
       const draggedChain = getChain(block.id);
@@ -121,19 +145,19 @@ export function useBlockDragDrop({
 
       const updates = new Map<string, Partial<Block>>();
 
-      // compute effective horizontal step (distance between block origins)
-      const horizStep = computeHorizStep(BLOCK_WIDTH, HORIZONTAL_SPACING ?? undefined);
-
-      updates.set(chain[0].id, { x: baseX, y: baseY, parentId: null });
-
+      // create sequential positions using per-block widths
+      let curX = baseX;
+      updates.set(chain[0].id, { x: curX, y: baseY, parentId: null });
       for (let i = 1; i < chain.length; i++) {
-        const x = baseX + i * horizStep;
-        updates.set(chain[i].id, { x, y: baseY });
+        const prev = chain[i - 1];
+        const step = computeHorizStep(getBlockWidth(prev), HORIZONTAL_SPACING ?? undefined);
+        curX = curX + step;
+        updates.set(chain[i].id, { x: curX, y: baseY });
       }
 
       setBlocks((prev) => prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : b)));
     },
-    [getChain, screenToWorld, HORIZONTAL_SPACING, BLOCK_WIDTH, setBlocks],
+    [getChain, screenToWorld, HORIZONTAL_SPACING, BLOCK_WIDTH, setBlocks, getBlockWidth],
   );
 
   const handleDrop = useCallback(
@@ -141,7 +165,6 @@ export function useBlockDragDrop({
       const blocks = blocksRef.current;
       const blockToSnap = blocksMap.get(droppedBlock.id);
       if (!blockToSnap) {
-        // still submit a capture of current blocks (the drag may have moved them)
         submitCapture();
         return;
       }
@@ -153,54 +176,77 @@ export function useBlockDragDrop({
       }
       const draggedIds = new Set(draggedChain.map((b) => b.id));
 
-      // Effective horizStep (distance between origins)
-      const horizStep = computeHorizStep(BLOCK_WIDTH, HORIZONTAL_SPACING ?? undefined);
-      const blockWidthWorld = BLOCK_WIDTH;
-      const blockHeightWorld = BLOCK_HEIGHT;
+      // compute intended drop origin (virtual) using pointer + drag offset
+      const pointerWorld = screenToWorld(pos.x, pos.y);
+      const baseX = pointerWorld.x - dragOffsetRef.current.x;
+      const baseY = pointerWorld.y - dragOffsetRef.current.y;
 
-      // NEW: thresholds using centralized snap computation
-      const centerThreshold = computeSnapThreshold(blockWidthWorld);
-      const gapThreshold = computeSnapThreshold(blockWidthWorld);
+      // Build virtual positions sequentially using per-block widths
+      const virtualPositions: { id: string; x: number; y: number; width: number }[] = [];
+      let curX = baseX;
+      for (let i = 0; i < draggedChain.length; i++) {
+        const d = draggedChain[i];
+        const w = getBlockWidth(d);
+        virtualPositions.push({ id: d.id, x: curX, y: baseY, width: w });
+        // step to next origin based on current block width
+        const step = computeHorizStep(w, HORIZONTAL_SPACING ?? undefined);
+        curX = curX + step;
+      }
 
-      // FIRST: if green-flag special case => attach as parent of a head ONLY
+      // Candidate type includes which dragged index matched
+      type Candidate =
+        | { kind: 'attachAfter'; target: Block; distance: number; draggedIndex: number; snapX: number; snapY: number }
+        | { kind: 'insertBetween'; target: Block; distance: number; draggedIndex: number; snapX: number; snapY: number };
+
+      const candidates: Candidate[] = [];
+
+      // FIRST: green-flag special case => attach as parent of a head ONLY
       if (blockToSnap.type === 'green-flag') {
         const potentialHeadTargets = blocks.filter(
           (b) => b.parentId === null && !draggedIds.has(b.id) && b.id !== blockToSnap.id,
         );
 
         for (const targetBlock of potentialHeadTargets) {
-          const snapX = targetBlock.x - horizStep;
+          // canonical snap point is left of target by target width + gap
+          const snapX = targetBlock.x - computeHorizStep(getBlockWidth(targetBlock), HORIZONTAL_SPACING ?? undefined);
           const snapY = targetBlock.y;
-          if (
-            Math.abs(blockToSnap.x - snapX) < gapThreshold &&
-            Math.abs(blockToSnap.y - snapY) < blockHeightWorld * 0.75
-          ) {
-            const updates = new Map<string, Partial<Block>>();
-            // green becomes parent (head parentId stays null)
-            updates.set(blockToSnap.id, {
-              x: snapX,
-              y: snapY,
-              parentId: null,
-              childId: targetBlock.id,
-            });
-            updates.set(targetBlock.id, { parentId: blockToSnap.id });
 
-            let newX = snapX + horizStep;
-            const targetChain = getChain(targetBlock.id);
-            for (let i = 0; i < targetChain.length; i++) {
-              const t = targetChain[i];
-              updates.set(t.id, {
-                x: newX,
+          // test every virtual dragged block
+          for (let vi = 0; vi < virtualPositions.length; vi++) {
+            const vp = virtualPositions[vi];
+            const thr = computeSnapThreshold(vp.width);
+            const dx = vp.x - snapX;
+            const dy = vp.y - snapY;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= thr && Math.abs(dy) < BLOCK_HEIGHT * 0.75) {
+              const rotated = rotateChain(draggedChain, vi);
+              const updates = new Map<string, Partial<Block>>();
+              // green becomes parent (head parentId stays null)
+              updates.set(blockToSnap.id, {
+                x: snapX,
                 y: snapY,
-                parentId: i === 0 ? blockToSnap.id : targetChain[i - 1].id,
-                childId: t.childId ?? null,
+                parentId: null,
+                childId: rotated[0].id,
               });
-              newX += horizStep;
-            }
+              updates.set(targetBlock.id, { parentId: blockToSnap.id });
 
-            applyUpdatesAndNormalize(updates, true);
-            playSnapSound();
-            return;
+              // place rotated chain sequentially using per-block widths
+              let placeX = snapX + computeHorizStep(getBlockWidth(blockToSnap as any), HORIZONTAL_SPACING ?? undefined);
+              for (let i = 0; i < rotated.length; i++) {
+                const t = rotated[i];
+                updates.set(t.id, {
+                  x: placeX,
+                  y: snapY,
+                  parentId: i === 0 ? blockToSnap.id : rotated[i - 1].id,
+                  childId: i < rotated.length - 1 ? rotated[i + 1].id : t.childId ?? null,
+                });
+                placeX += computeHorizStep(getBlockWidth(t), HORIZONTAL_SPACING ?? undefined);
+              }
+
+              applyUpdatesAndNormalize(updates, true);
+              playSnapSound();
+              return;
+            }
           }
         }
 
@@ -208,33 +254,51 @@ export function useBlockDragDrop({
         return;
       }
 
-      type Candidate =
-        | { kind: 'attachAfter'; target: Block; distance: number }
-        | { kind: 'insertBetween'; target: Block; distance: number };
-
-      const candidates: Candidate[] = [];
-
+      // General candidate collection:
       for (const target of blocks) {
         if (draggedIds.has(target.id) || target.id === blockToSnap.id) continue;
 
-        // center distance
-        const centerDistX = Math.abs(blockToSnap.x - target.x);
-        const centerDistY = Math.abs(blockToSnap.y - target.y);
-        const centerDist = Math.hypot(centerDistX, centerDistY);
+        // canonical snap position for "after this target" uses target width
+        const canonicalSnapX = target.x + computeHorizStep(getBlockWidth(target), HORIZONTAL_SPACING ?? undefined);
+        const canonicalSnapY = target.y;
 
-        if (centerDist < centerThreshold) {
-          candidates.push({ kind: 'attachAfter', target, distance: centerDist });
-        }
+        // test every virtual block
+        for (let vi = 0; vi < virtualPositions.length; vi++) {
+          const vp = virtualPositions[vi];
+          const thr = computeSnapThreshold(vp.width);
 
-        // if target has a child we can consider insertion point (gap right after target)
-        if (target.childId) {
-          const gapX = target.x + horizStep;
-          const gapY = target.y;
-          const gapDistX = Math.abs(blockToSnap.x - gapX);
-          const gapDistY = Math.abs(blockToSnap.y - gapY);
-          const gapDist = Math.hypot(gapDistX, gapDistY);
-          if (gapDist < gapThreshold) {
-            candidates.push({ kind: 'insertBetween', target, distance: gapDist });
+          const attachDx = vp.x - canonicalSnapX;
+          const attachDy = vp.y - canonicalSnapY;
+          const attachDist = Math.hypot(attachDx, attachDy);
+
+          if (Math.abs(attachDy) < BLOCK_HEIGHT * 0.75 && attachDist <= thr) {
+            candidates.push({
+              kind: 'attachAfter',
+              target,
+              distance: attachDist,
+              draggedIndex: vi,
+              snapX: canonicalSnapX,
+              snapY: canonicalSnapY,
+            });
+          }
+
+          // insertion between target + its child (if any) — same canonical gap spot
+          if (target.childId) {
+            const gapX = canonicalSnapX;
+            const gapY = canonicalSnapY;
+            const gapDx = vp.x - gapX;
+            const gapDy = vp.y - gapY;
+            const gapDist = Math.hypot(gapDx, gapDy);
+            if (Math.abs(gapDy) < BLOCK_HEIGHT * 0.75 && gapDist <= thr) {
+              candidates.push({
+                kind: 'insertBetween',
+                target,
+                distance: gapDist,
+                draggedIndex: vi,
+                snapX: gapX,
+                snapY: gapY,
+              });
+            }
           }
         }
       }
@@ -243,61 +307,63 @@ export function useBlockDragDrop({
       candidates.sort((a, b) => a.distance - b.distance);
       if (candidates.length > 0) {
         const best = candidates[0];
+
+        // rotate the draggedChain so matched index becomes head
+        const rotatedChain = rotateChain(draggedChain, best.draggedIndex);
+
+        // compute placement start: align the matched virtual pos to best.snapX
+        const vpMatched = virtualPositions[best.draggedIndex];
+        const shift = best.snapX - vpMatched.x;
+
+        // We'll place rotatedChain[0] at best.snapX (head position) and subsequent using per-block steps
+        const placeStartX = best.snapX;
+        const placeY = best.snapY;
+        const updates = new Map<string, Partial<Block>>();
+
         if (best.kind === 'attachAfter') {
           const target = best.target;
-          const firstDragged = draggedChain[0];
-          const lastDragged = draggedChain[draggedChain.length - 1];
-          const updates = new Map<string, Partial<Block>>();
-
-          const snapX = target.x + horizStep;
-          const snapY = target.y;
 
           if (target.childId) {
             const originalChild = blocksMap.get(target.childId!);
             if (!originalChild) {
-              updates.set(target.id, { childId: firstDragged.id });
-              let nextX = snapX;
-              for (let i = 0; i < draggedChain.length; i++) {
-                const d = draggedChain[i];
+              updates.set(target.id, { childId: rotatedChain[0].id });
+              let nextX = placeStartX;
+              for (let i = 0; i < rotatedChain.length; i++) {
+                const d = rotatedChain[i];
                 updates.set(d.id, {
                   x: nextX,
-                  y: snapY,
-                  parentId: i === 0 ? target.id : draggedChain[i - 1].id,
-                  childId:
-                    i < draggedChain.length - 1
-                      ? draggedChain[i + 1].id
-                      : draggedChain[i].childId ?? null,
+                  y: placeY,
+                  parentId: i === 0 ? target.id : rotatedChain[i - 1].id,
+                  childId: i < rotatedChain.length - 1 ? rotatedChain[i + 1].id : d.childId ?? null,
                 });
-                nextX += horizStep;
+                nextX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
               }
             } else {
               const originalChildChain = getChain(originalChild.id);
-              updates.set(target.id, { childId: firstDragged.id });
-              updates.set(lastDragged.id, { childId: originalChild.id });
-              updates.set(originalChild.id, { parentId: lastDragged.id });
+              updates.set(target.id, { childId: rotatedChain[0].id });
+              updates.set(rotatedChain[rotatedChain.length - 1].id, { childId: originalChild.id });
+              updates.set(originalChild.id, { parentId: rotatedChain[rotatedChain.length - 1].id });
 
-              let nextX = snapX;
-              for (let i = 0; i < draggedChain.length; i++) {
-                const d = draggedChain[i];
+              let nextX = placeStartX;
+              for (let i = 0; i < rotatedChain.length; i++) {
+                const d = rotatedChain[i];
                 updates.set(d.id, {
                   x: nextX,
-                  y: snapY,
-                  parentId: i === 0 ? target.id : draggedChain[i - 1].id,
+                  y: placeY,
+                  parentId: i === 0 ? target.id : rotatedChain[i - 1].id,
                   childId:
-                    i < draggedChain.length - 1
-                      ? draggedChain[i + 1].id
-                      : draggedChain[i].childId ?? null,
+                    i < rotatedChain.length - 1 ? rotatedChain[i + 1].id : rotatedChain[i].childId ?? null,
                 });
-                nextX += horizStep;
+                nextX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
               }
 
-              const startForOriginalChild = snapX + draggedChain.length * horizStep;
+              const startForOriginalChild = placeStartX + rotatedChain.reduce((sum, item) => sum + computeHorizStep(getBlockWidth(item), HORIZONTAL_SPACING ?? undefined), 0);
               for (let i = 0; i < originalChildChain.length; i++) {
                 const oc = originalChildChain[i];
                 updates.set(oc.id, {
-                  x: startForOriginalChild + i * horizStep,
-                  y: snapY,
-                  parentId: i === 0 ? lastDragged.id : originalChildChain[i - 1].id,
+                  x: startForOriginalChild + i * computeHorizStep(getBlockWidth(oc), HORIZONTAL_SPACING ?? undefined),
+                  y: placeY,
+                  parentId: i === 0 ? rotatedChain[rotatedChain.length - 1].id : originalChildChain[i - 1].id,
                   childId: oc.childId ?? null,
                 });
               }
@@ -307,21 +373,19 @@ export function useBlockDragDrop({
             playSnapSound();
             return;
           } else {
-            updates.set(target.id, { childId: firstDragged.id });
+            // target had no child -> simple attach
+            updates.set(target.id, { childId: rotatedChain[0].id });
 
-            let nextX = snapX;
-            for (let i = 0; i < draggedChain.length; i++) {
-              const d = draggedChain[i];
+            let nextX = placeStartX;
+            for (let i = 0; i < rotatedChain.length; i++) {
+              const d = rotatedChain[i];
               updates.set(d.id, {
                 x: nextX,
-                y: snapY,
-                parentId: i === 0 ? target.id : draggedChain[i - 1].id,
-                childId:
-                  i < draggedChain.length - 1
-                    ? draggedChain[i + 1].id
-                    : draggedChain[i].childId ?? null,
+                y: placeY,
+                parentId: i === 0 ? target.id : rotatedChain[i - 1].id,
+                childId: i < rotatedChain.length - 1 ? rotatedChain[i + 1].id : rotatedChain[i].childId ?? null,
               });
-              nextX += horizStep;
+              nextX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
             }
 
             applyUpdatesAndNormalize(updates, true);
@@ -330,7 +394,7 @@ export function useBlockDragDrop({
           }
         }
 
-        // handle insertBetween explicitly (target + its child)
+        // insertBetween
         if (best.kind === 'insertBetween') {
           const target = best.target;
           if (!target.childId) {
@@ -343,39 +407,32 @@ export function useBlockDragDrop({
             return;
           }
 
-          const updates = new Map<string, Partial<Block>>();
-          const firstDragged = draggedChain[0];
-          const lastDragged = draggedChain[draggedChain.length - 1];
+          updates.set(target.id, { childId: rotatedChain[0].id });
+          updates.set(rotatedChain[rotatedChain.length - 1].id, { childId: child.id });
+          updates.set(child.id, { parentId: rotatedChain[rotatedChain.length - 1].id });
 
-          updates.set(target.id, { childId: firstDragged.id });
-          updates.set(lastDragged.id, { childId: child.id });
-          updates.set(child.id, { parentId: lastDragged.id });
-
-          const insertionX = target.x + horizStep;
-          const insertionY = target.y;
-          let nextX = insertionX;
-          for (let i = 0; i < draggedChain.length; i++) {
-            const d = draggedChain[i];
+          // place rotatedChain starting at placeStartX
+          let nextX = placeStartX;
+          for (let i = 0; i < rotatedChain.length; i++) {
+            const d = rotatedChain[i];
             updates.set(d.id, {
               x: nextX,
-              y: insertionY,
-              parentId: i === 0 ? target.id : draggedChain[i - 1].id,
+              y: placeY,
+              parentId: i === 0 ? target.id : rotatedChain[i - 1].id,
               childId:
-                i < draggedChain.length - 1
-                  ? draggedChain[i + 1].id
-                  : draggedChain[i].childId ?? null,
+                i < rotatedChain.length - 1 ? rotatedChain[i + 1].id : rotatedChain[i].childId ?? null,
             });
-            nextX += horizStep;
+            nextX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
           }
 
           const originalChildChain = getChain(child.id);
-          const startForOriginalChild = insertionX + draggedChain.length * horizStep;
+          const startForOriginalChild = placeStartX + rotatedChain.reduce((sum, item) => sum + computeHorizStep(getBlockWidth(item), HORIZONTAL_SPACING ?? undefined), 0);
           for (let i = 0; i < originalChildChain.length; i++) {
             const oc = originalChildChain[i];
             updates.set(oc.id, {
-              x: startForOriginalChild + i * horizStep,
-              y: insertionY,
-              parentId: i === 0 ? lastDragged.id : originalChildChain[i - 1].id,
+              x: startForOriginalChild + i * computeHorizStep(getBlockWidth(oc), HORIZONTAL_SPACING ?? undefined),
+              y: placeY,
+              parentId: i === 0 ? rotatedChain[rotatedChain.length - 1].id : originalChildChain[i - 1].id,
               childId: oc.childId ?? null,
             });
           }
@@ -386,41 +443,44 @@ export function useBlockDragDrop({
         }
       }
 
+      // fallback: attach to tails (no child)
       const potentialTargets = blocks.filter((b) => !b.childId && !draggedIds.has(b.id));
       for (const targetBlock of potentialTargets) {
-        const snapX = targetBlock.x + horizStep;
+        const snapX = targetBlock.x + computeHorizStep(getBlockWidth(targetBlock), HORIZONTAL_SPACING ?? undefined);
         const snapY = targetBlock.y;
 
-        if (
-          Math.abs(blockToSnap.x - snapX) < centerThreshold &&
-          Math.abs(blockToSnap.y - snapY) < blockHeightWorld * 0.75
-        ) {
-          const updates = new Map<string, Partial<Block>>();
-          const firstDragged = draggedChain[0];
+        for (let vi = 0; vi < virtualPositions.length; vi++) {
+          const vp = virtualPositions[vi];
+          const thr = computeSnapThreshold(vp.width);
+          const dx = vp.x - snapX;
+          const dy = vp.y - snapY;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= thr && Math.abs(dy) < BLOCK_HEIGHT * 0.75) {
+            const rotated = rotateChain(draggedChain, vi);
 
-          updates.set(targetBlock.id, { childId: firstDragged.id });
+            const updates = new Map<string, Partial<Block>>();
+            updates.set(targetBlock.id, { childId: rotated[0].id });
 
-          let newX = snapX;
-          for (let i = 0; i < draggedChain.length; i++) {
-            const d = draggedChain[i];
-            updates.set(d.id, {
-              x: newX,
-              y: snapY,
-              parentId: i === 0 ? targetBlock.id : draggedChain[i - 1].id,
-              childId:
-                i < draggedChain.length - 1
-                  ? draggedChain[i + 1].id
-                  : d.childId ?? null,
-            });
-            newX += horizStep;
+            let newX = snapX;
+            for (let i = 0; i < rotated.length; i++) {
+              const d = rotated[i];
+              updates.set(d.id, {
+                x: newX,
+                y: snapY,
+                parentId: i === 0 ? targetBlock.id : rotated[i - 1].id,
+                childId: i < rotated.length - 1 ? rotated[i + 1].id : d.childId ?? null,
+              });
+              newX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
+            }
+
+            applyUpdatesAndNormalize(updates, true);
+            playSnapSound();
+            return;
           }
-
-          applyUpdatesAndNormalize(updates, true);
-          playSnapSound();
-          return;
         }
       }
 
+      // nothing matched
       submitCapture();
     },
     [
@@ -433,6 +493,9 @@ export function useBlockDragDrop({
       HORIZONTAL_SPACING,
       BLOCK_WIDTH,
       BLOCK_HEIGHT,
+      screenToWorld,
+      getBlockWidth,
+      rotateChain,
     ],
   );
 

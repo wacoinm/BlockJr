@@ -6,7 +6,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import type { RootState } from '../store';
 import { updateBlock as updateBlockAction, removeBlock as removeBlockAction } from '../store/slices/blocksSlice';
 import BatteryGauge from './BatteryGauge';
-import { computeHorizStep, DEFAULT_BLOCK_WIDTH, GAP_BETWEEN_BLOCKS } from '../constants/spacing';
+import { computeHorizStep, GAP_BETWEEN_BLOCKS } from '../constants/spacing';
 
 interface WorkspaceProps {
   blocks?: Block[]; // now optional — we prefer store when not provided
@@ -262,18 +262,21 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
   //
   // ----------------- NEW: visual spacing pass (display-only) -----------------
   //
-  // Build a displayX map so that chains never visually overlap. We don't mutate blocks[].
-  // We compute an effective horizontal step (horizStep) using centralized computeHorizStep and the canonical GAP_BETWEEN_BLOCKS.
+  // Build a displayX map so that chains never visually overlap. We compute horizontal step
+  // per-block using computeHorizStep(widthOfPrevBlock, GAP_BETWEEN_BLOCKS).
+  // IMPORTANT: we DO NOT modify any block.size/block.width values here — we only read them.
   //
+  // Also: the UI passes style={{ width: 100, height: 100 }} to BlockComponent.
+  // so when the block itself does not carry a size/width, we must fallback to that visual value (100)
+  // to ensure spacing matches the displayed blocks.
+  //
+  const VISUAL_STYLE_FALLBACK = 100; // <-- keep this in sync with the inline style used below
+
   const displayXById = useMemo(() => {
     const map = new Map<string, number>();
 
     // fast lookup
     const blocksMap = new Map<string, Block>(blocks.map((b) => [b.id, b]));
-
-    // compute horizStep using centralized rule:
-    // - pass DEFAULT_BLOCK_WIDTH (fallback) and the canonical GAP_BETWEEN_BLOCKS so Workspace honors that constant.
-    const horizStep = computeHorizStep(DEFAULT_BLOCK_WIDTH, GAP_BETWEEN_BLOCKS);
 
     // find heads (parentId === null)
     const heads = blocks.filter((b) => b.parentId == null);
@@ -310,9 +313,13 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
       visited.add(chain[0].id);
 
       for (let i = 1; i < chain.length; i++) {
+        const prev = chain[i - 1];
         const b = chain[i];
-        // place child at least horizStep to the right of previous displayed position
-        const nextX = Math.max(b.x, currX + horizStep);
+        // determine width/size of the previous block (use size or width or fallback to visual style width)
+        const prevWidth = (prev as any).size ?? (prev as any).width ?? VISUAL_STYLE_FALLBACK;
+        const step = computeHorizStep(prevWidth, GAP_BETWEEN_BLOCKS);
+        // place child at least 'step' to the right of previous displayed position
+        const nextX = Math.max(b.x, currX + step);
         map.set(b.id, nextX);
         visited.add(b.id);
         currX = nextX;
@@ -407,6 +414,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
                   onBlockDragStart?.(block, e);
                 }}
               >
+                {/* IMPORTANT: you asked to KEEP these inline sizes — so we pass them unchanged */}
                 <BlockComponent
                   block={block}
                   onDragStart={(e) => onBlockDragStart?.(block, e)}

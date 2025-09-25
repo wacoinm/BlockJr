@@ -8,8 +8,8 @@
  *    snapping stays consistent even if blocks get larger or smaller.
  */
 
-export const MIN_GAP = 2; // px — minimum spacing to avoid overlap
-export const GAP_BETWEEN_BLOCKS = 8; // px — desired gap between block edges
+export const MIN_GAP = 52; // px — minimum spacing to avoid overlap
+export const GAP_BETWEEN_BLOCKS = 30; // px — desired gap between block edges
 export const DEFAULT_BLOCK_WIDTH = 90; // px — fallback block width when not passed
 
 // Snap tuning:

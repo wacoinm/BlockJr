@@ -658,7 +658,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
         className={
           "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 " +
           "shadow-inner border-t border-gray-200 dark:border-slate-700 " +
-          "md:top-4 md:bottom-auto md:left-0 md:right-0 md:w-full md:shadow-lg"
+          "md:top-16 md:bottom-auto md:left-0 md:right-0 md:w-full md:shadow-lg"
         }
         style={{
           transform: paletteTransform,
@@ -669,7 +669,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           ref={paletteRef}
           className={
             "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
-            "xs:justify-start md:justify-start ml-1 mb-[calc(0.2rem+var(--safe-area-inset-bottom))]"
+            "xs:justify-start md:justify-center ml-1 mb-[calc(0.2rem+var(--safe-area-inset-bottom))]"
           }
           style={{
             paddingLeft: 18,

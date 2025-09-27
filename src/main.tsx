@@ -18,8 +18,7 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <DialogueProvider
-        leftCharacters={[{ name: "Eddy", src: "/avatars/left.png" }]}
-        rightCharacters={[{ name: "Ali", src: "/avatars/right.png" }]}
+        charectersPath="/public/avatars"
         mode="comic"
         speed={40}
         onFinished={() => {

@@ -5,12 +5,12 @@ import ErrorPage from "../pages/Error";
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <h1>Hello Router</h1>,
+    element: <App />,
     errorElement: <ErrorPage  />
   },
   {
     path: "/project/:id",
-    element: <App/>,
+    element: <h1>Hello Router</h1>,
     errorElement: <ErrorPage/>
   }
 ])

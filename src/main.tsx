@@ -18,7 +18,7 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <DialogueProvider
-        charectersPath="/public/avatars"
+        charectersPath="/avatars"
         mode="comic"
         speed={40}
         onFinished={() => {

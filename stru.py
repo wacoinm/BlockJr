@@ -77,13 +77,13 @@ def generate_project_file():
     project_dir = "."
     output_file = "project_context.txt"
     # Skip the script itself and the output file
-    skip_files = {output_file, os.path.basename(__file__)}
+    skip_files = {output_file, os.path.basename(__file__), "pnpm-lock.yaml"}
 
     exclude_dirs = [
         "node_modules", ".next", "dist", "build", ".git", ".vscode", ".idea",
         "out", ".cache", ".storybook", "stories", "coverage", ".vercel", "venv", "doc",
         "cache", "release", "dist", "blockjr-app"
-        "__pycache__" # Exclude python cache directories
+        "__pycache__", "android",  # Exclude python cache directories
     ]
 
     include_exts = [

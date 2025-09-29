@@ -19,6 +19,7 @@ export type FabItem = {
   key: string;
   onClick: () => void;
   content: React.ReactNode;
+  title?: string;
 };
 
 interface WorkspaceControlsProps {
@@ -97,6 +98,7 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
       key: 'bluetooth',
       onClick: () => dispatch(setMenuOpenAction(!menuOpen)),
       content: <div className="w-6 h-6">🔵</div>,
+      title: 'بلوتوث',
     },
     {
       key: 'theme',
@@ -109,6 +111,7 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
         ) : (
           <div className="w-6 h-6">🌙</div>
         ),
+      title: 'حالت شب/روز',
     },
     {
       key: 'selectProject',
@@ -117,11 +120,13 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
         dispatch(setSelectOpenAction(!selectOpen));
       },
       content: <div className="w-6 h-6">📁</div>,
+      title: 'پروژه',
     },
     {
       key: 'unit',
       onClick: cycleUnit,
       content: <div className="text-xs font-semibold select-none pointer-events-none">{unitLabel}</div>,
+      title: 'واحد',
     },
   ];
 
@@ -164,30 +169,127 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
           </div>
         </button>
 
-        {/* Floating Action Buttons */}
+        {/* Label animation CSS (inline for easy testing) */}
+        <style>{`
+          /* Container for each fab + label */
+          .fab-wrapper { position: relative; display: flex; align-items: center; }
+
+          /* Label itself - starts over FAB and expands to the left */
+          .fab-label {
+            position: absolute;
+            right: calc(100% + 12px); /* final resting position: to the left of the fab */
+            top: 50%;
+            transform: translateY(-50%) translateX(12px); /* start slightly over the fab */
+            opacity: 0;
+            padding: 8px 12px;
+            min-width: 54px;
+            white-space: nowrap;
+            border-radius: 999px; /* start circular to suggest it's coming from the FAB */
+            font-size: 13px;
+            line-height: 1;
+            box-shadow: 0 6px 18px rgba(2,6,23,0.12);
+            background: rgba(255,255,255,0.95);
+            color: #0f172a;
+            border: 1px solid rgba(2,6,23,0.06);
+            pointer-events: none;
+            transform-origin: right center;
+            will-change: transform, opacity, border-radius;
+          }
+
+          .dark .fab-label {
+            background: rgba(10,16,24,0.85);
+            color: #e6eef8;
+            border-color: rgba(255,255,255,0.04);
+          }
+
+          /* Entrance: slide left from over the FAB, overshoot (bounce), settle */
+          @keyframes fab-label-in {
+            0% {
+              transform: translateY(-50%) translateX(12px) scale(0.92);
+              opacity: 0;
+              border-radius: 999px;
+            }
+            60% {
+              transform: translateY(-50%) translateX(-14px) scale(1.06);
+              opacity: 1;
+              border-radius: 16px;
+            }
+            80% {
+              transform: translateY(-50%) translateX(-6px) scale(0.98);
+            }
+            100% {
+              transform: translateY(-50%) translateX(0) scale(1);
+              opacity: 1;
+              border-radius: 12px;
+            }
+          }
+
+          /* Exit: fade & retract slightly back to FAB */
+          @keyframes fab-label-out {
+            0% {
+              transform: translateY(-50%) translateX(0) scale(1);
+              opacity: 1;
+              border-radius: 12px;
+            }
+            60% {
+              transform: translateY(-50%) translateX(8px) scale(0.96);
+              opacity: 0.6;
+              border-radius: 999px;
+            }
+            100% {
+              transform: translateY(-50%) translateX(12px) scale(0.92);
+              opacity: 0;
+              border-radius: 999px;
+            }
+          }
+
+          .fab-label.show {
+            animation: fab-label-in 420ms cubic-bezier(.2,1.2,.2,1) forwards;
+          }
+          .fab-label.hide {
+            animation: fab-label-out 220ms cubic-bezier(.4,0,.2,1) forwards;
+          }
+        `}</style>
+
+        {/* Floating Action Buttons with animated Persian labels */}
         {fabItems.map((f, idx) => {
-          const delay = idx * 80;
+          const delay = idx * ITEM_STAGGER;
           return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => f.onClick()}
-              style={{ transitionDelay: `${delay}ms` }}
-              className={`
-                w-12 h-12 rounded-full shadow-lg flex items-center justify-center
-                transform transition-all duration-300
-                ${
-                  menuOpen
-                    ? 'scale-100 opacity-100 translate-y-0'
-                    : 'scale-75 opacity-0 -translate-y-2 pointer-events-none'
-                }
-                bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700
-              `}
-              aria-label={f.key === 'unit' ? `Unit: ${unitLabel}` : f.key}
-              title={f.key === 'unit' ? `Unit: ${unitLabel} (click to cycle)` : undefined}
-            >
-              {f.content}
-            </button>
+            <div key={f.key} className="fab-wrapper" style={{ transitionDelay: `${delay}ms` }}>
+              {/* Label: shown only if title exists */}
+              {f.title ? (
+                <div
+                  aria-hidden
+                  className={`fab-label ${menuOpen ? 'show' : 'hide'}`}
+                  // stagger label a bit after the fab's own appearance
+                  style={{ animationDelay: `${menuOpen ? delay + 80 : 0}ms` }}
+                  dir="rtl"
+                >
+                  <span className="select-none text-sm font-medium font-[Vazirmatn]">{f.title}</span>
+                </div>
+              ) : null}
+
+              {/* Actual FAB button */}
+              <button
+                type="button"
+                onClick={() => f.onClick()}
+                style={{ transitionDelay: `${delay}ms` }}
+                className={`
+                  w-12 h-12 rounded-full shadow-lg flex items-center justify-center
+                  transform transition-all duration-300
+                  ${
+                    menuOpen
+                      ? 'scale-100 opacity-100 translate-y-0'
+                      : 'scale-75 opacity-0 -translate-y-2 pointer-events-none'
+                  }
+                  bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700
+                `}
+                aria-label={f.key === 'unit' ? `Unit: ${unitLabel}` : f.key}
+                title={f.key === 'unit' ? `Unit: ${unitLabel} (click to cycle)` : undefined}
+              >
+                {f.content}
+              </button>
+            </div>
           );
         })}
       </div>
@@ -278,9 +380,7 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <div className="text-sm capitalize">{p}</div>
-                      {selectedProject === p && (
-                        <div className="text-xs text-slate-500">Selected</div>
-                      )}
+                      {selectedProject === p && <div className="text-xs text-slate-500">Selected</div>}
                     </button>
                   );
                 })}
@@ -297,12 +397,8 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
         <div>
           pan: {Math.round(panX)}, {Math.round(panY)}
         </div>
-        <div className="mt-1 text-xs text-slate-500">
-          project: {selectedProject ?? 'none'}
-        </div>
-        <div className="mt-1 text-xs text-slate-500">
-          unit: {unitLabel}
-        </div>
+        <div className="mt-1 text-xs text-slate-500">project: {selectedProject ?? 'none'}</div>
+        <div className="mt-1 text-xs text-slate-500">unit: {unitLabel}</div>
       </div>
     </>
   );

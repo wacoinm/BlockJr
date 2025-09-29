@@ -132,7 +132,8 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
-  const [paletteHeight, setPaletteHeight] = useState<number>(0);
+  // paletteHeight is nullable so we can distinguish "not measured yet" vs measured 0
+  const [paletteHeight, setPaletteHeight] = useState<number | null>(null);
 
   // New refs for press / move handling
   const pointerStartY = useRef<number | null>(null);
@@ -236,14 +237,46 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
 
   // Measure palette height so toggle button and chooser can match it
   useEffect(() => {
+    const mdQuery = window.matchMedia("(min-width: 768px)");
+
     const measure = () => {
-      if (paletteRef.current) {
-        setPaletteHeight(paletteRef.current.offsetHeight);
+      // when viewport >= md, we intentionally set height to 0
+      if (mdQuery.matches) {
+        setPaletteHeight(0);
+      } else {
+        if (paletteRef.current) {
+          setPaletteHeight(paletteRef.current.offsetHeight);
+        } else {
+          setPaletteHeight(0);
+        }
       }
     };
+
+    // initial measure
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+
+    // resize should re-measure
+    const onResize = () => {
+      measure();
+    };
+    window.addEventListener("resize", onResize);
+
+    // listen to media query changes so when user resizes across md we update immediately
+    // use addEventListener if available, fallback to addListener
+    if (typeof mdQuery.addEventListener === "function") {
+      mdQuery.addEventListener("change", measure);
+    } else if (typeof (mdQuery as any).addListener === "function") {
+      (mdQuery as any).addListener(measure);
+    }
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (typeof mdQuery.removeEventListener === "function") {
+        mdQuery.removeEventListener("change", measure);
+      } else if (typeof (mdQuery as any).removeListener === "function") {
+        (mdQuery as any).removeListener(measure);
+      }
+    };
   }, []);
 
   // Clean up timers on unmount
@@ -496,9 +529,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   // small helper for icon button styles
   const iconBtnBase =
     "inline-flex items-center justify-center w-8 h-8 rounded-md cursor-pointer select-none transition-transform active:scale-95";
+
   // compute chooser bottom offset so it sits just above the palette
+  // note: paletteHeight can be 0 (for md+) or a measured positive number.
   const chooserBottom = isOpen
-    ? paletteHeight
+    ? paletteHeight !== null
       ? paletteHeight + 12
       : 84
     : TOGGLE_WIDTH + 12;
@@ -518,9 +553,10 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close palette" : "Open palette"}
         onClick={toggleOpen}
-        className="fixed left-0 [bottom:calc(0px+var(--safe-area-inset-bottom))] z-50 focus:outline-none"
+        className="fixed md:!hidden left-0 [bottom:calc(0px+var(--safe-area-inset-bottom))] z-50 focus:outline-none"
         style={{
-          height: paletteHeight || 72,
+          // use paletteHeight directly when measured (including 0), otherwise fallback 72
+          height: paletteHeight !== null ? paletteHeight : 72,
           width: TOGGLE_WIDTH,
           display: "flex",
           alignItems: "center",
@@ -532,7 +568,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
                      bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
           style={{
             width: TOGGLE_WIDTH - 8,
-            height: (paletteHeight || 72) - 12,
+            height: (paletteHeight !== null ? paletteHeight : 72) - 12,
             backdropFilter: "blur(6px)",
             boxShadow: "0 6px 20px rgba(2,6,23,0.08)",
             transition:

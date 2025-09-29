@@ -372,17 +372,33 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
 
     // If hold is armed but drag hasn't started: check if pointer moved above palette top to start drag
     if (holdArmedRef.current && !dragStartedRef.current) {
-      const paletteTop =
-        paletteRef.current?.getBoundingClientRect().top ?? Infinity;
-      if (y < paletteTop - START_DRAG_OFFSET) {
-        // start drag: call onBlockDrag with a synthetic React.TouchEvent wrapper if needed
-        dragStartedRef.current = true;
-        const synthetic = ev as unknown as React.TouchEvent;
-        if (activeBlockRef.current) {
-          (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+      const paletteRect = paletteRef.current?.getBoundingClientRect();
+      if (!paletteRect) return;
+
+      // Determine whether palette is visually near the bottom or near the top
+      const anchoredBottom = paletteRect.top > (window.innerHeight / 2);
+
+      if (anchoredBottom) {
+        // palette is bottom-anchored: user must move upward (y decreases) to start drag
+        if (y < paletteRect.top - START_DRAG_OFFSET) {
+          // start drag: call onBlockDrag with a synthetic React.TouchEvent wrapper if needed
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.TouchEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
         }
-        // we can keep listening until touchend so parent can manage actual drag moves
+      } else {
+        // palette is top-anchored (desktop): user must move downward (y increases) to start drag
+        if (y > paletteRect.bottom + START_DRAG_OFFSET) {
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.TouchEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
+        }
       }
+      // we can keep listening until touchend so parent can manage actual drag moves
     }
   }
 
@@ -418,13 +434,29 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
     }
 
     if (holdArmedRef.current && !dragStartedRef.current) {
-      const paletteTop =
-        paletteRef.current?.getBoundingClientRect().top ?? Infinity;
-      if (y < paletteTop - START_DRAG_OFFSET) {
-        dragStartedRef.current = true;
-        const synthetic = ev as unknown as React.MouseEvent;
-        if (activeBlockRef.current) {
-          (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+      const paletteRect = paletteRef.current?.getBoundingClientRect();
+      if (!paletteRect) return;
+
+      // determine if palette is bottom-anchored or top-anchored and use appropriate direction
+      const anchoredBottom = paletteRect.top > (window.innerHeight / 2);
+
+      if (anchoredBottom) {
+        // bottom palette: start drag when pointer moves above palette top
+        if (y < paletteRect.top - START_DRAG_OFFSET) {
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.MouseEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
+        }
+      } else {
+        // top palette (desktop): start drag when pointer moves below palette bottom
+        if (y > paletteRect.bottom + START_DRAG_OFFSET) {
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.MouseEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
         }
       }
     }
@@ -481,7 +513,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       // Only arm the hold if the pointer hasn't moved away before hold completed
       if (!movedTooFarBeforeHoldRef.current) {
         holdArmedRef.current = true;
-        // Note: we DO NOT call onBlockDrag here. We wait until user moves the pointer above paletteTop.
+        // Note: we DO NOT call onBlockDrag here. We wait until user moves the pointer above paletteTop (or below for top-anchored).
       } else {
         // moved too far before hold; treat as cancellation
         holdArmedRef.current = false;

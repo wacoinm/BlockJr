@@ -746,12 +746,12 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           style={{
             paddingLeft: H_MARGIN,
             paddingRight: H_MARGIN,
-            WebkitOverflowScrolling: "touch" as any,
+            WebkitOverflowScrolling: "touch",
             position: "relative",
             whiteSpace: "nowrap",
           }}
         >
-          <div style={{ minWidth: 8, marginBottom: `calc(4rem + var(--safe-area-inset-bottom))` }}  />
+          <div style={{ minWidth: 8, marginBottom: `calc(4rem + var(--safe-area-inset-bottom))`, marginLeft: H_MARGIN*2 }}  />
           {filteredBlocks.map((block, idx) => {
             const baseDelay = 40;
             const openDelay = idx * baseDelay;

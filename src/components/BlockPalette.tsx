@@ -148,6 +148,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   // animation timing constants
   const PALETTE_TRANSITION_MS = 380;
   const PALETTE_BUFFER_MS = 60;
+  const H_MARGIN = 60;
 
   // Project -> types mapping
   const projectMap: Record<string, string[]> = {
@@ -729,6 +730,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           "md:top-16 md:bottom-auto md:left-0 md:right-0 md:w-full md:shadow-lg"
         }
         style={{
+          left: `${H_MARGIN}px`,
+          right: `${H_MARGIN}px`,
+          width: `calc(100% - ${H_MARGIN * 2}px)`,
           transform: paletteTransform,
           transition: paletteTransition,
         }}
@@ -740,8 +744,8 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
             "xs:justify-start md:justify-center ml-1 mb-[calc(0.2rem+var(--safe-area-inset-bottom))]"
           }
           style={{
-            paddingLeft: 18,
-            paddingRight: 18,
+            paddingLeft: H_MARGIN,
+            paddingRight: H_MARGIN,
             WebkitOverflowScrolling: "touch" as any,
             position: "relative",
             whiteSpace: "nowrap",

@@ -10,6 +10,7 @@ import { store } from "./store";
 import "dialogue-story/style.css";
 import "./index.css";
 import '@capacitor-community/safe-area';
+import "@fontsource/vazirmatn";
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);

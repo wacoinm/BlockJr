@@ -301,11 +301,13 @@ const App: React.FC = () => {
       key: 'bluetooth',
       onClick: () => setBluetoothOpen((p) => !p),
       content: <BluetoothIcon className="w-6 h-6" />,
+      title: "بلوتوث"
     },
     {
       key: 'theme',
       onClick: cycleTheme,
       content: theme === 'system' ? <Monitor className="w-6 h-6" /> : theme === 'light' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />,
+      title: "حالت شب/روز"
     },
     {
       key: 'selectProject',
@@ -314,11 +316,13 @@ const App: React.FC = () => {
         else closeSelectPopup();
       },
       content: <FolderOpenDot className="w-6 h-6" />,
+      title: "پروژه"
     },
     {
       key: 'unit',
       onClick: cycleUnit,
       content: <div className="text-xs font-semibold select-none pointer-events-none">{unitLabel}</div>,
+      title: "واحد"
     },
   ];
 

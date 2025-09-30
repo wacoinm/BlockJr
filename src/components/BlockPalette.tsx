@@ -132,7 +132,8 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
-  const [paletteHeight, setPaletteHeight] = useState<number>(0);
+  // paletteHeight is nullable so we can distinguish "not measured yet" vs measured 0
+  const [paletteHeight, setPaletteHeight] = useState<number | null>(null);
 
   // New refs for press / move handling
   const pointerStartY = useRef<number | null>(null);
@@ -147,6 +148,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   // animation timing constants
   const PALETTE_TRANSITION_MS = 380;
   const PALETTE_BUFFER_MS = 60;
+  const H_MARGIN = 60;
 
   // Project -> types mapping
   const projectMap: Record<string, string[]> = {
@@ -236,14 +238,46 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
 
   // Measure palette height so toggle button and chooser can match it
   useEffect(() => {
+    const mdQuery = window.matchMedia("(min-width: 768px)");
+
     const measure = () => {
-      if (paletteRef.current) {
-        setPaletteHeight(paletteRef.current.offsetHeight);
+      // when viewport >= md, we intentionally set height to 0
+      if (mdQuery.matches) {
+        setPaletteHeight(0);
+      } else {
+        if (paletteRef.current) {
+          setPaletteHeight(paletteRef.current.offsetHeight);
+        } else {
+          setPaletteHeight(0);
+        }
       }
     };
+
+    // initial measure
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+
+    // resize should re-measure
+    const onResize = () => {
+      measure();
+    };
+    window.addEventListener("resize", onResize);
+
+    // listen to media query changes so when user resizes across md we update immediately
+    // use addEventListener if available, fallback to addListener
+    if (typeof mdQuery.addEventListener === "function") {
+      mdQuery.addEventListener("change", measure);
+    } else if (typeof (mdQuery as any).addListener === "function") {
+      (mdQuery as any).addListener(measure);
+    }
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (typeof mdQuery.removeEventListener === "function") {
+        mdQuery.removeEventListener("change", measure);
+      } else if (typeof (mdQuery as any).removeListener === "function") {
+        (mdQuery as any).removeListener(measure);
+      }
+    };
   }, []);
 
   // Clean up timers on unmount
@@ -339,17 +373,33 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
 
     // If hold is armed but drag hasn't started: check if pointer moved above palette top to start drag
     if (holdArmedRef.current && !dragStartedRef.current) {
-      const paletteTop =
-        paletteRef.current?.getBoundingClientRect().top ?? Infinity;
-      if (y < paletteTop - START_DRAG_OFFSET) {
-        // start drag: call onBlockDrag with a synthetic React.TouchEvent wrapper if needed
-        dragStartedRef.current = true;
-        const synthetic = ev as unknown as React.TouchEvent;
-        if (activeBlockRef.current) {
-          (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+      const paletteRect = paletteRef.current?.getBoundingClientRect();
+      if (!paletteRect) return;
+
+      // Determine whether palette is visually near the bottom or near the top
+      const anchoredBottom = paletteRect.top > (window.innerHeight / 2);
+
+      if (anchoredBottom) {
+        // palette is bottom-anchored: user must move upward (y decreases) to start drag
+        if (y < paletteRect.top - START_DRAG_OFFSET) {
+          // start drag: call onBlockDrag with a synthetic React.TouchEvent wrapper if needed
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.TouchEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
         }
-        // we can keep listening until touchend so parent can manage actual drag moves
+      } else {
+        // palette is top-anchored (desktop): user must move downward (y increases) to start drag
+        if (y > paletteRect.bottom + START_DRAG_OFFSET) {
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.TouchEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
+        }
       }
+      // we can keep listening until touchend so parent can manage actual drag moves
     }
   }
 
@@ -385,13 +435,29 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
     }
 
     if (holdArmedRef.current && !dragStartedRef.current) {
-      const paletteTop =
-        paletteRef.current?.getBoundingClientRect().top ?? Infinity;
-      if (y < paletteTop - START_DRAG_OFFSET) {
-        dragStartedRef.current = true;
-        const synthetic = ev as unknown as React.MouseEvent;
-        if (activeBlockRef.current) {
-          (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+      const paletteRect = paletteRef.current?.getBoundingClientRect();
+      if (!paletteRect) return;
+
+      // determine if palette is bottom-anchored or top-anchored and use appropriate direction
+      const anchoredBottom = paletteRect.top > (window.innerHeight / 2);
+
+      if (anchoredBottom) {
+        // bottom palette: start drag when pointer moves above palette top
+        if (y < paletteRect.top - START_DRAG_OFFSET) {
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.MouseEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
+        }
+      } else {
+        // top palette (desktop): start drag when pointer moves below palette bottom
+        if (y > paletteRect.bottom + START_DRAG_OFFSET) {
+          dragStartedRef.current = true;
+          const synthetic = ev as unknown as React.MouseEvent;
+          if (activeBlockRef.current) {
+            (onBlockDrag ?? (() => {}))(activeBlockRef.current, synthetic);
+          }
         }
       }
     }
@@ -448,7 +514,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       // Only arm the hold if the pointer hasn't moved away before hold completed
       if (!movedTooFarBeforeHoldRef.current) {
         holdArmedRef.current = true;
-        // Note: we DO NOT call onBlockDrag here. We wait until user moves the pointer above paletteTop.
+        // Note: we DO NOT call onBlockDrag here. We wait until user moves the pointer above paletteTop (or below for top-anchored).
       } else {
         // moved too far before hold; treat as cancellation
         holdArmedRef.current = false;
@@ -496,9 +562,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   // small helper for icon button styles
   const iconBtnBase =
     "inline-flex items-center justify-center w-8 h-8 rounded-md cursor-pointer select-none transition-transform active:scale-95";
+
   // compute chooser bottom offset so it sits just above the palette
+  // note: paletteHeight can be 0 (for md+) or a measured positive number.
   const chooserBottom = isOpen
-    ? paletteHeight
+    ? paletteHeight !== null
       ? paletteHeight + 12
       : 84
     : TOGGLE_WIDTH + 12;
@@ -518,9 +586,10 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close palette" : "Open palette"}
         onClick={toggleOpen}
-        className="fixed left-0 [bottom:calc(0px+var(--safe-area-inset-bottom))] z-50 focus:outline-none"
+        className="fixed md:!hidden left-0 [bottom:calc(0px+var(--safe-area-inset-bottom))] z-50 focus:outline-none"
         style={{
-          height: paletteHeight || 72,
+          // use paletteHeight directly when measured (including 0), otherwise fallback 72
+          height: paletteHeight !== null ? paletteHeight : 72,
           width: TOGGLE_WIDTH,
           display: "flex",
           alignItems: "center",
@@ -532,7 +601,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
                      bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
           style={{
             width: TOGGLE_WIDTH - 8,
-            height: (paletteHeight || 72) - 12,
+            height: (paletteHeight !== null ? paletteHeight : 72) - 12,
             backdropFilter: "blur(6px)",
             boxShadow: "0 6px 20px rgba(2,6,23,0.08)",
             transition:
@@ -661,6 +730,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           "md:top-16 md:bottom-auto md:left-0 md:right-0 md:w-full md:shadow-lg"
         }
         style={{
+          left: `${H_MARGIN}px`,
+          right: `${H_MARGIN}px`,
+          width: `calc(100% - ${H_MARGIN * 2}px)`,
           transform: paletteTransform,
           transition: paletteTransition,
         }}
@@ -672,14 +744,14 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
             "xs:justify-start md:justify-center ml-1 mb-[calc(0.2rem+var(--safe-area-inset-bottom))]"
           }
           style={{
-            paddingLeft: 18,
-            paddingRight: 18,
-            WebkitOverflowScrolling: "touch" as any,
+            paddingLeft: H_MARGIN,
+            paddingRight: H_MARGIN,
+            WebkitOverflowScrolling: "touch",
             position: "relative",
             whiteSpace: "nowrap",
           }}
         >
-          <div style={{ minWidth: 8, marginBottom: `calc(4rem + var(--safe-area-inset-bottom))` }}  />
+          <div style={{ minWidth: 8, marginBottom: `calc(4rem + var(--safe-area-inset-bottom))`, marginLeft: H_MARGIN*2 }}  />
           {filteredBlocks.map((block, idx) => {
             const baseDelay = 40;
             const openDelay = idx * baseDelay;

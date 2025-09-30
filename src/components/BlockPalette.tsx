@@ -727,12 +727,11 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
         className={
           "fixed left-0 bottom-0 w-full z-40 bg-white dark:bg-slate-900 " +
           "shadow-inner border-t border-gray-200 dark:border-slate-700 " +
-          "md:top-16 md:bottom-auto md:left-0 md:right-0 md:w-full md:shadow-lg"
+          "md:top-16 md:bottom-auto md:shadow-lg " +
+          "left-6 md:left-[var(--h-margin)] md:right-[var(--h-margin)]"
         }
         style={{
-          left: `${H_MARGIN}px`,
-          right: `${H_MARGIN}px`,
-          width: `calc(100% - ${H_MARGIN * 2}px)`,
+          ['--h-margin' as string]: `${H_MARGIN}px`,
           transform: paletteTransform,
           transition: paletteTransition,
         }}
@@ -741,17 +740,15 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           ref={paletteRef}
           className={
             "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
-            "xs:justify-start md:justify-center ml-1 mb-[calc(0.2rem+var(--safe-area-inset-bottom))]"
+            "xs:justify-start md:justify-start xl:justify-center mb-[calc(0.2rem+var(--safe-area-inset-bottom))] " +
+            "md:px-[var(--h-margin)] mr-8"
           }
           style={{
-            paddingLeft: H_MARGIN,
-            paddingRight: H_MARGIN,
             WebkitOverflowScrolling: "touch",
             position: "relative",
             whiteSpace: "nowrap",
           }}
         >
-          <div style={{ minWidth: 8, marginBottom: `calc(4rem + var(--safe-area-inset-bottom))`, marginLeft: H_MARGIN*2 }}  />
           {filteredBlocks.map((block, idx) => {
             const baseDelay = 40;
             const openDelay = idx * baseDelay;

@@ -31,7 +31,7 @@ const ThemeToggle: React.FC = () => {
       <div
         className={
           "w-6 h-6 rounded-full shadow transform transition-transform duration-300 " +
-          (isDark ? "translate-x-4 bg-yellow-400" : "translate-x-0 bg-white")
+          (isDark ? "translate-x-0 bg-yellow-400" : "translate-x-[-1rem] bg-white")
         }
       />
     </button>

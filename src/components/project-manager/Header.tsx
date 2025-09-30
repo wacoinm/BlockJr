@@ -15,7 +15,18 @@ const Header: React.FC<Props> = ({ view, setView }) => {
         {/* Right side: Logo + Company name */}
         <div className="flex items-center gap-3 text-right">
           <div className="rounded-2xl p-2 shadow-sm bg-brand-plain dark:bg-brand-plain-dark flex items-center justify-center">
-            <span className="font-semibold text-sm tracking-wider text-white select-none">K</span>
+            {/* Light mode logo */}
+            <img
+              src="/icon-light.svg"
+              alt="Kamaan Logo"
+              className="w-10 h-10 block dark:hidden"
+            />
+            {/* Dark mode logo */}
+            <img
+              src="/icon.svg"
+              alt="Kamaan Logo"
+              className="w-10 h-10 hidden dark:block"
+            />
           </div>
           <div>
             <div className="text-sm font-semibold tracking-wide text-neutral-700 dark:text-neutral-100">

@@ -3,7 +3,12 @@ import React, { useEffect, useRef, useState } from "react";
 import Header from "../../components/project-manager/Header";
 import ProjectList from "../../components/project-manager/ProjectList";
 import FAB from "../../components/project-manager/FAB";
-import { loadProjects, saveProjects, removeProjectFolder, renameProjectFolder } from "../../utils/projectStorage";
+import {
+  loadProjects,
+  saveProjects,
+  removeProjectFolder,
+  renameProjectFolder,
+} from "../../utils/projectStorage";
 import { toPackId } from "../../utils/slugifyPack";
 
 export interface Project {
@@ -16,10 +21,18 @@ export interface Project {
 
 const initialProjects: Project[] = []; // start empty
 
+const defaultCategories = ["آسانسور", "تله کابین", "پلکان برقی", "سایر"];
+
 const ProjectManager: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [view, setView] = useState<"cards" | "list">("cards");
   const mountedRef = useRef(false);
+
+  // edit modal state
+  const [editing, setEditing] = useState<boolean>(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editName, setEditName] = useState<string>("");
+  const [editCategory, setEditCategory] = useState<string>("");
 
   // load persisted projects on mount
   useEffect(() => {
@@ -42,7 +55,7 @@ const ProjectManager: React.FC = () => {
     saveProjects(projects).catch((e) => console.warn("saveProjects failed", e));
   }, [projects]);
 
-  // handle --vh and RTL attribute (unchanged from your original behavior)
+  // handle --vh and RTL attribute (unchanged)
   useEffect(() => {
     const setSmallHeight = () => {
       document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
@@ -86,7 +99,7 @@ const ProjectManager: React.FC = () => {
     });
   }
 
-  // handle create: FAB sends payload { name, category }
+  // handle create: FAB sends payload { name, category } or legacy string
   function handleCreateProject(payloadOrName: any) {
     let name: string | undefined;
     let category: string | undefined;
@@ -125,48 +138,84 @@ const ProjectManager: React.FC = () => {
     removeProjectFolder(id).catch((e) => console.warn("removeProjectFolder failed", e));
   }
 
-  // edit project using prompt (keeps UI unchanged). Attempts folder migration if name changed.
-  async function handleEditProject(project: Project) {
-    try {
-      const newName = window.prompt("New project name:", project.name);
-      if (newName === null) return;
-      const trimmed = newName.trim();
-      if (!trimmed) return;
+  // open edit modal (called by ProjectCard via ProjectList -> onEdit)
+  function openEditModal(project: Project) {
+    setEditingProject(project);
+    setEditName(project.name);
+    setEditCategory(project.category || "");
+    setEditing(true);
+  }
 
-      const newCategory = window.prompt("Project category:", project.category || "");
-      if (newCategory === null) return;
+  // close edit modal and reset fields
+  function closeEditModal() {
+    setEditing(false);
+    setEditingProject(null);
+    setEditName("");
+    setEditCategory("");
+  }
 
-      const newId = toPackId(trimmed);
+  // save edits from modal
+  async function saveEdit() {
+    if (!editingProject) return;
+    const trimmed = editName?.trim();
+    if (!trimmed) return; // name required
+    if (!editCategory) return; // category required
 
-      if (newId !== project.id) {
-        const ok = await renameProjectFolder(project.id, newId).catch(() => false);
-        if (ok) {
-          setProjects((s) =>
-            s.map((p) =>
-              p.id === project.id
-                ? { ...p, id: newId, name: trimmed, category: newCategory || p.category, updatedAt: new Date().toISOString().slice(0, 10) }
-                : p
-            )
-          );
-        } else {
-          setProjects((s) =>
-            s.map((p) =>
-              p.id === project.id
-                ? { ...p, name: trimmed, category: newCategory || p.category, updatedAt: new Date().toISOString().slice(0, 10) }
-                : p
-            )
-          );
-        }
+    const newIdBase = toPackId(trimmed);
+    const sameId = newIdBase === editingProject.id;
+    let targetId = editingProject.id;
+
+    // if desired id collides with other project (not counting current), add suffix
+    if (!sameId) {
+      const collision = projects.find((p) => p.id === newIdBase);
+      if (collision) {
+        targetId = `${newIdBase.replace(/\.pack$/, "")}-${Date.now().toString(36)}.pack`;
       } else {
+        targetId = newIdBase;
+      }
+    }
+
+    // If id changes, attempt folder rename/migration (best-effort)
+    if (targetId !== editingProject.id) {
+      try {
+        const ok = await renameProjectFolder(editingProject.id, targetId).catch(() => false);
+        if (!ok) {
+          // migration failed; we still allow metadata update but keep old id
+          setProjects((s) =>
+            s.map((p) =>
+              p.id === editingProject.id
+                ? { ...p, name: trimmed, category: editCategory, updatedAt: new Date().toISOString().slice(0, 10) }
+                : p
+            )
+          );
+          closeEditModal();
+          return;
+        }
+      } catch (e) {
+        console.warn("renameProjectFolder failed", e);
+        // fallback: update metadata only
         setProjects((s) =>
           s.map((p) =>
-            p.id === project.id ? { ...p, name: trimmed, category: newCategory || p.category, updatedAt: new Date().toISOString().slice(0, 10) } : p
+            p.id === editingProject.id
+              ? { ...p, name: trimmed, category: editCategory, updatedAt: new Date().toISOString().slice(0, 10) }
+              : p
           )
         );
+        closeEditModal();
+        return;
       }
-    } catch (e) {
-      console.warn("handleEditProject failed", e);
     }
+
+    // Update project entry (id may have changed)
+    setProjects((s) =>
+      s.map((p) =>
+        p.id === editingProject.id
+          ? { ...p, id: targetId, name: trimmed, category: editCategory, updatedAt: new Date().toISOString().slice(0, 10) }
+          : p
+      )
+    );
+
+    closeEditModal();
   }
 
   return (
@@ -179,11 +228,78 @@ const ProjectManager: React.FC = () => {
         <ProjectList
           projects={projects}
           view={view}
-          onEdit={handleEditProject}
-          onDelete={handleDeleteProject}
+          onEdit={(p) => openEditModal(p)}
+          onDelete={(id) => handleDeleteProject(id)}
         />
       </main>
+
+      {/* Create FAB */}
       <FAB onCreate={handleCreateProject} />
+
+      {/* Edit modal (same style as create modal) */}
+      {editing && editingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditModal} />
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveEdit();
+            }}
+            className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-md shadow-xl z-10 text-right"
+          >
+            <div className="flex items-center gap-3 justify-between">
+              <div className="text-sm font-semibold">ویرایش پروژه</div>
+              <button type="button" onClick={closeEditModal} className="text-neutral-500">
+                بستن
+              </button>
+            </div>
+
+            <div className="mt-3">
+              <label className="text-xs text-neutral-500 dark:text-neutral-400">نام پروژه</label>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="مثلاً: آسانسور"
+                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-brand-plain dark:focus:ring-brand-plain-dark transition"
+                autoFocus
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="text-xs text-neutral-500 dark:text-neutral-400">دسته‌بندی</label>
+              <select
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-brand-plain dark:focus:ring-brand-plain-dark transition"
+              >
+                <option value="">دسته‌بندی را انتخاب کنید</option>
+                {defaultCategories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="px-3 py-1 rounded-md border"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1 rounded-md bg-brand-plain text-white dark:bg-brand-plain-dark"
+              >
+                ذخیره
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

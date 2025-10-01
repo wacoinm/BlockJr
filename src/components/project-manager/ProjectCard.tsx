@@ -1,3 +1,4 @@
+// src/components/project-manager/ProjectCard.tsx
 import React from "react";
 import { generateSVGDataURL } from "../../utils/projectImage";
 import type { Project } from "../../pages/ProjectManager";
@@ -5,6 +6,8 @@ import type { Project } from "../../pages/ProjectManager";
 interface Props {
   project: Project;
   listView?: boolean;
+  onEdit?: (project: Project) => void;
+  onDelete?: (id: string) => void;
 }
 
 const formatDateFa = (iso: string) => {
@@ -16,7 +19,7 @@ const formatDateFa = (iso: string) => {
   }
 };
 
-const ProjectCard: React.FC<Props> = ({ project, listView = false }) => {
+const ProjectCard: React.FC<Props> = ({ project, listView = false, onEdit, onDelete }) => {
   const thumb = generateSVGDataURL(project.name, 420, 260);
 
   return (
@@ -42,8 +45,18 @@ const ProjectCard: React.FC<Props> = ({ project, listView = false }) => {
           {`شناسه پروژه: ${project.id}`}
         </p>
         <div className="mt-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <button className="px-3 py-1 rounded-full text-xs bg-white/80 dark:bg-black/30 shadow-sm">باز کردن</button>
-          <button className="px-3 py-1 rounded-full text-xs bg-white/10 dark:bg-white/5">تنظیمات</button>
+          <button
+            className="px-3 py-1 rounded-full text-xs  text-white dark:text-black bg-slate-500 dark:bg-white/70"
+            onClick={() => onEdit && onEdit(project)}
+          >
+            ویرایش
+          </button>
+          <button
+            className="px-3 py-1 rounded-full text-xs text-white dark:text-black bg-red-500 dark:bg-red-600/70 shadow-sm"
+            onClick={() => onDelete && onDelete(project.id)}
+          >
+            حذف
+          </button>
         </div>
       </div>
 

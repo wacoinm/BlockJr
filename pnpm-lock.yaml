@@ -26,9 +26,15 @@ importers:
       '@capacitor/device':
         specifier: ^7.0.2
         version: 7.0.2(@capacitor/core@7.4.3)
+      '@capacitor/filesystem':
+        specifier: ^7.1.4
+        version: 7.1.4(@capacitor/core@7.4.3)
       '@capacitor/splash-screen':
         specifier: ^7.0.3
         version: 7.0.3(@capacitor/core@7.4.3)
+      '@capacitor/storage':
+        specifier: ^1.2.5
+        version: 1.2.5(@capacitor/core@7.4.3)
       '@e-is/capacitor-bluetooth-serial':
         specifier: ^6.0.3
         version: 6.0.3
@@ -249,10 +255,24 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
+  '@capacitor/filesystem@7.1.4':
+    resolution: {integrity: sha512-BdUnOVulHAtruW2GeC9o7e9LO5aFcVYqNn3dLypJSOck/WipUFNfI0QWoUS0FVGeqBbDJgFGi3zjXJx0lzbDkA==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
   '@capacitor/splash-screen@7.0.3':
     resolution: {integrity: sha512-coAw2de3rRX0EfneK0/D9IZaDAUOtsPaE9ZNbSdCs2UtmXp0hdcr5Tsil01Kve707nQfLsd03pmvaesJYD60EA==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/storage@1.2.5':
+    resolution: {integrity: sha512-pWhnw4U7wN/zFV4lA4BLMypSufTktCbk548Yk4whSb0KAq3R0mLfSubRIHkGdcPqQWCsM6g/zUuszurhz6ncWQ==}
+    deprecated: package has been renamed to @capacitor/preferences
+    peerDependencies:
+      '@capacitor/core': ^3.0.0
+
+  '@capacitor/synapse@1.0.4':
+    resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -3390,9 +3410,20 @@ snapshots:
     dependencies:
       '@capacitor/core': 7.4.3
 
+  '@capacitor/filesystem@7.1.4(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
+      '@capacitor/synapse': 1.0.4
+
   '@capacitor/splash-screen@7.0.3(@capacitor/core@7.4.3)':
     dependencies:
       '@capacitor/core': 7.4.3
+
+  '@capacitor/storage@1.2.5(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
+
+  '@capacitor/synapse@1.0.4': {}
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:

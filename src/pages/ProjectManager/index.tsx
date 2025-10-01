@@ -28,17 +28,14 @@ const ProjectManager: React.FC = () => {
   const [view, setView] = useState<"cards" | "list">("cards");
   const mountedRef = useRef(false);
 
-  // edit modal state
   const [editing, setEditing] = useState<boolean>(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editName, setEditName] = useState<string>("");
   const [editCategory, setEditCategory] = useState<string>("");
 
-  // delete modal state
   const [deleting, setDeleting] = useState<boolean>(false);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
-  // load persisted projects on mount
   useEffect(() => {
     (async () => {
       try {
@@ -50,7 +47,6 @@ const ProjectManager: React.FC = () => {
     })();
   }, []);
 
-  // persist on changes
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -59,7 +55,6 @@ const ProjectManager: React.FC = () => {
     saveProjects(projects).catch((e) => console.warn("saveProjects failed", e));
   }, [projects]);
 
-  // handle --vh and RTL attribute
   useEffect(() => {
     const setSmallHeight = () => {
       document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
@@ -81,7 +76,6 @@ const ProjectManager: React.FC = () => {
     };
   }, []);
 
-  // animate new project card
   function animateNewProject() {
     requestAnimationFrame(() => {
       try {
@@ -103,7 +97,6 @@ const ProjectManager: React.FC = () => {
     });
   }
 
-  // create project
   function handleCreateProject(payloadOrName: any) {
     let name: string | undefined;
     let category: string | undefined;
@@ -134,7 +127,6 @@ const ProjectManager: React.FC = () => {
     setTimeout(() => animateNewProject(), 40);
   }
 
-  // open delete modal
   function openDeleteModal(project: Project) {
     setDeletingProject(project);
     setDeleting(true);
@@ -145,7 +137,6 @@ const ProjectManager: React.FC = () => {
     setDeletingProject(null);
   }
 
-  // confirm deletion
   function confirmDelete() {
     if (!deletingProject) return;
     const id = deletingProject.id;
@@ -154,7 +145,6 @@ const ProjectManager: React.FC = () => {
     closeDeleteModal();
   }
 
-  // open edit modal
   function openEditModal(project: Project) {
     setEditingProject(project);
     setEditName(project.name);
@@ -169,7 +159,6 @@ const ProjectManager: React.FC = () => {
     setEditCategory("");
   }
 
-  // save edits
   async function saveEdit() {
     if (!editingProject) return;
     const trimmed = editName?.trim();

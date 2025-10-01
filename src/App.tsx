@@ -35,26 +35,33 @@ import type { RootState } from './store';
 
 import { computeHorizStep, GAP_BETWEEN_BLOCKS } from './constants/spacing';
 
+import { saveProjectFile, readProjectFile } from './utils/projectStorage';
+import { useParams } from 'react-router';
+
 export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
-  // Unconditional redux selectors (so components can gradually be moved to store)
-  const reduxInteractionMode = useAppSelector((s: RootState) => (s.ui ? s.ui.interactionMode : undefined));
-  const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? s.ui.bluetoothOpen : undefined));
+  // read UI values from redux; cast to any for properties that may not be typed
+  const reduxInteractionMode = useAppSelector((s: RootState) => (s.ui ? (s.ui as any).interactionMode : undefined));
+  const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? (s.ui as any).bluetoothOpen : undefined));
 
-  // blocks + history (local for now; you can move to redux later)
+  // local blocks + history
   const [blocks, setBlocks] = useState<Block[]>([]);
   const blocksRef = useRef<Block[]>(blocks);
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
 
-  const { submitCapture, goPrev, goNext, hasPrev, hasNext } = useCaptureHistory(blocksRef, setBlocks);
+  // capture history hook (we will wrap submitCapture for autosave)
+  const { submitCapture: rawSubmitCapture, goPrev, goNext, hasPrev, hasNext } = useCaptureHistory(blocksRef, setBlocks);
+
+  // selected project ref for autosave
+  const selectedProjectRef = useRef<string | null>(null);
 
   // bluetooth connection state (local for now)
   const [isBluetoothConnected, setIsBluetoothConnected] = useState<boolean>(false);
 
-  // other global UI state
+  // viewport
   const [viewportWidth, setViewportWidth] = useState<number>(
     typeof window !== 'undefined' ? window.innerWidth : 1024,
   );
@@ -62,21 +69,21 @@ const App: React.FC = () => {
   // sound
   const playSnapSound = useSnapSound();
 
-  // derived map of blocks for O(1) lookup
+  // derived map for quick lookup
   const blocksMap = useMemo(() => new Map<string, Block>(blocks.map((b) => [b.id, b])), [blocks]);
 
-  // attempt to call ensureBluetoothPermissions if module exists (dynamic import to avoid build-time error)
+  // load ensureBluetoothPermissions if available
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        // dynamic import avoids compile error if file missing
         const mod = await import('./utils/ensureBluetoothPermissions');
         if (!mounted) return;
         if (typeof mod.ensureBluetoothPermissions === 'function') {
           await mod.ensureBluetoothPermissions();
         }
       } catch (err) {
+        // not critical
         console.warn('ensureBluetoothPermissions not available or failed:', err);
       }
     })();
@@ -84,12 +91,10 @@ const App: React.FC = () => {
     const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener('resize', onResize);
 
-    // hide splash if capacitor present
     void (async () => {
       try {
         await SplashScreen.hide();
       } catch (err) {
-        // not critical
         console.warn('Failed to hide splash screen:', err);
       }
     })();
@@ -104,17 +109,10 @@ const App: React.FC = () => {
   const BLOCK_WIDTH = isMobile ? 48 : 64;
   const BLOCK_HEIGHT = isMobile ? 48 : 64;
 
-  // NOTE: we no longer compute HORIZONTAL_SPACING here as BLOCK_WIDTH + gap.
-  // Instead we keep a single canonical value GAP_BETWEEN_BLOCKS in src/constants/spacing
-  // and compute horizStep where needed via computeHorizStep(BLOCK_WIDTH, GAP_BETWEEN_BLOCKS).
-  // (useBlockDragDrop expects HORIZONTAL_SPACING to be either a gap or a full step;
-  // we pass the gap for canonical behavior).
   const HORIZONTAL_SPACING = GAP_BETWEEN_BLOCKS;
 
-  // pan & zoom (hook)
   const { pan, zoom, screenToWorld, zoomBy, panBy } = usePanZoom({ x: 0, y: 0 }, 1);
 
-  // helper functions
   const getChain = useCallback(
     (startBlockId: string): Block[] => {
       const chain: Block[] = [];
@@ -134,7 +132,6 @@ const App: React.FC = () => {
       return { clientX: t.clientX, clientY: t.clientY };
     }
     if ('clientX' in e && 'clientY' in e) {
-      // mouse or pointer event
       return {
         clientX: (e as React.MouseEvent).clientX,
         clientY: (e as React.MouseEvent).clientY,
@@ -143,24 +140,40 @@ const App: React.FC = () => {
     return { clientX: 0, clientY: 0 };
   }, []);
 
-  // apply updates + normalize chains/positions
+  // Autosave wrapper: call rawSubmitCapture then attempt to save blocks.json for the selected project
+  const submitCapture = useCallback(
+    (snapshot?: Block[]) => {
+      rawSubmitCapture(snapshot);
+
+      const projectId = selectedProjectRef.current;
+      if (!projectId) return;
+
+      try {
+        const data = JSON.stringify(snapshot ?? blocksRef.current);
+        void saveProjectFile(projectId, 'blocks.json', data).catch((err) => {
+          console.warn('autosave failed', err);
+        });
+      } catch (err) {
+        console.warn('autosave serialization failed', err);
+      }
+    },
+    [rawSubmitCapture],
+  );
+
+  // block updates & normalization
   const applyUpdatesAndNormalize = useCallback(
     (updates: Map<string, Partial<Block>>, capture = true) => {
       setBlocks((prev) => {
-        // merge updates
         let merged = prev.map((b) => (updates.has(b.id) ? { ...b, ...updates.get(b.id)! } : { ...b }));
 
-        // recompute childId from parentId relationships
         const parentToChild = new Map<string, string>();
         for (const b of merged) {
           if (b.parentId) parentToChild.set(b.parentId, b.id);
         }
         merged = merged.map((b) => ({ ...b, childId: parentToChild.get(b.id) ?? null }));
 
-        // normalize head chains horizontal spacing
         const heads = merged.filter((b) => b.parentId == null);
 
-        // compute canonical horiz step here using centralized spacing constants
         const horizStep = computeHorizStep(BLOCK_WIDTH, GAP_BETWEEN_BLOCKS);
 
         for (const head of heads) {
@@ -189,10 +202,10 @@ const App: React.FC = () => {
         return merged;
       });
     },
-    [BLOCK_WIDTH, GAP_BETWEEN_BLOCKS, submitCapture],
+    [BLOCK_WIDTH, submitCapture],
   );
 
-  // block drag/drop hook (typed)
+  // block drag/drop hook
   const { handleDragStart, isDragging, draggedBlock } = useBlockDragDrop({
     blocksRef,
     setBlocks,
@@ -204,11 +217,10 @@ const App: React.FC = () => {
     playSnapSound,
     BLOCK_WIDTH,
     BLOCK_HEIGHT,
-    HORIZONTAL_SPACING, // pass the canonical gap; hook will compute final step via computeHorizStep
-    getClientXY
+    HORIZONTAL_SPACING,
+    getClientXY,
   });
 
-  // units / projects / theme hooks (typed)
   const { unitLabel, unitValue, cycleUnit } = useUnits();
   const {
     selectVisible,
@@ -221,13 +233,43 @@ const App: React.FC = () => {
     BASE_DURATION,
     ITEM_DURATION,
   } = useProjects('elevator');
+
+  useEffect(() => {
+    selectedProjectRef.current = selectedProject ?? null;
+  }, [selectedProject]);
+
   const { theme, cycleTheme } = useTheme('system');
 
-  // actions: green flag
+  // If route param present, load that project's blocks and select it
+  const params = useParams();
+  useEffect(() => {
+    (async () => {
+      if (!params?.id) return;
+      const projectId = decodeURIComponent(params.id);
+      try {
+        handleProjectSelect(projectId);
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        const data = await readProjectFile(projectId, 'blocks.json');
+        if (data) {
+          const parsed = JSON.parse(data) as Block[];
+          setBlocks(parsed);
+          blocksRef.current = parsed;
+          rawSubmitCapture(parsed); // initial snapshot (do not autosave twice)
+        }
+      } catch (e) {
+        console.warn('failed to load project blocks for', projectId, e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.id]);
+
   const handleGreenFlagClick = useCallback(
     async (blockId: string) => {
       if (!isBluetoothConnected) {
-        // keep the original behavior but don't block execution
         toast.info('You must connect to a device');
       }
       const flag = blocksMap.get(blockId);
@@ -242,7 +284,6 @@ const App: React.FC = () => {
   const handleDelayChange = useCallback(
     (blockId: string, value: number) => {
       setBlocks((prev) => prev.map((block) => (block.id === blockId ? { ...block, value } : block)));
-      // schedule capture microtask
       setTimeout(() => submitCapture(), 0);
     },
     [submitCapture],
@@ -276,13 +317,12 @@ const App: React.FC = () => {
     [blocks, blocksMap, getChain, playSnapSound, submitCapture],
   );
 
-  // UI state (local for now)
+  // UI local state
   const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>(reduxInteractionMode ?? 'runner');
   const [bluetoothOpen, setBluetoothOpen] = useState<boolean>(reduxBluetoothOpen ?? false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [blockPaletteBottom, setBlockPaletteBottom] = useState<number>(88);
 
-  // sync redux -> local if redux changes (non-destructive)
   useEffect(() => {
     if (reduxInteractionMode && reduxInteractionMode !== interactionMode) {
       setInteractionMode(reduxInteractionMode);
@@ -295,8 +335,8 @@ const App: React.FC = () => {
     }
   }, [reduxBluetoothOpen]);
 
-  // FAB items (typed)
-  const fabItems: Array<{ key: string; onClick: () => void; content: React.ReactNode }> = [
+  // fab items: include optional title so TypeScript matches usage
+  const fabItems: Array<{ key: string; onClick: () => void; content: React.ReactNode; title?: string }> = [
     {
       key: 'bluetooth',
       onClick: () => setBluetoothOpen((p) => !p),
@@ -327,16 +367,14 @@ const App: React.FC = () => {
   ];
 
   const projects = ['elevator', 'bulldozer', 'lift truck'];
-  const LEFT_TOGGLE_LEFT = 6; // px - offset to avoid overlapping the palette toggle at left:0
-  // use dynamic state-controlled bottom offset
-  const LEFT_TOGGLE_BOTTOM = blockPaletteBottom; // px - aligns roughly with the palette chooser bottom when closed
+  const LEFT_TOGGLE_LEFT = 6;
+  const LEFT_TOGGLE_BOTTOM = blockPaletteBottom;
   const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));
 
   return (
     <SoundContext.Provider value={playSnapSound}>
       <Header initialCollapsed={false} hasPrev={hasPrev} hasNext={hasNext} onPrev={goPrev} onNext={goNext} />
 
-      {/* left-side interaction button */}
       <div
         style={{
           position: 'fixed',

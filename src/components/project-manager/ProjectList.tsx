@@ -1,4 +1,4 @@
-// src/components/project-manager/ProjectList.tsx
+import React from "react";
 import type { Project } from "../../pages/ProjectManager";
 import ProjectCard from "./ProjectCard";
 
@@ -15,7 +15,6 @@ export default function ProjectList({
   onEdit,
   onDelete,
 }: Props) {
-  // defensive: ensure projects is an array
   const list = Array.isArray(projects) ? projects : [];
 
   if (list.length === 0) {
@@ -42,7 +41,6 @@ export default function ProjectList({
     );
   }
 
-  // cards view (grid)
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {list.map((p) => (

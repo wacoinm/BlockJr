@@ -6,9 +6,6 @@ import type { Project } from "../pages/ProjectManager";
 const PROJECT_INDEX_KEY = "pj_index_v1";
 const PROJECT_FOLDER = "bj_projects";
 
-/**
- * Detect running on web (localStorage available).
- */
 function isWeb(): boolean {
   try {
     return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -17,11 +14,6 @@ function isWeb(): boolean {
   }
 }
 
-/**
- * Load projects.
- * On web => use localStorage.
- * On native => prefer Capacitor Storage, fallback to Filesystem.
- */
 export async function loadProjects(): Promise<Project[]> {
   if (isWeb()) {
     try {
@@ -40,7 +32,7 @@ export async function loadProjects(): Promise<Project[]> {
       try {
         return JSON.parse(kv.value) as Project[];
       } catch {
-        // fallthrough to FS
+        // fallthrough
       }
     }
 
@@ -62,11 +54,6 @@ export async function loadProjects(): Promise<Project[]> {
   }
 }
 
-/**
- * Save projects list.
- * On web => localStorage.
- * On native => Storage + write projects.json to Filesystem when possible.
- */
 export async function saveProjects(projects: Project[]): Promise<void> {
   if (isWeb()) {
     try {
@@ -96,18 +83,13 @@ export async function saveProjects(projects: Project[]): Promise<void> {
   }
 }
 
-/**
- * Save a single project file (base64 string without data: prefix).
- * On web => store base64 under a key in localStorage.
- * On native => write file to Filesystem.
- */
-export async function saveProjectFile(projectId: string, filename: string, base64data: string): Promise<boolean> {
+export async function saveProjectFile(projectId: string, filename: string, data: string): Promise<boolean> {
   if (!projectId || !filename) return false;
 
   if (isWeb()) {
     try {
       const key = `${PROJECT_FOLDER}/${projectId}/${filename}`;
-      window.localStorage.setItem(key, base64data);
+      window.localStorage.setItem(key, data);
       return true;
     } catch (e) {
       console.warn("saveProjectFile(localStorage) failed", e);
@@ -120,7 +102,7 @@ export async function saveProjectFile(projectId: string, filename: string, base6
     await Filesystem.mkdir({ path: folder, directory: Directory.Data, recursive: true });
     await Filesystem.writeFile({
       path: `${folder}/${filename}`,
-      data: base64data,
+      data,
       directory: Directory.Data,
       encoding: Encoding.UTF8,
     });
@@ -132,10 +114,36 @@ export async function saveProjectFile(projectId: string, filename: string, base6
 }
 
 /**
- * Remove a project's folder and files.
- * On web => remove localStorage keys with that prefix.
- * On native => rmdir recursive.
+ * Read a file for a project. Returns string data or null if missing.
  */
+export async function readProjectFile(projectId: string, filename: string): Promise<string | null> {
+  if (!projectId || !filename) return null;
+
+  if (isWeb()) {
+    try {
+      const key = `${PROJECT_FOLDER}/${projectId}/${filename}`;
+      const v = window.localStorage.getItem(key);
+      return v;
+    } catch (e) {
+      console.warn("readProjectFile(localStorage) failed", e);
+      return null;
+    }
+  }
+
+  try {
+    const res = await Filesystem.readFile({
+      path: `${PROJECT_FOLDER}/${projectId}/${filename}`,
+      directory: Directory.Data,
+      encoding: Encoding.UTF8,
+    });
+    return res.data;
+  } catch (e) {
+    // file doesn't exist or cannot be read
+    // console.warn("readProjectFile(Filesystem) failed", e);
+    return null;
+  }
+}
+
 export async function removeProjectFolder(projectId: string): Promise<void> {
   if (!projectId) return;
 
@@ -162,11 +170,6 @@ export async function removeProjectFolder(projectId: string): Promise<void> {
   }
 }
 
-/**
- * Rename a project's folder (best-effort).
- * On web => rename keys by copying values to new prefix then deleting old keys.
- * On native => copy files and remove old folder.
- */
 export async function renameProjectFolder(oldId: string, newId: string): Promise<boolean> {
   if (!oldId || !newId) return false;
   if (oldId === newId) return true;
@@ -183,15 +186,16 @@ export async function renameProjectFolder(oldId: string, newId: string): Promise
           if (v !== null) toCopy.push({ k: k.slice(oldPrefix.length), v });
         }
       }
-      // copy
       for (const item of toCopy) {
         window.localStorage.setItem(`${newPrefix}${item.k}`, item.v);
       }
       // remove old keys
+      const removals: string[] = [];
       for (let i = 0; i < window.localStorage.length; i++) {
         const k = window.localStorage.key(i);
-        if (k && k.startsWith(oldPrefix)) window.localStorage.removeItem(k);
+        if (k && k.startsWith(oldPrefix)) removals.push(k);
       }
+      for (const k of removals) window.localStorage.removeItem(k);
       return true;
     } catch (e) {
       console.warn("renameProjectFolder(localStorage) failed", e);
@@ -216,13 +220,13 @@ export async function renameProjectFolder(oldId: string, newId: string): Promise
         }
       }
     } catch {
-      // ignore read errors
+      // ignore
     }
 
     try {
       await Filesystem.rmdir({ path: oldFolder, directory: Directory.Data, recursive: true });
     } catch {
-      // ignore removal errors
+      // ignore
     }
 
     return true;

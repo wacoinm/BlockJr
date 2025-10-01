@@ -118,7 +118,7 @@ const ProjectManager: React.FC = () => {
     if (!name || !name.trim()) return;
     if (!category) category = "سایر";
 
-    const packId = toPackId(name);
+    const packId = toPackId(name, category);
     const exists = projects.find((p) => p.id === packId);
     const id = exists ? `${packId.replace(/\.pack$/, "")}-${Date.now().toString(36)}.pack` : packId;
 
@@ -176,7 +176,7 @@ const ProjectManager: React.FC = () => {
     if (!trimmed) return;
     if (!editCategory) return;
 
-    const newIdBase = toPackId(trimmed);
+    const newIdBase = toPackId(trimmed, editCategory);
     const sameId = newIdBase === editingProject.id;
     let targetId = editingProject.id;
 

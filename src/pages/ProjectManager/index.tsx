@@ -34,6 +34,10 @@ const ProjectManager: React.FC = () => {
   const [editName, setEditName] = useState<string>("");
   const [editCategory, setEditCategory] = useState<string>("");
 
+  // delete modal state
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+
   // load persisted projects on mount
   useEffect(() => {
     (async () => {
@@ -55,7 +59,7 @@ const ProjectManager: React.FC = () => {
     saveProjects(projects).catch((e) => console.warn("saveProjects failed", e));
   }, [projects]);
 
-  // handle --vh and RTL attribute (unchanged)
+  // handle --vh and RTL attribute
   useEffect(() => {
     const setSmallHeight = () => {
       document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
@@ -77,7 +81,7 @@ const ProjectManager: React.FC = () => {
     };
   }, []);
 
-  // animate new project card (first element)
+  // animate new project card
   function animateNewProject() {
     requestAnimationFrame(() => {
       try {
@@ -99,7 +103,7 @@ const ProjectManager: React.FC = () => {
     });
   }
 
-  // handle create: FAB sends payload { name, category } or legacy string
+  // create project
   function handleCreateProject(payloadOrName: any) {
     let name: string | undefined;
     let category: string | undefined;
@@ -127,18 +131,30 @@ const ProjectManager: React.FC = () => {
     };
 
     setProjects((s) => [project, ...s]);
-
     setTimeout(() => animateNewProject(), 40);
   }
 
-  // delete project and cleanup folder
-  function handleDeleteProject(id: string) {
-    if (!id) return;
-    setProjects((s) => s.filter((p) => p.id !== id));
-    removeProjectFolder(id).catch((e) => console.warn("removeProjectFolder failed", e));
+  // open delete modal
+  function openDeleteModal(project: Project) {
+    setDeletingProject(project);
+    setDeleting(true);
   }
 
-  // open edit modal (called by ProjectCard via ProjectList -> onEdit)
+  function closeDeleteModal() {
+    setDeleting(false);
+    setDeletingProject(null);
+  }
+
+  // confirm deletion
+  function confirmDelete() {
+    if (!deletingProject) return;
+    const id = deletingProject.id;
+    setProjects((s) => s.filter((p) => p.id !== id));
+    removeProjectFolder(id).catch((e) => console.warn("removeProjectFolder failed", e));
+    closeDeleteModal();
+  }
+
+  // open edit modal
   function openEditModal(project: Project) {
     setEditingProject(project);
     setEditName(project.name);
@@ -146,7 +162,6 @@ const ProjectManager: React.FC = () => {
     setEditing(true);
   }
 
-  // close edit modal and reset fields
   function closeEditModal() {
     setEditing(false);
     setEditingProject(null);
@@ -154,18 +169,17 @@ const ProjectManager: React.FC = () => {
     setEditCategory("");
   }
 
-  // save edits from modal
+  // save edits
   async function saveEdit() {
     if (!editingProject) return;
     const trimmed = editName?.trim();
-    if (!trimmed) return; // name required
-    if (!editCategory) return; // category required
+    if (!trimmed) return;
+    if (!editCategory) return;
 
     const newIdBase = toPackId(trimmed);
     const sameId = newIdBase === editingProject.id;
     let targetId = editingProject.id;
 
-    // if desired id collides with other project (not counting current), add suffix
     if (!sameId) {
       const collision = projects.find((p) => p.id === newIdBase);
       if (collision) {
@@ -175,12 +189,10 @@ const ProjectManager: React.FC = () => {
       }
     }
 
-    // If id changes, attempt folder rename/migration (best-effort)
     if (targetId !== editingProject.id) {
       try {
         const ok = await renameProjectFolder(editingProject.id, targetId).catch(() => false);
         if (!ok) {
-          // migration failed; we still allow metadata update but keep old id
           setProjects((s) =>
             s.map((p) =>
               p.id === editingProject.id
@@ -193,7 +205,6 @@ const ProjectManager: React.FC = () => {
         }
       } catch (e) {
         console.warn("renameProjectFolder failed", e);
-        // fallback: update metadata only
         setProjects((s) =>
           s.map((p) =>
             p.id === editingProject.id
@@ -206,7 +217,6 @@ const ProjectManager: React.FC = () => {
       }
     }
 
-    // Update project entry (id may have changed)
     setProjects((s) =>
       s.map((p) =>
         p.id === editingProject.id
@@ -214,7 +224,6 @@ const ProjectManager: React.FC = () => {
           : p
       )
     );
-
     closeEditModal();
   }
 
@@ -229,18 +238,18 @@ const ProjectManager: React.FC = () => {
           projects={projects}
           view={view}
           onEdit={(p) => openEditModal(p)}
-          onDelete={(id) => handleDeleteProject(id)}
+          onDelete={(id) => {
+            const proj = projects.find((p) => p.id === id);
+            if (proj) openDeleteModal(proj);
+          }}
         />
       </main>
-
-      {/* Create FAB */}
       <FAB onCreate={handleCreateProject} />
 
-      {/* Edit modal (same style as create modal) */}
+      {/* Edit Modal */}
       {editing && editingProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditModal} />
-
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -260,9 +269,7 @@ const ProjectManager: React.FC = () => {
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                placeholder="مثلاً: آسانسور"
-                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-brand-plain dark:focus:ring-brand-plain-dark transition"
-                autoFocus
+                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2"
               />
             </div>
 
@@ -271,33 +278,36 @@ const ProjectManager: React.FC = () => {
               <select
                 value={editCategory}
                 onChange={(e) => setEditCategory(e.target.value)}
-                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-brand-plain dark:focus:ring-brand-plain-dark transition"
+                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2"
               >
-                <option value="">دسته‌بندی را انتخاب کنید</option>
+                <option value="">انتخاب دسته‌بندی</option>
                 {defaultCategories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="px-3 py-1 rounded-md border"
-              >
-                انصراف
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-1 rounded-md bg-brand-plain text-white dark:bg-brand-plain-dark"
-              >
-                ذخیره
-              </button>
+              <button type="button" onClick={closeEditModal} className="px-3 py-1 rounded-md border">انصراف</button>
+              <button type="submit" className="px-4 py-1 rounded-md bg-brand-plain text-white">ذخیره</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {deleting && deletingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeDeleteModal} />
+          <div className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-sm shadow-xl z-10 text-right">
+            <div className="text-sm font-semibold mb-4">
+              آیا می‌خواهید پروژه <span className="font-bold">{deletingProject.name}</span> حذف شود؟
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={closeDeleteModal} className="px-3 py-1 rounded-md border">انصراف</button>
+              <button type="button" onClick={confirmDelete} className="px-4 py-1 rounded-md bg-red-500 text-white">حذف</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

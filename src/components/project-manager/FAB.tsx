@@ -27,13 +27,13 @@ const FAB: React.FC<Props> = ({ onCreate }) => {
     <>
       {/* FAB: respect safe-area bottom */}
       <div
-        className="fixed left-5 z-40"
+        className="fixed left-5 z-40 bg-sky-500 dark:bg-sky-700 rounded-2xl hover:scale-90 transform transition-transform duration-200"
         // use calc so desktop browsers without the var fall back to 1rem spacing
         style={{ bottom: "calc(var(--safe-area-inset-bottom, 0px) + 1rem)" }}
       >
         <button
           onClick={() => setOpen((s) => !s)}
-          className="w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl font-bold bg-brand-plain dark:bg-brand-plain-dark transform active:scale-95 transition-transform duration-200"
+          className="w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold bg-brand-plain dark:bg-brand-plain-dark"
           aria-label="ایجاد پروژه"
         >
           +

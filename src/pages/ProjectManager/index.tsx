@@ -218,87 +218,105 @@ const ProjectManager: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300"
-      style={{ minHeight: "calc(var(--vh, 1vh) * 100)" }}
+      style={{
+        paddingTop: "calc(var(--safe-area-inset-top, 0px) + 1rem)",
+        paddingBottom: "calc(var(--safe-area-inset-bottom, 0px) + 1rem)",
+        minHeight: "100svh",
+      }}
     >
-      <Header view={view} setView={setView} />
-      <main className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-        <ProjectList
-          projects={projects}
-          view={view}
-          onEdit={(p) => openEditModal(p)}
-          onDelete={(id) => {
-            const proj = projects.find((p) => p.id === id);
-            if (proj) openDeleteModal(proj);
-          }}
-        />
-      </main>
-      <FAB onCreate={handleCreateProject} />
-
-      {/* Edit Modal */}
-      {editing && editingProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditModal} />
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveEdit();
+      <div
+        className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300"
+        style={{ minHeight: "calc(var(--vh, 1vh) * 100)" }}
+      >
+        <Header view={view} setView={setView} />
+        <main className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+          <ProjectList
+            projects={projects}
+            view={view}
+            onEdit={(p) => openEditModal(p)}
+            onDelete={(id) => {
+              const proj = projects.find((p) => p.id === id);
+              if (proj) openDeleteModal(proj);
             }}
-            className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-md shadow-xl z-10 text-right"
-          >
-            <div className="flex items-center gap-3 justify-between">
-              <div className="text-sm font-semibold">ویرایش پروژه</div>
-              <button type="button" onClick={closeEditModal} className="text-neutral-500">
-                بستن
-              </button>
-            </div>
+          />
+        </main>
+        <FAB onCreate={handleCreateProject} />
 
-            <div className="mt-3">
-              <label className="text-xs text-neutral-500 dark:text-neutral-400">نام پروژه</label>
-              <input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2"
-              />
-            </div>
+        {/* Edit Modal */}
+        {editing && editingProject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditModal} />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveEdit();
+              }}
+              className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-md shadow-xl z-10 text-right"
+            >
+              <div className="flex items-center gap-3 justify-between">
+                <div className="text-sm font-semibold">ویرایش پروژه</div>
+                <button type="button" onClick={closeEditModal} className="text-neutral-500">
+                  بستن
+                </button>
+              </div>
 
-            <div className="mt-3">
-              <label className="text-xs text-neutral-500 dark:text-neutral-400">دسته‌بندی</label>
-              <select
-                value={editCategory}
-                onChange={(e) => setEditCategory(e.target.value)}
-                className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2"
-              >
-                <option value="">انتخاب دسته‌بندی</option>
-                {defaultCategories.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
+              <div className="mt-3">
+                <label className="text-xs text-neutral-500 dark:text-neutral-400">نام پروژه</label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2"
+                />
+              </div>
 
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={closeEditModal} className="px-3 py-1 rounded-md border">انصراف</button>
-              <button type="submit" className="px-4 py-1 rounded-md bg-brand-plain text-white">ذخیره</button>
-            </div>
-          </form>
-        </div>
-      )}
+              <div className="mt-3">
+                <label className="text-xs text-neutral-500 dark:text-neutral-400">دسته‌بندی</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="mt-2 w-full bg-neutral-50 dark:bg-neutral-800 border border-transparent rounded-lg p-2"
+                >
+                  <option value="">انتخاب دسته‌بندی</option>
+                  {defaultCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-      {/* Delete Modal */}
-      {deleting && deletingProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeDeleteModal} />
-          <div className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-sm shadow-xl z-10 text-right">
-            <div className="text-sm font-semibold mb-4">
-              آیا می‌خواهید پروژه <span className="font-bold">{deletingProject.name}</span> حذف شود؟
-            </div>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={closeDeleteModal} className="px-3 py-1 rounded-md border">انصراف</button>
-              <button type="button" onClick={confirmDelete} className="px-4 py-1 rounded-md bg-red-500 text-white">حذف</button>
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" onClick={closeEditModal} className="px-3 py-1 rounded-md border">
+                  انصراف
+                </button>
+                <button type="submit" className="px-4 py-1 rounded-md bg-brand-plain text-white">
+                  ذخیره
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Delete Modal */}
+        {deleting && deletingProject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeDeleteModal} />
+            <div className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-sm shadow-xl z-10 text-right">
+              <div className="text-sm font-semibold mb-4">
+                آیا می‌خواهید پروژه <span className="font-bold">{deletingProject.name}</span> حذف شود؟
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={closeDeleteModal} className="px-3 py-1 rounded-md border">
+                  انصراف
+                </button>
+                <button type="button" onClick={confirmDelete} className="px-4 py-1 rounded-md bg-red-500 text-white">
+                  حذف
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

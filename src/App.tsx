@@ -35,8 +35,9 @@ import type { RootState } from './store';
 
 import { computeHorizStep, GAP_BETWEEN_BLOCKS } from './constants/spacing';
 
-import { saveProjectFile, readProjectFile } from './utils/projectStorage';
+import { saveProjectFile, readProjectFile, loadProjects } from './utils/projectStorage';
 import { useParams, useNavigate } from 'react-router';
+
 
 export const SoundContext = createContext<() => void>(() => {});
 
@@ -244,53 +245,112 @@ const App: React.FC = () => {
   const params = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    (async () => {
-      if (!params?.id) return;
-      const projectId = decodeURIComponent(params.id);
 
+useEffect(() => {
+  (async () => {
+    // 1) Load projects index first
+    let projectsIndex : any = [];
+    try {
+      projectsIndex = await loadProjects();
+    } catch (e) {
+      console.warn('loadProjects failed', e);
+      // conservatively treat as no projects
+      projectsIndex = [];
+    }
+
+    // If there are no projects at all -> go to project manager
+    if (!projectsIndex || projectsIndex.length === 0) {
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // If no route param -> nothing to load
+    if (!params?.id) return;
+
+    const originalProjectId = decodeURIComponent(params.id);
+    let projectId = originalProjectId;
+
+    // Build candidate keys to try (exact, .pack stripped, sanitized, trimmed)
+    const candidates: string[] = [projectId];
+    if (/\.pack$/i.test(projectId)) candidates.push(projectId.replace(/\.pack$/i, ''));
+    const sanitized = projectId.replace(/[\/\\?#%*:|"<>]/g, '-');
+    if (!candidates.includes(sanitized)) candidates.push(sanitized);
+    const trimmed = sanitized.replace(/\s+/g, '-').replace(/[()]/g, '');
+    if (!candidates.includes(trimmed)) candidates.push(trimmed);
+
+    // Try to find an existing blocks.json among candidates
+    let loaded = false;
+    let successfulCandidate: string | null = null;
+
+    for (const candidate of candidates) {
       try {
-        // Try to read blocks.json first — if it doesn't exist or is invalid, treat as error
-        const data = await readProjectFile(projectId, 'blocks.json');
+        const data = await readProjectFile(candidate, 'blocks.json');
+        console.info('Trying project candidate:', candidate, '->', !!data);
+        if (!data) continue;
 
-        if (!data) {
-          // file missing or empty -> show error and go back to project list
-          toast.error('پروژه یافت نشد یا فایل پروژه نامعتبر است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
-          navigate('/', { replace: true });
-          return;
-        }
-
-        // parse and load blocks
+        // parse and load
         let parsed: Block[];
         try {
           parsed = JSON.parse(data) as Block[];
         } catch (parseErr) {
-          console.warn('failed to parse blocks.json for', projectId, parseErr);
-          toast.error('خطا در خواندن فایل پروژه — فایل خراب است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
-          navigate('/', { replace: true });
-          return;
+          console.warn('Failed to parse blocks.json for', candidate, parseErr);
+          continue;
         }
 
         setBlocks(parsed);
         blocksRef.current = parsed;
-        rawSubmitCapture(parsed); // initial snapshot (do not autosave twice)
+        rawSubmitCapture(parsed); // initial snapshot
 
-        // finally, select the project in the UI (ignore non-fatal errors)
         try {
-          handleProjectSelect(projectId);
+          handleProjectSelect(candidate);
         } catch (selErr) {
-          console.warn('handleProjectSelect failed for', projectId, selErr);
+          console.warn('handleProjectSelect failed for', candidate, selErr);
         }
-      } catch (err) {
-        // readProjectFile threw an unexpected error (IO/permission/etc.)
-        console.error('failed to load project blocks for', projectId, err);
-        toast.error('خطا در بارگذاری پروژه — به صفحه پروژه‌ها بازگردانده می‌شوید.');
-        navigate('/', { replace: true });
-      }
-    })();
-    // keep deps explicit so effect runs when the route id changes or helpers change
-  }, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
 
+        loaded = true;
+        successfulCandidate = candidate;
+        break;
+      } catch (err) {
+        console.warn('Error while reading project candidate', candidate, err);
+      }
+    }
+
+    if (loaded) return;
+
+    // --- Not loaded from any candidate ---
+    // If the requested id exists in the projects index, treat as NEW (empty) project:
+    const indexIds = (projectsIndex || []).map((p: any) => p.id);
+    if (indexIds.includes(originalProjectId)) {
+      // initialize empty project (no error)
+      const emptyBlocks: Block[] = [];
+      setBlocks(emptyBlocks);
+      blocksRef.current = emptyBlocks;
+      rawSubmitCapture(emptyBlocks);
+
+      try {
+        handleProjectSelect(originalProjectId);
+      } catch (selErr) {
+        console.warn('handleProjectSelect failed for (init)', originalProjectId, selErr);
+      }
+
+      // Persist empty blocks.json so next load finds it
+      try {
+        void saveProjectFile(originalProjectId, 'blocks.json', JSON.stringify([])).catch((e) =>
+          console.warn('saveProjectFile(init empty) failed', e),
+        );
+      } catch (e) {
+        console.warn('saveProjectFile threw synchronously', e);
+      }
+
+      return;
+    }
+
+    // If requested id is not in index -> show error and navigate back
+    toast.error('پروژه یافت نشد یا فایل پروژه نامعتبر است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
+    navigate('/', { replace: true });
+  })();
+  // keep deps explicit
+}, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
 
   const handleGreenFlagClick = useCallback(
     async (blockId: string) => {

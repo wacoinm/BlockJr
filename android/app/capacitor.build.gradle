@@ -13,8 +13,8 @@ dependencies {
     implementation project(':capacitor-community-safe-area')
     implementation project(':capacitor-device')
     implementation project(':capacitor-filesystem')
+    implementation project(':capacitor-preferences')
     implementation project(':capacitor-splash-screen')
-    implementation project(':capacitor-storage')
     implementation project(':e-is-capacitor-bluetooth-serial')
 
 }

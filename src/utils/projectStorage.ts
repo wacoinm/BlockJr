@@ -1,6 +1,6 @@
 // src/utils/projectStorage.ts
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
-import { Storage } from "@capacitor/storage";
+import { Preferences } from "@capacitor/preferences";
 import type { Project } from "../pages/ProjectManager";
 
 const PROJECT_INDEX_KEY = "pj_index_v1";
@@ -27,12 +27,12 @@ export async function loadProjects(): Promise<Project[]> {
   }
 
   try {
-    const kv = await Storage.get({ key: PROJECT_INDEX_KEY });
-    if (kv.value) {
+    const kv = await Preferences.get({ key: PROJECT_INDEX_KEY });
+    if (kv && kv.value) {
       try {
         return JSON.parse(kv.value) as Project[];
       } catch {
-        // fallthrough
+        // fallthrough to filesystem attempt
       }
     }
 
@@ -43,13 +43,13 @@ export async function loadProjects(): Promise<Project[]> {
         encoding: Encoding.UTF8,
       });
       const list = JSON.parse(res.data) as Project[];
-      await Storage.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(list) });
+      await Preferences.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(list) });
       return list;
     } catch {
       return [];
     }
   } catch (e) {
-    console.warn("loadProjects(capacitor) error", e);
+    console.warn("loadProjects(Preferences/Filesystem) error", e);
     return [];
   }
 }
@@ -65,9 +65,9 @@ export async function saveProjects(projects: Project[]): Promise<void> {
   }
 
   try {
-    await Storage.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(projects) });
+    await Preferences.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(projects) });
   } catch (e) {
-    console.warn("saveProjects(Storage) failed", e);
+    console.warn("saveProjects(Preferences) failed", e);
   }
 
   try {
@@ -139,7 +139,6 @@ export async function readProjectFile(projectId: string, filename: string): Prom
     return res.data;
   } catch (e) {
     // file doesn't exist or cannot be read
-    // console.warn("readProjectFile(Filesystem) failed", e);
     return null;
   }
 }
@@ -220,13 +219,13 @@ export async function renameProjectFolder(oldId: string, newId: string): Promise
         }
       }
     } catch {
-      // ignore
+      // ignore if reading old folder fails
     }
 
     try {
       await Filesystem.rmdir({ path: oldFolder, directory: Directory.Data, recursive: true });
     } catch {
-      // ignore
+      // ignore rmdir failure
     }
 
     return true;

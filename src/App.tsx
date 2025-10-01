@@ -36,7 +36,7 @@ import type { RootState } from './store';
 import { computeHorizStep, GAP_BETWEEN_BLOCKS } from './constants/spacing';
 
 import { saveProjectFile, readProjectFile } from './utils/projectStorage';
-import { useParams } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 
 export const SoundContext = createContext<() => void>(() => {});
 
@@ -242,30 +242,55 @@ const App: React.FC = () => {
 
   // If route param present, load that project's blocks and select it
   const params = useParams();
+  const navigate = useNavigate();
+
   useEffect(() => {
     (async () => {
       if (!params?.id) return;
       const projectId = decodeURIComponent(params.id);
-      try {
-        handleProjectSelect(projectId);
-      } catch (e) {
-        // ignore
-      }
 
       try {
+        // Try to read blocks.json first — if it doesn't exist or is invalid, treat as error
         const data = await readProjectFile(projectId, 'blocks.json');
-        if (data) {
-          const parsed = JSON.parse(data) as Block[];
-          setBlocks(parsed);
-          blocksRef.current = parsed;
-          rawSubmitCapture(parsed); // initial snapshot (do not autosave twice)
+
+        if (!data) {
+          // file missing or empty -> show error and go back to project list
+          toast.error('پروژه یافت نشد یا فایل پروژه نامعتبر است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
+          navigate('/', { replace: true });
+          return;
         }
-      } catch (e) {
-        console.warn('failed to load project blocks for', projectId, e);
+
+        // parse and load blocks
+        let parsed: Block[];
+        try {
+          parsed = JSON.parse(data) as Block[];
+        } catch (parseErr) {
+          console.warn('failed to parse blocks.json for', projectId, parseErr);
+          toast.error('خطا در خواندن فایل پروژه — فایل خراب است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
+          navigate('/', { replace: true });
+          return;
+        }
+
+        setBlocks(parsed);
+        blocksRef.current = parsed;
+        rawSubmitCapture(parsed); // initial snapshot (do not autosave twice)
+
+        // finally, select the project in the UI (ignore non-fatal errors)
+        try {
+          handleProjectSelect(projectId);
+        } catch (selErr) {
+          console.warn('handleProjectSelect failed for', projectId, selErr);
+        }
+      } catch (err) {
+        // readProjectFile threw an unexpected error (IO/permission/etc.)
+        console.error('failed to load project blocks for', projectId, err);
+        toast.error('خطا در بارگذاری پروژه — به صفحه پروژه‌ها بازگردانده می‌شوید.');
+        navigate('/', { replace: true });
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params?.id]);
+    // keep deps explicit so effect runs when the route id changes or helpers change
+  }, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
+
 
   const handleGreenFlagClick = useCallback(
     async (blockId: string) => {

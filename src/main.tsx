@@ -16,7 +16,7 @@ const container = document.getElementById("root")!;
 const root = createRoot(container);
 
 root.render(
-  <React.StrictMode>
+  // <React.StrictMode>
     <Provider store={store}>
       <DialogueProvider
         charectersPath="/avatars"
@@ -31,5 +31,5 @@ root.render(
         <ToastContain />
       </DialogueProvider>
     </Provider>
-  </React.StrictMode>
+  // </React.StrictMode>
 );

@@ -95,12 +95,17 @@ export default function ToastContain(): JSX.Element {
            -------------------------- */
         .toast-item {
           pointer-events: auto;
-          padding: 0;
+          padding: 8px;
           margin: 0;
-          background: transparent;
-          border: none;
-          box-shadow: none;
-        //   animation: ios-toast-in 360ms cubic-bezier(.22,.9,.35,1);
+          background: rgba(255,255,255,0.96);
+          border: 1px solid rgba(0,0,0,0.05);
+          border-radius: 10px;
+          box-shadow: 0 6px 18px rgba(2,6,23,0.08);
+        }
+
+        .dark .toast-item {
+          background: rgba(8,10,18,0.92);
+          border: 1px solid rgba(255,255,255,0.08);
         }
 
         /* Exit animation */
@@ -113,7 +118,7 @@ export default function ToastContain(): JSX.Element {
           display: flex;
           flex-direction: column;
           gap: 2px;
-          padding: 10px 12px;
+          padding: 8px 12px;
           font-size: 0.9rem;
           line-height: 1.2;
           color: #0f172a;

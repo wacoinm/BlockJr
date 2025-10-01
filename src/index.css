@@ -22,7 +22,7 @@ html, body, #root {
 * {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;     /* Firefox */
-  font-family: "Vazirmatn";
+  font-family: "Vazirmatn" !important;
 }
 
 *::-webkit-scrollbar {

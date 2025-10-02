@@ -5,9 +5,10 @@ import IconViewToggle from "./IconViewToggle";
 interface Props {
   view: "cards" | "list";
   setView: (v: "cards" | "list") => void;
+  children?: React.ReactNode;
 }
 
-const Header: React.FC<Props> = ({ view, setView }) => {
+const Header: React.FC<Props> = ({ view, setView, children }) => {
   return (
     <header className="w-full backdrop-blur-sm bg-white/50 dark:bg-black/40 border-b border-transparent dark:border-neutral-800 transition-colors duration-300 sticky top-0 z-30">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
@@ -40,7 +41,7 @@ const Header: React.FC<Props> = ({ view, setView }) => {
 
         {/* Left side: View + Theme toggle */}
         <div className="flex items-center gap-3">
-          <IconViewToggle view={view} setView={setView} />
+          {children ?? null}
           <ThemeToggle />
         </div>
       </div>

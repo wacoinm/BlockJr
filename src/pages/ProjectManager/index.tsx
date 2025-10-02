@@ -10,6 +10,7 @@ import {
   renameProjectFolder,
 } from "../../utils/projectStorage";
 import { toPackId } from "../../utils/slugifyPack";
+import IconViewToggle from "../../components/project-manager/IconViewToggle";
 
 export interface Project {
   id: string;
@@ -228,7 +229,9 @@ const ProjectManager: React.FC = () => {
         className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300"
         style={{ minHeight: "calc(var(--vh, 1vh) * 100)" }}
       >
-        <Header view={view} setView={setView} />
+        <Header view={view} setView={setView}>
+          <IconViewToggle view={view} setView={setView} />
+        </Header>
         <main className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
           <ProjectList
             projects={projects}

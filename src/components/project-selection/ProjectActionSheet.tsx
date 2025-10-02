@@ -26,16 +26,18 @@ const SWIPE_CLOSE_THRESHOLD = 80; // px to trigger close on swipe
 const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   const checkpoints = project.checkpoints ?? [];
   const [current, setCurrent] = useState<string | null>(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
+
   const [isVisible, setIsVisible] = useState(true);
-
   const sheetRef = useRef<HTMLDivElement | null>(null);
-  const checkpointsRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null); // <-- new: scrollable container ref
 
-  // touch tracking refs (mutable so native handlers can read/write)
   const startYRef = useRef<number | null>(null);
   const lastTranslateRef = useRef(0);
-  const initialScrollTopRef = useRef(0);
-  const isSheetDraggingRef = useRef(false);
+
+  // controls whether the sheet should handle dragging for the current touch
+  const dragAllowedRef = useRef(true);
+  // remembers whether the touch started inside the scrollable checkpoint column
+  const startedInScrollRef = useRef(false);
 
   useEffect(() => {
     setCurrent(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
@@ -46,86 +48,67 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     setTimeout(() => onClose(), ANIM_MS + 20);
   };
 
-  // --- Native touch handlers (so we can control passive option) ---
-  useEffect(() => {
-    const node = sheetRef.current;
-    if (!node) return;
+  const onTouchStart = (e: React.TouchEvent) => {
+    startYRef.current = e.touches[0].clientY;
+    lastTranslateRef.current = 0;
 
-    // start
-    const handleTouchStart = (e: TouchEvent) => {
-      startYRef.current = e.touches[0].clientY;
-      lastTranslateRef.current = 0;
-      isSheetDraggingRef.current = false;
-      initialScrollTopRef.current = checkpointsRef.current ? checkpointsRef.current.scrollTop : 0;
-      // stop any transition while dragging
-      node.style.transition = "";
-    };
+    // detect if the touch began inside the scrollable area
+    const target = e.target as Node;
+    startedInScrollRef.current = !!(scrollRef.current && scrollRef.current.contains(target));
 
-    // move (must be passive: false to allow preventDefault)
-    const handleTouchMove = (e: TouchEvent) => {
-      if (startYRef.current === null) return;
-      const currentY = e.touches[0].clientY;
-      const dy = currentY - startYRef.current;
+    if (startedInScrollRef.current && scrollRef.current) {
+      // if the scroll container is not at the top, let it handle touch (don't start dragging sheet)
+      dragAllowedRef.current = scrollRef.current.scrollTop === 0;
+    } else {
+      // touch started outside the scroll container -> sheet can be dragged
+      dragAllowedRef.current = true;
+    }
 
-      // if we haven't decided to drag sheet yet:
-      if (!isSheetDraggingRef.current) {
-        // start dragging sheet only when pulling down AND inner list is at top
-        if (dy > 0 && (initialScrollTopRef.current === 0 || !checkpointsRef.current)) {
-          isSheetDraggingRef.current = true;
-          e.preventDefault(); // prevent page rubberband / inner scroll from interfering
-        } else {
-          // let inner scroll handle the gesture
-          return;
-        }
-      }
+    if (sheetRef.current) sheetRef.current.style.transition = "";
+  };
 
-      // if here, sheet dragging is active
-      e.preventDefault();
-      lastTranslateRef.current = Math.max(0, dy);
-      node.style.transform = `translateY(${lastTranslateRef.current}px)`;
-      node.style.boxShadow = `0 8px 30px rgba(2,6,23,${Math.max(0.06, 0.18 - lastTranslateRef.current / 800)})`;
-    };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (startYRef.current === null) return;
 
-    // end
-    const handleTouchEnd = () => {
-      const dy = lastTranslateRef.current;
-      startYRef.current = null;
-      lastTranslateRef.current = 0;
-      node.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.22,.9,.32,1)`;
+    // if drag isn't allowed (e.g., user started dragging a scroller that can scroll), do nothing
+    if (!dragAllowedRef.current) return;
 
-      if (isSheetDraggingRef.current) {
-        isSheetDraggingRef.current = false;
-        if (dy >= SWIPE_CLOSE_THRESHOLD) {
-          // close
-          node.style.transform = `translateY(100%)`;
-          setTimeout(() => onClose(), ANIM_MS + 10);
-        } else {
-          // snap back
-          node.style.transform = `translateY(0)`;
-        }
-      } else {
-        // nothing special: ensure sheet is at resting position
-        node.style.transform = `translateY(0)`;
-      }
-    };
+    const dy = e.touches[0].clientY - startYRef.current;
 
-    // attach listeners: touchmove must be passive:false
-    node.addEventListener("touchstart", handleTouchStart, { passive: true });
-    node.addEventListener("touchmove", handleTouchMove, { passive: false });
-    node.addEventListener("touchend", handleTouchEnd, { passive: true });
-    node.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    // only handle downward movement for dismiss (ignore upward moves)
+    if (dy < 0) return;
 
-    return () => {
-      node.removeEventListener("touchstart", handleTouchStart);
-      node.removeEventListener("touchmove", handleTouchMove);
-      node.removeEventListener("touchend", handleTouchEnd);
-      node.removeEventListener("touchcancel", handleTouchEnd);
-    };
-  }, [onClose]);
+    lastTranslateRef.current = dy;
+
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${dy}px)`;
+      sheetRef.current.style.boxShadow = `0 8px 30px rgba(2,6,23,${Math.max(0.06, 0.18 - dy / 800)})`;
+    }
+  };
+
+  const onTouchEnd = () => {
+    const dy = lastTranslateRef.current;
+    startYRef.current = null;
+    lastTranslateRef.current = 0;
+    dragAllowedRef.current = true;
+    startedInScrollRef.current = false;
+
+    if (sheetRef.current) sheetRef.current.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.22,.9,.32,1)`;
+
+    if (dy >= SWIPE_CLOSE_THRESHOLD) {
+      // animate sheet offscreen then close
+      if (sheetRef.current) sheetRef.current.style.transform = `translateY(100%)`;
+      setTimeout(() => onClose(), ANIM_MS + 10);
+    } else {
+      // snap back
+      if (sheetRef.current) sheetRef.current.style.transform = `translateY(0)`;
+    }
+  };
 
   const currentCheckpoint = checkpoints.find((c) => c.id === current) ?? null;
 
   return (
+    // very high z to overlap header
     <div className="fixed inset-0 z-[9999] flex items-end justify-center">
       {/* backdrop */}
       <div
@@ -138,12 +121,15 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         role="dialog"
         aria-modal="true"
         ref={sheetRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         className="relative w-full max-w-3xl rounded-t-2xl bg-white dark:bg-neutral-900 p-4 shadow-xl touch-pan-y"
         style={{
           transform: isVisible ? "translateY(0)" : "translateY(100%)",
           transition: `transform ${ANIM_MS}ms cubic-bezier(.22,.9,.32,1)`,
           maxHeight: "calc(100vh - 80px)",
-          overflow: "hidden",
+          overflow: "hidden", // <-- prevent full-sheet scroll
           display: "flex",
           flexDirection: "column",
         }}
@@ -152,16 +138,18 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         <div className="mx-auto w-12 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 mb-3" />
 
         {/* content area: takes remaining height and splits into image/description and checkpoints.
-            Using flex so checkpoints column becomes the only scrollable area.
+            Using flex so we can make checkpoints column scrollable independently.
         */}
         <div className="flex flex-col md:flex-row gap-4" style={{ flex: 1, minHeight: 0 }}>
           {/* IMAGE + DESCRIPTION column */}
           <div className="w-full md:w-1/2 flex-shrink-0 flex flex-col" style={{ minHeight: 0 }}>
+            {/* image wrapper: on desktop we want it to fill available height; on mobile it will be natural height but capped */}
             <div
               className="relative rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800"
               style={{
+                // ensure image never overflows viewport; on md it will expand to fill column height
                 maxHeight: "55vh",
-                height: "100%",
+                height: "100%", // allows md column to stretch
                 minHeight: 120,
               }}
             >
@@ -207,14 +195,14 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             </div>
           </div>
 
-          {/* CHECKPOINT column: only this scrolls */}
+          {/* CHECKPOINT column: make this the only scrollable area */}
           <div
-            ref={checkpointsRef}
+            ref={scrollRef} // <-- attach ref here
             className="flex-1 text-right w-full md:w-1/2"
             style={{
+              // IMPORTANT: make this a scroll container inside the sheet
               overflowY: "auto",
-              WebkitOverflowScrolling: "touch",
-              minHeight: 0,
+              minHeight: 0, // allow proper flex scrolling
             }}
           >
             <div className="font-semibold text-lg">{project.name}</div>

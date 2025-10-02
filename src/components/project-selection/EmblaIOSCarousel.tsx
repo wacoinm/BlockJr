@@ -129,7 +129,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                 aria-hidden={!isCenter}
                 // slide: basis responsive, pl-4 = slide spacing
                 className={
-                  `flex-none basis-[80%] sm:basis-[50%] md:basis-[32%] pl-4 ` +
+                  `flex-none basis-[80%] sm:basis-[50%] md:basis-[62%] pl-4 ` +
                   `transition-opacity duration-300 ${isCenter ? "opacity-100" : "opacity-50"}`
                 }
               >

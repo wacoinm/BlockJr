@@ -54,3 +54,40 @@ html, body, #root {
 }
 
 
+/* ensure embla viewport wrapper if needed */
+.embla {
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.embla__container {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* make sure peek visible */
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  box-sizing: border-box;
+}
+
+.embla__slide {
+  position: relative;
+  box-sizing: border-box;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/* inner card must not overflow */
+.embla__slide > div {
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* responsive tweaks: on larger screens reduce min-width so more fits */
+@media (min-width: 768px) {
+  .embla__slide {
+    min-width: 44% !important;
+    max-width: 420px;
+  }
+}
+
+

@@ -1,0 +1,180 @@
+/* embla.css — adjusted mobile height + small layout tweaks */
+
+/* default / mobile-first: increase --slide-height for taller cards on mobile */
+.embla {
+  max-width: 48rem;
+  margin: auto;
+  --slide-height: 42rem;    /* <-- increased from ~18rem -> taller on mobile */
+  --slide-spacing: 1rem;
+  --slide-size: 70%;
+}
+
+.embla__viewport {
+  overflow: hidden;
+}
+.embla__container {
+  display: flex;
+  touch-action: pan-y pinch-zoom;
+  margin-left: calc(var(--slide-spacing) * -1);
+}
+.embla__slide {
+  transform: translate3d(0, 0, 0);
+  flex: 0 0 var(--slide-size);
+  min-width: 0;
+  padding-left: var(--slide-spacing);
+}
+.embla__slide__img {
+  border-radius: 1.8rem;
+  display: block;
+  height: var(--slide-height);
+  width: 100%;
+  object-fit: cover;
+}
+
+/* controls: we removed prev/next so ensure dots area looks centered */
+.embla__controls {
+  margin-top: 1.8rem;
+  display: flex;
+  justify-content: center; /* center the dots when no buttons */
+  gap: 1.2rem;
+}
+
+/* keep original button styles (unused) */
+.embla__buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+/* keep embla buttons style so existing classes remain valid if reused elsewhere */
+.embla__button {
+  -webkit-tap-highlight-color: rgba(var(--text-high-contrast-rgb-value), 0.5);
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  touch-action: manipulation;
+  display: inline-flex;
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  box-shadow: inset 0 0 0 0.2rem var(--detail-medium-contrast);
+  width: 3.6rem;
+  height: 3.6rem;
+  z-index: 1;
+  border-radius: 50%;
+  color: var(--text-body);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.embla__button:disabled { color: var(--detail-high-contrast); }
+.embla__button__svg { width: 35%; height: 35%; }
+
+/* dots centered + appearance */
+.embla__dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+.embla__dot {
+  -webkit-tap-highlight-color: rgba(var(--text-high-contrast-rgb-value), 0.5);
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  touch-action: manipulation;
+  display: inline-flex;
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  margin: 0 0.25rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.embla__dot:after {
+  box-shadow: inset 0 0 0 0.2rem var(--detail-medium-contrast);
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  content: '';
+}
+.embla__dot--selected:after {
+  box-shadow: inset 0 0 0 0.2rem var(--text-body);
+}
+
+/* card styles (kept from your previous file) */
+.embla-card {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--app-surface, #fff);
+  box-sizing: border-box;
+  transition: box-shadow 240ms ease, border 240ms ease;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.embla__card--center {
+  border: 4px solid rgba(125,211,252,0.98);
+  box-shadow: 0 14px 36px rgba(2,6,23,0.18);
+}
+.embla-card__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #f3f4f6;
+}
+.embla-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.embla-card__play {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+.embla-card__play-btn {
+  border-radius: 999px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(2,6,23,0.12);
+  background: rgba(255,255,255,0.9);
+}
+
+/* responsive: reduce slide height on larger screens if you want smaller cards there */
+@media (min-width: 640px) {
+  .embla { --slide-size: 60%; --slide-height: 20rem; }
+}
+@media (min-width: 768px) {
+  .embla { --slide-size: 42%; --slide-height: 18rem; }
+}
+
+.embla__slide {
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.embla__slide .embla-card {
+  pointer-events: none; /* so only center is clickable */
+}
+
+.embla__slide.is-selected {
+  opacity: 1;
+}
+
+.embla__slide.is-selected .embla-card {
+  pointer-events: auto;
+}
+

@@ -63,7 +63,7 @@ const ProjectSelection: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">
-      <Header view={view} setView={setView}>
+      <Header view={view} setView={setView} dir="rtl">
         <IconViewToggle view={view} setView={setView} />
       </Header>
 

@@ -150,7 +150,7 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 14px rgba(2,6,23,0.12);
-  background: rgba(255,255,255,0.9);
+  background: green;
 }
 
 /* responsive: reduce slide height on larger screens if you want smaller cards there */

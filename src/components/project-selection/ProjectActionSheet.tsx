@@ -13,11 +13,11 @@ type Project = {
   id: string;
   name: string;
   subtitle?: string;
-  img?: string;
-  imgMobile?: string;
+  // imgsPath should be a public path (served from /), e.g. "/scenes/elevator/chapters/"
+  imgsPath?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
-  project?: any; // <-- elevator object etc
+  project?: any; // elevator object etc
 };
 
 type Props = {
@@ -28,10 +28,37 @@ type Props = {
 const ANIM_MS = 320;
 const SWIPE_CLOSE_THRESHOLD = 80; // px to trigger close on swipe
 
+// helper to check if an image exists (using Image onload/onerror)
+function checkImageExists(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let done = false;
+    const onLoad = () => {
+      if (done) return;
+      done = true;
+      resolve(true);
+    };
+    const onErr = () => {
+      if (done) return;
+      done = true;
+      resolve(false);
+    };
+    img.onload = onLoad;
+    img.onerror = onErr;
+    // avoid accidental relative resolution issues by using the url as-is
+    img.src = url;
+    // safety timeout
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        resolve(false);
+      }
+    }, 2500);
+  });
+}
+
 const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   // derive checkpoints:
-  // 1) use explicit project.checkpoints if provided
-  // 2) otherwise, if project.project is an object (like your elevator import) map its top-level keys
   const derivedCheckpointsBase = useMemo<Checkpoint[]>(() => {
     if (Array.isArray(project.checkpoints) && project.checkpoints.length > 0) {
       return project.checkpoints;
@@ -70,16 +97,13 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
           setSessionProgress(typeof s.progress === "number" ? s.progress : project.progress ?? 0);
           setSessionStep(typeof s.step === "number" ? s.step : null);
 
-          // compute checkpoint locked state: unlocked if index < step
           const base = derivedCheckpointsBase.map((c, i) => {
-            // step is 1-based; checkpoints index 0 corresponds to step 1
             const step = s.step ?? 1;
-            const isLocked = i + 1 > step; // checkpoint unlocked if i+1 <= step
+            const isLocked = i + 1 > step;
             return { ...c, locked: !!isLocked };
           });
           setDerivedCheckpoints(base);
         } else {
-          // no session: leave as-is but ensure progress stays from project
           setSessionProgress(project.progress ?? 0);
           setSessionStep(null);
           setDerivedCheckpoints(derivedCheckpointsBase);
@@ -93,7 +117,6 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     };
   }, [project?.id, project.progress, derivedCheckpointsBase]);
 
-  // keep backwards-compatible name `checkpoints` used by the UI
   const checkpoints = derivedCheckpoints;
 
   const [current, setCurrent] = useState<string | null>(
@@ -106,14 +129,11 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
 
   const [isVisible, setIsVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null); // <-- scrollable container ref
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const startYRef = useRef<number | null>(null);
   const lastTranslateRef = useRef(0);
-
-  // controls whether the sheet should handle dragging for the current touch
   const dragAllowedRef = useRef(true);
-  // remembers whether the touch started inside the scrollable checkpoint column
   const startedInScrollRef = useRef(false);
 
   useEffect(() => {
@@ -128,35 +148,22 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   const onTouchStart = (e: React.TouchEvent) => {
     startYRef.current = e.touches[0].clientY;
     lastTranslateRef.current = 0;
-
-    // detect if the touch began inside the scrollable area
     const target = e.target as Node;
     startedInScrollRef.current = !!(scrollRef.current && scrollRef.current.contains(target));
-
     if (startedInScrollRef.current && scrollRef.current) {
-      // if the scroll container is not at the top, let it handle touch (don't start dragging sheet)
       dragAllowedRef.current = scrollRef.current.scrollTop === 0;
     } else {
-      // touch started outside the scroll container -> sheet can be dragged
       dragAllowedRef.current = true;
     }
-
     if (sheetRef.current) sheetRef.current.style.transition = "";
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
     if (startYRef.current === null) return;
-
-    // if drag isn't allowed (e.g., user started dragging a scroller that can scroll), do nothing
     if (!dragAllowedRef.current) return;
-
     const dy = e.touches[0].clientY - startYRef.current;
-
-    // only handle downward movement for dismiss (ignore upward moves)
     if (dy < 0) return;
-
     lastTranslateRef.current = dy;
-
     if (sheetRef.current) {
       sheetRef.current.style.transform = `translateY(${dy}px)`;
       sheetRef.current.style.boxShadow = `0 8px 30px rgba(2,6,23,${Math.max(0.06, 0.18 - dy / 800)})`;
@@ -169,15 +176,11 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     lastTranslateRef.current = 0;
     dragAllowedRef.current = true;
     startedInScrollRef.current = false;
-
     if (sheetRef.current) sheetRef.current.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.22,.9,.32,1)`;
-
     if (dy >= SWIPE_CLOSE_THRESHOLD) {
-      // animate sheet offscreen then close
       if (sheetRef.current) sheetRef.current.style.transform = `translateY(100%)`;
       setTimeout(() => onClose(), ANIM_MS + 10);
     } else {
-      // snap back
       if (sheetRef.current) sheetRef.current.style.transform = `translateY(0)`;
     }
   };
@@ -186,13 +189,6 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
 
   const navigate = useNavigate();
 
-  /**
-   * Play button handler:
-   * 1) ensure blocks.json exists for project (saveProjectFile)
-   * 2) ensure project is present in projects index (loadProjects + saveProjects)
-   * 3) initialize session (initSession)
-   * 4) navigate to /project/:id (pass state so App auto-starts dialogue)
-   */
   const handlePlay = async () => {
     try {
       const projectId = project.id;
@@ -201,12 +197,10 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         return;
       }
 
-      // 1) ensure blocks.json exists (use saveProjectFile util which handles web/native)
       const existing = await readProjectFile(projectId, "blocks.json");
       if (!existing) {
         const ok = await saveProjectFile(projectId, "blocks.json", JSON.stringify([]));
         if (!ok) {
-          console.warn("ProjectActionSheet: failed to create blocks.json via saveProjectFile, falling back to localStorage");
           try {
             const key = `bj_projects/${projectId}/blocks.json`;
             if (typeof window !== "undefined" && window.localStorage) {
@@ -218,7 +212,6 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         }
       }
 
-      // 2) ensure project index contains this project id (so App load recognizes it)
       try {
         const idx = await loadProjects();
         const exists = Array.isArray(idx) && idx.some((p: any) => p && p.id === projectId);
@@ -227,7 +220,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             id: projectId,
             name: project.name ?? projectId,
             subtitle: project.subtitle ?? "",
-            img: project.img ?? "",
+            img: (project as any).img ?? "",
             progress: sessionProgress ?? 0,
           };
           const next = Array.isArray(idx) ? [...idx, newEntry] : [newEntry];
@@ -237,14 +230,12 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         console.warn("ProjectActionSheet: ensuring project index failed", err);
       }
 
-      // 3) initialize session for project (if missing)
       try {
         await initSession(projectId);
       } catch (err) {
         console.warn("ProjectActionSheet: initSession failed", err);
       }
 
-      // 4) close sheet (animate) then navigate to /project/:id with navigation state
       setIsVisible(false);
       setTimeout(() => {
         onClose();
@@ -260,8 +251,141 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     }
   };
 
+  // -------------------------
+  // IMAGE logic for action sheet (improved)
+  // -------------------------
+  const [imageCandidates, setImageCandidates] = useState<string[]>([]);
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
+  const [isFading, setIsFading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!project?.imgsPath) {
+        const legacy = (project as any).img;
+        if (legacy) {
+          if (!mounted) return;
+          setImageCandidates([legacy]);
+          setCurrentImage(legacy);
+          return;
+        }
+        const ph = "https://placehold.co/800x600?text=project";
+        if (!mounted) return;
+        setImageCandidates([ph]);
+        setCurrentImage(ph);
+        return;
+      }
+
+      const base = project.imgsPath.replace(/\/?$/, "/");
+      const discovered: string[] = [];
+
+      for (const cp of checkpoints) {
+        const cand = `${base}${cp.id}.png`;
+        // eslint-disable-next-line no-await-in-loop
+        if (await checkImageExists(cand)) {
+          discovered.push(cand);
+        } else {
+          const maybeNum = `${base}ch${cp.id}.png`;
+          // eslint-disable-next-line no-await-in-loop
+          if (await checkImageExists(maybeNum)) {
+            discovered.push(maybeNum);
+          }
+        }
+      }
+
+      if (discovered.length === 0) {
+        const MAX_PROBE = 20;
+        for (let i = 1; i <= MAX_PROBE; i++) {
+          const candCh = `${base}ch${i}.png`;
+          // eslint-disable-next-line no-await-in-loop
+          if (await checkImageExists(candCh)) {
+            discovered.push(candCh);
+            continue;
+          }
+          const candNum = `${base}${i}.png`;
+          // eslint-disable-next-line no-await-in-loop
+          if (await checkImageExists(candNum)) {
+            discovered.push(candNum);
+          }
+        }
+      }
+
+      if (discovered.length === 0) {
+        const thumb = `${base}thumb.png`;
+        if (await checkImageExists(thumb)) discovered.push(thumb);
+      }
+
+      if (discovered.length === 0 && (project as any).img) {
+        discovered.push((project as any).img);
+      }
+
+      if (discovered.length === 0) {
+        discovered.push("https://placehold.co/800x600?text=project");
+      }
+
+      if (!mounted) return;
+      const uniq = Array.from(new Set(discovered));
+      setImageCandidates(uniq);
+      setCurrentImage((prev) => prev ?? uniq[0] ?? null);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [project?.imgsPath, checkpoints]);
+
+  // when checkpoint changes: attempt to swap to checkpoint-specific image (with fade)
+  useEffect(() => {
+    if (!current) return;
+    (async () => {
+      const base = project.imgsPath ? project.imgsPath.replace(/\/?$/, "/") : null;
+      if (base) {
+        const candidate1 = `${base}${current}.png`;
+        if (await checkImageExists(candidate1)) {
+          setIsFading(true);
+          setTimeout(() => {
+            setCurrentImage(candidate1);
+            setIsFading(false);
+          }, 160);
+          return;
+        }
+        const candidate2 = `${base}ch${current}.png`;
+        if (await checkImageExists(candidate2)) {
+          setIsFading(true);
+          setTimeout(() => {
+            setCurrentImage(candidate2);
+            setIsFading(false);
+          }, 160);
+          return;
+        }
+        const numericMatch = current.match(/\d+/);
+        if (numericMatch) {
+          const candidate3 = `${base}${numericMatch[0]}.png`;
+          if (await checkImageExists(candidate3)) {
+            setIsFading(true);
+            setTimeout(() => {
+              setCurrentImage(candidate3);
+              setIsFading(false);
+            }, 160);
+            return;
+          }
+        }
+      }
+
+      const idx = Math.max(0, checkpoints.findIndex((c) => c.id === current));
+      if (imageCandidates.length > 0) {
+        const pick = imageCandidates[idx % imageCandidates.length];
+        setIsFading(true);
+        setTimeout(() => {
+          setCurrentImage(pick);
+          setIsFading(false);
+        }, 160);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
+
   return (
-    // very high z to overlap header
     <div className="fixed inset-0 z-[9999] flex items-end justify-center">
       {/* backdrop */}
       <div
@@ -269,7 +393,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         onClick={closeWithAnimation}
       />
 
-      {/* sheet container: constrained height, hidden overflow; internal layout manages scroll only for checkpoints */}
+      {/* sheet container */}
       <div
         role="dialog"
         aria-modal="true"
@@ -282,38 +406,31 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
           transform: isVisible ? "translateY(0)" : "translateY(100%)",
           transition: `transform ${ANIM_MS}ms cubic-bezier(.22,.9,.32,1)`,
           maxHeight: "calc(100vh - 80px)",
-          overflow: "hidden", // <-- prevent full-sheet scroll
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
         }}
       >
-        {/* drag handle */}
         <div className="mx-auto w-12 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 mb-3" />
 
-        {/* content area: takes remaining height and splits into image/description and checkpoints.
-            Using flex so we can make checkpoints column scrollable independently.
-        */}
         <div className="flex flex-col md:flex-row gap-4" style={{ flex: 1, minHeight: 0 }}>
           {/* IMAGE + DESCRIPTION column */}
           <div className="w-full md:w-1/2 flex-shrink-0 flex flex-col" style={{ minHeight: 0 }}>
-            {/* image wrapper: on desktop we want it to fill available height; on mobile it will be natural height but capped */}
+            {/* CHANGED: use an aspect-ratio container so image is visible on mobile and desktop equally */}
             <div
-              className="relative rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800"
-              style={{
-                // ensure image never overflows viewport; on md it will expand to fill column height
-                maxHeight: "55vh",
-                height: "100%", // allows md column to stretch
-                minHeight: 120,
-              }}
+              className="relative rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 aspect-[11/9] md:aspect-[16/9]"
             >
-              <img
-                src={project.img}
-                srcSet={project.imgMobile ? `${project.imgMobile} 480w, ${project.img} 800w` : undefined}
-                sizes="(max-width: 640px) 90vw, 360px"
-                alt={project.name}
-                className="w-full h-full object-cover"
-                style={{ display: "block" }}
-              />
+              <div
+                className="w-full h-full"
+                style={{ position: "relative" }}
+              >
+                <img
+                  src={currentImage ?? "https://placehold.co/800x600?text=project"}
+                  alt={project.name}
+                  className="w-full h-full object-cover transition-opacity duration-300"
+                  style={{ opacity: isFading ? 0 : 1, position: "absolute", inset: 0 }}
+                />
+              </div>
 
               <button
                 onClick={async () => {
@@ -339,23 +456,21 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
               </div>
             </div>
 
-            {/* description sits under image (not scrollable) */}
             <div className="mt-3 text-right">
               <div className="text-sm font-medium mb-1">توضیحات مرحله</div>
               <div className="text-sm text-neutral-600 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-800 p-3 rounded-md">
-                {currentCheckpoint?.description ?? `توضیحات برای "${currentCheckpoint?.title ?? "مرحله"}" موجود نیست.`}
+                {currentCheckpoint?.description ?? (typeof project.project?.[currentCheckpoint?.id] === "string" ? project.project[currentCheckpoint?.id] : project.project?.[currentCheckpoint?.id]?.[0]?.text || project.project?.[currentCheckpoint?.id]?.[0]?.message || project.project?.[currentCheckpoint?.id]?.dialogue?.[0]?.text || project.project?.[currentCheckpoint?.id]?.blocks?.[0]?.text || `توضیحات برای "${currentCheckpoint?.title ?? "مرحله"}" موجود نیست.`)}
               </div>
             </div>
           </div>
 
           {/* CHECKPOINT column: make this the only scrollable area */}
           <div
-            ref={scrollRef} // <-- attach ref here
+            ref={scrollRef}
             className="flex-1 text-right w-full md:w-1/2"
             style={{
-              // IMPORTANT: make this a scroll container inside the sheet
               overflowY: "auto",
-              minHeight: 0, // allow proper flex scrolling
+              minHeight: 0,
             }}
           >
             <div className="font-semibold text-lg">{project.name}</div>
@@ -396,7 +511,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
           </div>
         </div>
 
-        {/* footer buttons (not part of checkpoint scroll) */}
+        {/* footer buttons */}
         <div className="mt-4 flex justify-end gap-2">
           <button onClick={closeWithAnimation} className="px-4 py-2 rounded-md border">
             بستن

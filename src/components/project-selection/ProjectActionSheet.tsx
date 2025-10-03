@@ -6,7 +6,7 @@ import "react-circular-progressbar/dist/styles.css";
 
 import { useNavigate } from "react-router";
 import { saveProjectFile, readProjectFile, loadProjects, saveProjects } from "../../utils/projectStorage";
-import { initSession } from "../../utils/sessionStorage";
+import { initSession, getSession } from "../../utils/sessionStorage";
 
 type Checkpoint = { id: string; title?: string; locked?: boolean; description?: string };
 type Project = {
@@ -17,7 +17,7 @@ type Project = {
   imgMobile?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
-  project?: any; // <-- added so we can accept the elevator object
+  project?: any; // <-- elevator object etc
 };
 
 type Props = {
@@ -32,7 +32,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   // derive checkpoints:
   // 1) use explicit project.checkpoints if provided
   // 2) otherwise, if project.project is an object (like your elevator import) map its top-level keys
-  const derivedCheckpoints = useMemo<Checkpoint[]>(() => {
+  const derivedCheckpointsBase = useMemo<Checkpoint[]>(() => {
     if (Array.isArray(project.checkpoints) && project.checkpoints.length > 0) {
       return project.checkpoints;
     }
@@ -40,13 +40,58 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
       const keys = Object.keys(project.project);
       return keys.map((k) => ({
         id: k,
-        title: k, // you can replace this with prettier title mapping if desired
+        title: k,
         locked: false,
         description: undefined,
       }));
     }
     return [];
   }, [project]);
+
+  // session-aware checkpoints (we'll overlay locked/current based on session.step)
+  const [derivedCheckpoints, setDerivedCheckpoints] = useState<Checkpoint[]>(derivedCheckpointsBase);
+
+  useEffect(() => {
+    setDerivedCheckpoints(derivedCheckpointsBase);
+  }, [derivedCheckpointsBase]);
+
+  // overlay session progress/step for UI
+  const [sessionProgress, setSessionProgress] = useState<number | undefined>(project.progress ?? 0);
+  const [sessionStep, setSessionStep] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!project?.id) return;
+        const s = await getSession(project.id);
+        if (!mounted) return;
+        if (s) {
+          setSessionProgress(typeof s.progress === "number" ? s.progress : project.progress ?? 0);
+          setSessionStep(typeof s.step === "number" ? s.step : null);
+
+          // compute checkpoint locked state: unlocked if index < step
+          const base = derivedCheckpointsBase.map((c, i) => {
+            // step is 1-based; checkpoints index 0 corresponds to step 1
+            const step = s.step ?? 1;
+            const isLocked = i + 1 > step; // checkpoint unlocked if i+1 <= step
+            return { ...c, locked: !!isLocked };
+          });
+          setDerivedCheckpoints(base);
+        } else {
+          // no session: leave as-is but ensure progress stays from project
+          setSessionProgress(project.progress ?? 0);
+          setSessionStep(null);
+          setDerivedCheckpoints(derivedCheckpointsBase);
+        }
+      } catch (err) {
+        console.warn("ProjectActionSheet: failed to read session", err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [project?.id, project.progress, derivedCheckpointsBase]);
 
   // keep backwards-compatible name `checkpoints` used by the UI
   const checkpoints = derivedCheckpoints;
@@ -57,7 +102,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
 
   useEffect(() => {
     setCurrent(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
-  }, [project]); // eslint-disable-line
+  }, [project, checkpoints]); // eslint-disable-line
 
   const [isVisible, setIsVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
@@ -146,7 +191,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
    * 1) ensure blocks.json exists for project (saveProjectFile)
    * 2) ensure project is present in projects index (loadProjects + saveProjects)
    * 3) initialize session (initSession)
-   * 4) navigate to /project/:id
+   * 4) navigate to /project/:id (pass state so App auto-starts dialogue)
    */
   const handlePlay = async () => {
     try {
@@ -183,6 +228,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             name: project.name ?? projectId,
             subtitle: project.subtitle ?? "",
             img: project.img ?? "",
+            progress: sessionProgress ?? 0,
           };
           const next = Array.isArray(idx) ? [...idx, newEntry] : [newEntry];
           await saveProjects(next);
@@ -191,18 +237,23 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         console.warn("ProjectActionSheet: ensuring project index failed", err);
       }
 
-      // 3) initialize session for project (step=1, progress=0)
+      // 3) initialize session for project (if missing)
       try {
         await initSession(projectId);
       } catch (err) {
         console.warn("ProjectActionSheet: initSession failed", err);
       }
 
-      // 4) close sheet (animate) then navigate to /project/:id
+      // 4) close sheet (animate) then navigate to /project/:id with navigation state
       setIsVisible(false);
       setTimeout(() => {
         onClose();
-        navigate(`/project/${encodeURIComponent(projectId)}`);
+        navigate(`/project/${encodeURIComponent(projectId)}`, {
+          state: {
+            autoStartDialogue: true,
+            startChapter: currentCheckpoint?.id ?? undefined,
+          } as any,
+        } as any);
       }, ANIM_MS + 10);
     } catch (err) {
       console.error("ProjectActionSheet: handlePlay error", err);
@@ -276,8 +327,8 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
 
               <div className="absolute left-3 top-3 w-14 h-14 bg-white/90 rounded-full p-1">
                 <CircularProgressbar
-                  value={project.progress ?? 0}
-                  text={`${project.progress ?? 0}%`}
+                  value={typeof sessionProgress === "number" ? sessionProgress : project.progress ?? 0}
+                  text={`${Math.round(typeof sessionProgress === "number" ? sessionProgress : project.progress ?? 0)}%`}
                   styles={buildStyles({
                     textSize: "28px",
                     pathColor: "#16a34a",
@@ -313,7 +364,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             <div className="mt-3">
               <div className="text-sm font-medium mb-2">مراحل (Checkpoint)</div>
               <div className="space-y-2 px-0">
-                {checkpoints.map((c) => {
+                {checkpoints.map((c, idx) => {
                   const isCurrent = c.id === current;
                   return (
                     <button
@@ -332,7 +383,9 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
                     >
                       <div>
                         <div className="text-sm">{c.title}</div>
-                        <div className="text-xs text-neutral-400">{isCurrent ? "فعلی" : c.locked ? "قفل شده" : ""}</div>
+                        <div className="text-xs text-neutral-400">
+                          {isCurrent ? "فعلی" : c.locked ? "قفل شده" : sessionStep ? `قابل اجرا تا ${sessionStep}` : ""}
+                        </div>
                       </div>
                       <div className="text-xs text-neutral-400">{c.locked ? "🔒" : "›"}</div>
                     </button>

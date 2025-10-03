@@ -41,6 +41,76 @@ export const elevatorValidationRules: Record<string, Array<Array<string>>> = {
     ["green-flag", "up", "delay", "up"],
     ["green-flag", "up"],
   ],
+  "chapter-03": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-04": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-05": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-06": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-07": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-08": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-09": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-10": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-11": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-12": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-13": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-14": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-15": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
+  "chapter-16": [
+    // allow either "green-flag -> up -> delay -> up" OR a simple "green-flag -> up"
+    ["green-flag", "up", "delay", "up"],
+    ["green-flag", "up"],
+  ],
 
   // add more chapters here...
 };

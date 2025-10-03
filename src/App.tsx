@@ -27,6 +27,7 @@ import {
   Sun,
   Moon,
   FolderOpenDot,
+  SkipForward,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
@@ -35,9 +36,14 @@ import type { RootState } from './store';
 
 import { computeHorizStep, GAP_BETWEEN_BLOCKS } from './constants/spacing';
 
-import { saveProjectFile, readProjectFile, loadProjects } from './utils/projectStorage';
-import { useParams, useNavigate } from 'react-router';
+import { saveProjectFile, readProjectFile, loadProjects, saveProjects } from './utils/projectStorage';
+import { useParams, useNavigate, useLocation } from 'react-router';
 
+import Confetti from 'react-confetti';
+import { useDialogue } from 'dialogue-story';
+import { elevator } from './assets/stories/elevator';
+import validateElevatorChapter from './assets/stories/elevator-validate';
+import { advanceSessionStep, getSession } from './utils/sessionStorage';
 
 export const SoundContext = createContext<() => void>(() => {});
 
@@ -56,7 +62,7 @@ const App: React.FC = () => {
   // capture history hook (we will wrap submitCapture for autosave)
   const { submitCapture: rawSubmitCapture, goPrev, goNext, hasPrev, hasNext } = useCaptureHistory(blocksRef, setBlocks);
 
-  // selected project ref for autosave
+  // selected project ref for autosave and session updates
   const selectedProjectRef = useRef<string | null>(null);
 
   // bluetooth connection state (local for now)
@@ -141,6 +147,13 @@ const App: React.FC = () => {
     return { clientX: 0, clientY: 0 };
   }, []);
 
+  // Dialogue + elevator validation UI state
+  const { dialogue } = useDialogue();
+  const location = useLocation();
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showNextButton, setShowNextButton] = useState(false);
+  const [currentDialogueChapter, setCurrentDialogueChapter] = useState<string | null>(null);
+
   // Autosave wrapper: call rawSubmitCapture then attempt to save blocks.json for the selected project
   const submitCapture = useCallback(
     (snapshot?: Block[]) => {
@@ -157,8 +170,22 @@ const App: React.FC = () => {
       } catch (err) {
         console.warn('autosave serialization failed', err);
       }
+
+      // run elevator validator if this project is elevator
+      try {
+        if (projectId === 'elevator' && currentDialogueChapter) {
+          const ok = validateElevatorChapter(snapshot ?? blocksRef.current, currentDialogueChapter);
+          if (ok && !showNextButton) {
+            setShowConfetti(true);
+            setShowNextButton(true);
+            setTimeout(() => setShowConfetti(false), 3500);
+          }
+        }
+      } catch (e) {
+        console.warn('validator check failed', e);
+      }
     },
-    [rawSubmitCapture],
+    [rawSubmitCapture, showNextButton, currentDialogueChapter],
   );
 
   // block updates & normalization
@@ -245,112 +272,111 @@ const App: React.FC = () => {
   const params = useParams();
   const navigate = useNavigate();
 
-
-useEffect(() => {
-  (async () => {
-    // 1) Load projects index first
-    let projectsIndex : any = [];
-    try {
-      projectsIndex = await loadProjects();
-    } catch (e) {
-      console.warn('loadProjects failed', e);
-      // conservatively treat as no projects
-      projectsIndex = [];
-    }
-
-    // If there are no projects at all -> go to project manager
-    if (!projectsIndex || projectsIndex.length === 0) {
-      navigate('/', { replace: true });
-      return;
-    }
-
-    // If no route param -> nothing to load
-    if (!params?.id) return;
-
-    const originalProjectId = decodeURIComponent(params.id);
-    let projectId = originalProjectId;
-
-    // Build candidate keys to try (exact, .pack stripped, sanitized, trimmed)
-    const candidates: string[] = [projectId];
-    if (/\.pack$/i.test(projectId)) candidates.push(projectId.replace(/\.pack$/i, ''));
-    const sanitized = projectId.replace(/[\/\\?#%*:|"<>]/g, '-');
-    if (!candidates.includes(sanitized)) candidates.push(sanitized);
-    const trimmed = sanitized.replace(/\s+/g, '-').replace(/[()]/g, '');
-    if (!candidates.includes(trimmed)) candidates.push(trimmed);
-
-    // Try to find an existing blocks.json among candidates
-    let loaded = false;
-    let successfulCandidate: string | null = null;
-
-    for (const candidate of candidates) {
+  useEffect(() => {
+    (async () => {
+      // 1) Load projects index first
+      let projectsIndex : any = [];
       try {
-        const data = await readProjectFile(candidate, 'blocks.json');
-        console.info('Trying project candidate:', candidate, '->', !!data);
-        if (!data) continue;
-
-        // parse and load
-        let parsed: Block[];
-        try {
-          parsed = JSON.parse(data) as Block[];
-        } catch (parseErr) {
-          console.warn('Failed to parse blocks.json for', candidate, parseErr);
-          continue;
-        }
-
-        setBlocks(parsed);
-        blocksRef.current = parsed;
-        rawSubmitCapture(parsed); // initial snapshot
-
-        try {
-          handleProjectSelect(candidate);
-        } catch (selErr) {
-          console.warn('handleProjectSelect failed for', candidate, selErr);
-        }
-
-        loaded = true;
-        successfulCandidate = candidate;
-        break;
-      } catch (err) {
-        console.warn('Error while reading project candidate', candidate, err);
-      }
-    }
-
-    if (loaded) return;
-
-    // --- Not loaded from any candidate ---
-    // If the requested id exists in the projects index, treat as NEW (empty) project:
-    const indexIds = (projectsIndex || []).map((p: any) => p.id);
-    if (indexIds.includes(originalProjectId)) {
-      // initialize empty project (no error)
-      const emptyBlocks: Block[] = [];
-      setBlocks(emptyBlocks);
-      blocksRef.current = emptyBlocks;
-      rawSubmitCapture(emptyBlocks);
-
-      try {
-        handleProjectSelect(originalProjectId);
-      } catch (selErr) {
-        console.warn('handleProjectSelect failed for (init)', originalProjectId, selErr);
-      }
-
-      // Persist empty blocks.json so next load finds it
-      try {
-        void saveProjectFile(originalProjectId, 'blocks.json', JSON.stringify([])).catch((e) =>
-          console.warn('saveProjectFile(init empty) failed', e),
-        );
+        projectsIndex = await loadProjects();
       } catch (e) {
-        console.warn('saveProjectFile threw synchronously', e);
+        console.warn('loadProjects failed', e);
+        // conservatively treat as no projects
+        projectsIndex = [];
       }
 
-      return;
-    }
+      // If there are no projects at all -> go to project manager
+      if (!projectsIndex || projectsIndex.length === 0) {
+        navigate('/', { replace: true });
+        return;
+      }
 
-    // If requested id is not in index -> show error and navigate back
-    toast.error('پروژه یافت نشد یا فایل پروژه نامعتبر است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
-    navigate('/', { replace: true });
-  })();
-  // keep deps explicit
-}, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
+      // If no route param -> nothing to load
+      if (!params?.id) return;
+
+      const originalProjectId = decodeURIComponent(params.id);
+      let projectId = originalProjectId;
+
+      // Build candidate keys to try (exact, .pack stripped, sanitized, trimmed)
+      const candidates: string[] = [projectId];
+      if (/\.pack$/i.test(projectId)) candidates.push(projectId.replace(/\.pack$/i, ''));
+      const sanitized = projectId.replace(/[\/\\?#%*:|"<>]/g, '-');
+      if (!candidates.includes(sanitized)) candidates.push(sanitized);
+      const trimmed = sanitized.replace(/\s+/g, '-').replace(/[()]/g, '');
+      if (!candidates.includes(trimmed)) candidates.push(trimmed);
+
+      // Try to find an existing blocks.json among candidates
+      let loaded = false;
+      let successfulCandidate: string | null = null;
+
+      for (const candidate of candidates) {
+        try {
+          const data = await readProjectFile(candidate, 'blocks.json');
+          console.info('Trying project candidate:', candidate, '->', !!data);
+          if (!data) continue;
+
+          // parse and load
+          let parsed: Block[];
+          try {
+            parsed = JSON.parse(data) as Block[];
+          } catch (parseErr) {
+            console.warn('Failed to parse blocks.json for', candidate, parseErr);
+            continue;
+          }
+
+          setBlocks(parsed);
+          blocksRef.current = parsed;
+          rawSubmitCapture(parsed); // initial snapshot
+
+          try {
+            handleProjectSelect(candidate);
+          } catch (selErr) {
+            console.warn('handleProjectSelect failed for', candidate, selErr);
+          }
+
+          loaded = true;
+          successfulCandidate = candidate;
+          break;
+        } catch (err) {
+          console.warn('Error while reading project candidate', candidate, err);
+        }
+      }
+
+      if (loaded) return;
+
+      // --- Not loaded from any candidate ---
+      // If the requested id exists in the projects index, treat as NEW (empty) project:
+      const indexIds = (projectsIndex || []).map((p: any) => p.id);
+      if (indexIds.includes(originalProjectId)) {
+        // initialize empty project (no error)
+        const emptyBlocks: Block[] = [];
+        setBlocks(emptyBlocks);
+        blocksRef.current = emptyBlocks;
+        rawSubmitCapture(emptyBlocks);
+
+        try {
+          handleProjectSelect(originalProjectId);
+        } catch (selErr) {
+          console.warn('handleProjectSelect failed for (init)', originalProjectId, selErr);
+        }
+
+        // Persist empty blocks.json so next load finds it
+        try {
+          void saveProjectFile(originalProjectId, 'blocks.json', JSON.stringify([])).catch((e) =>
+            console.warn('saveProjectFile(init empty) failed', e),
+          );
+        } catch (e) {
+          console.warn('saveProjectFile threw synchronously', e);
+        }
+
+        return;
+      }
+
+      // If requested id is not in index -> show error and navigate back
+      toast.error('پروژه یافت نشد یا فایل پروژه نامعتبر است. به صفحه پروژه‌ها بازگردانده می‌شوید.');
+      navigate('/', { replace: true });
+    })();
+    // keep deps explicit
+  }, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
 
   const handleGreenFlagClick = useCallback(
     async (blockId: string) => {
@@ -401,6 +427,112 @@ useEffect(() => {
     },
     [blocks, blocksMap, getChain, playSnapSound, submitCapture],
   );
+
+  // start dialogue and normalize messages (small helper)
+  const normalizeMessagesForSides = (raw: any[]) => {
+    return raw.map((m) => {
+      const input = (m.charecter || "").trim();
+      let name = input;
+      let forcedSide: "left" | "right" | undefined = undefined;
+
+      if (input.includes(":")) {
+        const [base, suffix] = input.split(":");
+        name = base;
+        if (suffix === "left" || suffix === "right") forcedSide = suffix;
+      } else {
+        forcedSide = "left";
+      }
+
+      const normalized: any = {
+        ...m,
+        charecter: name,
+        characterInfo: { name, forcedSide },
+      };
+
+      return normalized;
+    });
+  };
+
+  const startDialogueForChapter = useCallback(
+    async (chapterKey?: string | null) => {
+      try {
+        const chapterKeys = Object.keys(elevator);
+        if (chapterKeys.length === 0) return;
+
+        let key = chapterKey ?? chapterKeys[0];
+        if (!key || !elevator[key]) {
+          key = chapterKeys[0];
+        }
+
+        const rawMessages: any[] = Array.isArray(elevator[key]) ? elevator[key] : [];
+        setCurrentDialogueChapter(key);
+        const normalized = normalizeMessagesForSides(rawMessages);
+        await dialogue(normalized as any);
+      } catch (err) {
+        console.warn("startDialogueForChapter failed", err);
+      }
+    },
+    [dialogue],
+  );
+
+  // If navigated with state requesting autoStartDialogue, start it
+  useEffect(() => {
+    const navState: any = (location && (location as any).state) || null;
+    if (navState && navState.autoStartDialogue) {
+      const requestedChapter = navState.startChapter ?? null;
+      void startDialogueForChapter(requestedChapter);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
+
+  // Next-chapter handler (now also advances session & updates project progress)
+  const handleNextChapter = useCallback(async () => {
+    setShowNextButton(false);
+
+    const keys = Object.keys(elevator);
+    if (!keys || keys.length === 0) return;
+
+    const currentKey = currentDialogueChapter ?? keys[0];
+    const idx = keys.indexOf(currentKey);
+    const nextKey = idx >= 0 && idx + 1 < keys.length ? keys[idx + 1] : null;
+
+    // Advance session step in storage (so when user returns to project selection the step is updated)
+    try {
+      const projectId = selectedProjectRef.current;
+      if (projectId) {
+        // advance session step by 1. provide totalChapters for calculating progress
+        const totalChapters = keys.length;
+        await advanceSessionStep(projectId, totalChapters);
+
+        // reload projects index and update the progress value for UI
+        try {
+          const projectsIndex: any[] = (await loadProjects()) ?? [];
+          const idxP = projectsIndex.findIndex((p) => p && p.id === projectId);
+          if (idxP !== -1) {
+            // fetch session to compute progress
+            const session = await getSession(projectId);
+            const step = session?.step ?? 1;
+            const progress = Math.min(100, Math.round((step / Math.max(1, totalChapters)) * 100));
+            projectsIndex[idxP] = {
+              ...projectsIndex[idxP],
+              progress,
+            };
+            await saveProjects(projectsIndex);
+          }
+        } catch (pe) {
+          console.warn('Failed to update projects progress after advancing session', pe);
+        }
+      }
+    } catch (err) {
+      console.warn('advanceSessionStep failed', err);
+    }
+
+    if (nextKey) {
+      await startDialogueForChapter(nextKey);
+    } else {
+      toast.info("فصل بعدی موجود نیست.");
+    }
+  }, [currentDialogueChapter, startDialogueForChapter]);
 
   // UI local state
   const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>(reduxInteractionMode ?? 'runner');
@@ -526,6 +658,23 @@ useEffect(() => {
           blockPaletteBottom={blockPaletteBottom}
           setBlockPaletteBottom={setBlockPaletteBottom}
         />
+
+        {/* Confetti overlay (appears when validator passes) */}
+        {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
+
+        {/* Next chapter rounded button (floating) */}
+        {showNextButton && (
+          <div className="fixed bottom-44 right-4 z-[9999]">
+            <button
+              onClick={handleNextChapter}
+              aria-label="رفتن به فصل بعد"
+              className="inline-flex items-center justify-center w-14 h-14 rounded-full shadow-lg text-white"
+              style={{ background: "linear-gradient(180deg,#60a5fa,#0384d6)" }}
+            >
+              <SkipForward size={22} />
+            </button>
+          </div>
+        )}
       </div>
     </SoundContext.Provider>
   );

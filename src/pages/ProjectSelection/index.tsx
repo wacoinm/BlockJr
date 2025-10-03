@@ -1,15 +1,22 @@
 // src/pages/ProjectSelection/index.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Header from "../../components/project-manager/Header"; // reuse header
 import IconViewToggle from "../../components/project-manager/IconViewToggle";
 import EmblaIOSCarousel from "../../components/project-selection/EmblaIOSCarousel";
 import ProjectActionSheet from "../../components/project-selection/ProjectActionSheet";
 import ProjectListNew from "../../components/project-selection/ProjectListNew";
 
+// import the elevator story you added
+import { elevator } from "../../assets/stories/elevator";
+import { initSession } from "../../utils/sessionStorage";
+
 /**
  * ProjectSelection page
  * - toggle between ios-like carousel (mobile-first) and a new list view
  * - uses dummy data (Persian texts)
+ *
+ * NOTE: DUMMY_PROJECTS no longer carry `progress` or `checkpoints` fields.
+ * Instead each entry has `project` which points to story assets (e.g. elevator).
  */
 
 const DUMMY_PROJECTS = [
@@ -17,13 +24,7 @@ const DUMMY_PROJECTS = [
     id: "elevator",
     name: "آسانسور",
     subtitle: "پروژه نصب و راه‌اندازی آسانسور",
-    progress: 28,
-    checkpoints: [
-      { id: "cp1", title: "بررسی اولیه", locked: false, description: "بازدید اولیه و بررسی مکان و شرایط نصب." },
-      { id: "cp2", title: "نصب ریل", locked: false, description: "نصب ریل‌ها مطابق نقشه و استاندارد." },
-      { id: "cp3", title: "راه‌اندازی موتور", locked: true, description: "نصب و تنظیم موتور (قفل شده تا تکمیل مراحل قبل)." },
-      { id: "cp4", title: "تست و تحویل", locked: true, description: "تست نهایی و تحویل به کارفرما." },
-    ],
+    project: elevator,
     img: "https://placehold.co/800x600?text=elevator",
     imgMobile: "https://placehold.co/480x360?text=elevator+mobile"
   },
@@ -31,13 +32,8 @@ const DUMMY_PROJECTS = [
     id: "crane",
     name: "جرثقیل",
     subtitle: "پروژه جرثقیل سقفی",
-    progress: 54,
-    checkpoints: [
-      { id: "cp1", title: "نقشه‌برداری", locked: false, description: "جمع‌آوری داده‌های نقشه و تحلیل زمین." },
-      { id: "cp2", title: "نصب ستون", locked: false, description: "نصب ستون‌های اصلی و فونداسیون." },
-      { id: "cp3", title: "نصب بازو", locked: false, description: "نصب بازوها و اتصالات." },
-      { id: "cp4", title: "آزمایش بار", locked: true, description: "آزمایش بار و کنترل ایمنی." },
-    ],
+    // for test we reuse elevator story as you asked
+    project: elevator,
     img: "https://placehold.co/800x600?text=crane",
     imgMobile: "https://placehold.co/480x360?text=crane+mobile"
   },
@@ -45,13 +41,7 @@ const DUMMY_PROJECTS = [
     id: "gondola",
     name: "تله کابین",
     subtitle: "پروژه احداث تله کابین",
-    progress: 12,
-    checkpoints: [
-      { id: "cp1", title: "نقشه مسیر", locked: false, description: "طراحی و بررسی مسیر." },
-      { id: "cp2", title: "پایه‌ها", locked: true, description: "ساخت و نصب پایه‌ها." },
-      { id: "cp3", title: "کیبل‌کشی", locked: true, description: "نصب کابل‌ها و سیستم هدایت." },
-      { id: "cp4", title: "تست مسیر", locked: true, description: "تست مسیر و تحویل." },
-    ],
+    project: elevator, // reuse elevator for test
     img: "https://placehold.co/800x600?text=telecabin",
     imgMobile: "https://placehold.co/480x360?text=telecabin+mobile"
   },
@@ -60,6 +50,17 @@ const DUMMY_PROJECTS = [
 const ProjectSelection: React.FC = () => {
   const [view, setView] = useState<"carousel" | "list">("carousel");
   const [openProject, setOpenProject] = useState<any | null>(null);
+
+  // ensure each project's session exists (step=1, progress=0%) when page mounts
+  useEffect(() => {
+    (async () => {
+      try {
+        await Promise.all(DUMMY_PROJECTS.map((p) => initSession(p.id)));
+      } catch (e) {
+        console.warn("Failed to init sessions for dummy projects", e);
+      }
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">

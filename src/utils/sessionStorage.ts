@@ -1,112 +1,128 @@
 // src/utils/sessionStorage.ts
-import { Capacitor } from "@capacitor/core";
-import { Preferences } from "@capacitor/preferences";
+// Lightweight session storage helpers backed by localStorage.
+// Exports named functions: initSession, getSession, setSession, advanceSessionStep
+// Also exports a default object with the same functions.
 
 export type ProjectSession = {
-  step: number;
-  progress: number; // 0..100
-  // you can extend this shape later (e.g. currentCheckpoint, meta, ...)
+  step: number; // current chapter index (1-based)
+  progress: number; // percentage 0..100
+  updatedAt: string; // ISO timestamp
+  [k: string]: any;
 };
 
-const PREFIX = "pj_session_v1_";
+const KEY_PREFIX = "bj_session/";
 
-function isWeb(): boolean {
-  try {
-    return Capacitor.getPlatform() === "web" || (typeof window !== "undefined" && typeof window.localStorage !== "undefined");
-  } catch {
-    return false;
-  }
+function keyFor(projectId: string) {
+  return `${KEY_PREFIX}${projectId}`;
 }
 
 /**
- * Initialize session for projectId if not present.
- * Returns the current session (existing or newly created default).
+ * Ensure a session exists for projectId; if not, create initial session.
  */
 export async function initSession(projectId: string): Promise<ProjectSession> {
-  const key = PREFIX + projectId;
-  const defaultSession: ProjectSession = { step: 1, progress: 0 };
+  if (!projectId) throw new Error("projectId required");
+  const existing = await getSession(projectId);
+  if (existing) return existing;
 
-  if (isWeb()) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) {
-        window.localStorage.setItem(key, JSON.stringify(defaultSession));
-        return defaultSession;
-      }
-      return JSON.parse(raw) as ProjectSession;
-    } catch (e) {
-      console.warn("initSession(localStorage) failed", e);
-      return defaultSession;
-    }
-  }
-
-  try {
-    const kv = await Preferences.get({ key });
-    if (!kv.value) {
-      await Preferences.set({ key, value: JSON.stringify(defaultSession) });
-      return defaultSession;
-    }
-    return JSON.parse(kv.value) as ProjectSession;
-  } catch (e) {
-    console.warn("initSession(Preferences) failed", e);
-    return defaultSession;
-  }
+  const initial: ProjectSession = {
+    step: 1,
+    progress: 0,
+    updatedAt: new Date().toISOString(),
+  };
+  await setSession(projectId, initial);
+  return initial;
 }
 
 /**
- * Load session (may return null if not present)
+ * Read session from localStorage. Returns null if not present.
  */
-export async function loadSession(projectId: string): Promise<ProjectSession | null> {
-  const key = PREFIX + projectId;
-
-  if (isWeb()) {
+export async function getSession(projectId: string): Promise<ProjectSession | null> {
+  if (!projectId) return null;
+  try {
+    const key = keyFor(projectId);
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+    if (!raw) return null;
     try {
-      const raw = window.localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as ProjectSession) : null;
+      const parsed = JSON.parse(raw) as ProjectSession;
+      return parsed;
     } catch (e) {
-      console.warn("loadSession(localStorage) failed", e);
+      // corrupted data: remove and return null
+      try {
+        if (typeof window !== "undefined") window.localStorage.removeItem(key);
+      } catch {}
       return null;
     }
-  }
-
-  try {
-    const kv = await Preferences.get({ key });
-    return kv.value ? (JSON.parse(kv.value) as ProjectSession) : null;
-  } catch (e) {
-    console.warn("loadSession(Preferences) failed", e);
+  } catch (err) {
+    console.warn("getSession failed", err);
     return null;
   }
 }
 
 /**
- * Save session (overwrites)
+ * Save session to localStorage. Overwrites existing session.
  */
-export async function saveSession(projectId: string, session: ProjectSession): Promise<boolean> {
-  const key = PREFIX + projectId;
-
-  if (isWeb()) {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(session));
-      return true;
-    } catch (e) {
-      console.warn("saveSession(localStorage) failed", e);
-      return false;
-    }
-  }
-
+export async function setSession(projectId: string, session: ProjectSession): Promise<void> {
+  if (!projectId) return;
   try {
-    await Preferences.set({ key, value: JSON.stringify(session) });
-    return true;
-  } catch (e) {
-    console.warn("saveSession(Preferences) failed", e);
-    return false;
+    const key = keyFor(projectId);
+    const copy = { ...session, updatedAt: new Date().toISOString() };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(key, JSON.stringify(copy));
+    }
+  } catch (err) {
+    console.warn("setSession failed", err);
   }
 }
 
 /**
- * Convenience to get progress (returns 0 if missing)
+ * Advance the stored session step by +1 (unless step already at totalChapters)
+ * and update progress (if totalChapters provided).
+ * Returns the updated session object.
  */
-export async function getProgress(projectId: string): Promise<number> {
-  const s = await loadSession(projectId);
-  return s ? s.progress : 0;
+export async function advanceSessionStep(projectId: string, totalChapters?: number): Promise<ProjectSession> {
+  if (!projectId) throw new Error("projectId required");
+  const cur = (await getSession(projectId)) ?? { step: 1, progress: 0, updatedAt: new Date().toISOString() };
+
+  let nextStep = (cur.step ?? 1) + 1;
+  if (typeof totalChapters === "number" && totalChapters > 0) {
+    nextStep = Math.min(nextStep, totalChapters);
+  }
+  const progress = typeof totalChapters === "number" && totalChapters > 0
+    ? Math.min(100, Math.round((nextStep / Math.max(1, totalChapters)) * 100))
+    : cur.progress ?? 0;
+
+  const updated: ProjectSession = {
+    ...cur,
+    step: nextStep,
+    progress,
+    updatedAt: new Date().toISOString(),
+  };
+  await setSession(projectId, updated);
+  return updated;
 }
+
+/**
+ * Convenience: decrement step (in case you need it), not used right now but handy.
+ */
+export async function retreatSessionStep(projectId: string): Promise<ProjectSession> {
+  if (!projectId) throw new Error("projectId required");
+  const cur = (await getSession(projectId)) ?? { step: 1, progress: 0, updatedAt: new Date().toISOString() };
+  const nextStep = Math.max(1, (cur.step ?? 1) - 1);
+  const updated: ProjectSession = {
+    ...cur,
+    step: nextStep,
+    updatedAt: new Date().toISOString(),
+  };
+  await setSession(projectId, updated);
+  return updated;
+}
+
+const defaultExport = {
+  initSession,
+  getSession,
+  setSession,
+  advanceSessionStep,
+  retreatSessionStep,
+};
+
+export default defaultExport;

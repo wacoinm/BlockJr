@@ -15,8 +15,8 @@ import { initSession } from "../../utils/sessionStorage";
  * - toggle between ios-like carousel (mobile-first) and a new list view
  * - uses dummy data (Persian texts)
  *
- * NOTE: DUMMY_PROJECTS no longer carry `progress` or `checkpoints` fields.
- * Instead each entry has `project` which points to story assets (e.g. elevator).
+ * NOTE: DUMMY_PROJECTS now use the single `imgsPath` key (directory containing PNGs),
+ * so components will probe images inside that folder (e.g. "/scense/elevator/1.png", etc).
  */
 
 const DUMMY_PROJECTS = [
@@ -25,8 +25,8 @@ const DUMMY_PROJECTS = [
     name: "آسانسور",
     subtitle: "پروژه نصب و راه‌اندازی آسانسور",
     project: elevator,
-    img: "https://placehold.co/800x600?text=elevator",
-    imgMobile: "https://placehold.co/480x360?text=elevator+mobile"
+    // single key pointing at the folder with pngs for this project
+    imgsPath: "/scenes/elevator/chapters/",
   },
   {
     id: "crane",
@@ -34,16 +34,15 @@ const DUMMY_PROJECTS = [
     subtitle: "پروژه جرثقیل سقفی",
     // for test we reuse elevator story as you asked
     project: elevator,
-    img: "https://placehold.co/800x600?text=crane",
-    imgMobile: "https://placehold.co/480x360?text=crane+mobile"
+    // reusing same imgsPath for now (adjust to your real folder if different)
+    imgsPath: "/scenes/elevator/chapters/",
   },
   {
     id: "gondola",
     name: "تله کابین",
     subtitle: "پروژه احداث تله کابین",
     project: elevator, // reuse elevator for test
-    img: "https://placehold.co/800x600?text=telecabin",
-    imgMobile: "https://placehold.co/480x360?text=telecabin+mobile"
+    imgsPath: "/scenes/elevator/chapters/",
   },
 ];
 

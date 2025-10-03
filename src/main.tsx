@@ -16,7 +16,7 @@ const container = document.getElementById("root")!;
 const root = createRoot(container);
 
 root.render(
-  // <React.StrictMode>
+  <React.StrictMode>
     <Provider store={store}>
       <DialogueProvider
         charectersPath="/avatars"
@@ -26,10 +26,12 @@ root.render(
           console.log("Dialogue finished (onFinished prop)");
         }}
         rtl={true}
+        activeRedo
+        canSkip
       >
         <RouterProvider router={router} />
         <ToastContain />
       </DialogueProvider>
     </Provider>
-  // </React.StrictMode>
+  </React.StrictMode>
 );

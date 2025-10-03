@@ -50,6 +50,17 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
     // raw messages: you may use "woody", "woody:left" or "woody:right"
     const rawMessages: DialogueMessage[] = [
       {
+        text: "در دوردستِ کوه‌ها، دهکده‌ای چشم‌انتظارِ مسیرِ جدید است.\nما امروز کابل‌ها و ایستگاه‌ها را می‌سازیم تا مردم به‌راحتی سفر کنند.\nهرکسی سهمی دارد — حالا دست به کار شویم.",
+        charecter: "ravi",
+        typeSpeed: 24,
+        textColor: "#ffffff",
+        bgColor: "#111827",
+        showTimes: true,
+        bgImage: "/scenes/1.Metting/overview.png",
+        filter: { fade: 0.05, blur: 0.2 },
+        fontSize: 30
+      },
+      {
         text: "سلام! به پروژهٔ تله‌کابین خوش اومدی. امروز قراره با هم مسیر و کابین‌ها رو بسازیم.",
         charecter: "woody", // will default to left => {name:"woody", forcedSide:"left"}
         mode: "happy",
@@ -59,6 +70,7 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
         showTimes: true,
         bgImage: "/scenes/1.Metting/default.png",
         filter: { fade: 0, blur: 0 },
+        fontSize: 30
       },
       {
         text: "اول باید ستون‌ها و قرقره‌ها رو درست کنیم — زیگ و خانم سیب برنامه دارن.",
@@ -70,6 +82,18 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
         bgImage: "/scenes/1.Metting/busy.png",
         filter: { fade: 0.15, blur: 0.6 },
         forcedSide: "right",
+        fontSize: 30
+      },
+      {
+        text: "در دوردستِ کوه‌ها، دهکده‌ای چشم‌انتظارِ مسیرِ جدید است.\nما امروز کابل‌ها و ایستگاه‌ها را می‌سازیم تا مردم به‌راحتی سفر کنند.\nهرکسی سهمی دارد — حالا دست به کار شویم.",
+        charecter: "ravi",
+        typeSpeed: 24,
+        textColor: "#ffffff",
+        bgColor: "#111827",
+        showTimes: true,
+        bgImage: "/scenes/1.Metting/overview.png",
+        filter: { fade: 0.05, blur: 0.2 },
+        fontSize: 30
       },
       {
         text: "من کتاب‌ها و بلوک‌ها رو چیدم تا برج‌ها شکل بگیرن — پایه‌ها آماده است.",
@@ -80,6 +104,7 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
         bgColor: "#d1f7c4",
         bgImage: "/scenes/1.Metting/minimalist.png",
         filter: { fade: 0.05, blur: 0.2 },
+        fontSize: 30
       },
       {
         text: "من قرقره‌ها و نخ‌ها رو چک می‌کنم؛ مطمئن می‌شم که همه محکم باشن.",
@@ -88,6 +113,7 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
         typeSpeed: 32,
         textColor: "#ffffff",
         bgColor: "#6aa84f",
+        fontSize: 30
       },
       {
         text: "اگه گره بخوره چی؟ من یه کم نگرانم...",
@@ -98,6 +124,7 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
         bgColor: "#ffd27f",
         bgImage: "/scenes/1.Metting/evening-quiet.png",
         filter: { fade: 0.65, blur: 1.0 },
+        fontSize: 30
       },
       {
         text: "نترس رکس، همه با هم گره‌ها رو باز می‌کنیم — بزن بریم ساخت رو شروع کنیم!",
@@ -109,8 +136,10 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
         showTimes: true,
         bgImage: "/scenes/1.Metting/busy.png",
         filter: { fade: 0.0, blur: 0.3 },
+        fontSize: 80
       },
     ];
+
 
     // Normalize them into messages that also contain characterInfo
     const normalized = normalizeMessagesForSides(rawMessages);

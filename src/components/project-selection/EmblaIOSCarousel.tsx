@@ -1,7 +1,7 @@
 // src/components/project-selection/EmblaIOSCarousel.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { Play } from "lucide-react";
+import { Play, Lock } from "lucide-react";
 import { getSession } from "../../utils/sessionStorage";
 
 type Checkpoint = { id: string; title?: string; locked?: boolean };
@@ -13,6 +13,10 @@ type Project = {
   imgsPath?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
+  // NEW: lock flag (optional, default false)
+  isLock?: boolean;
+  // NEW: optional human-readable reason why locked
+  lockReason?: string;
 };
 
 type DerivedProject = Project & {
@@ -330,6 +334,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
         <div className="flex -ml-4 my-6">
           {derivedProjects.map((p, i) => {
             const isCenter = i === logicalSelected;
+            const locked = !!p.isLock;
 
             // compute displayed values: progress uses session overlay if present
             const displayedProgress =
@@ -373,7 +378,8 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                     `${isCenter ? "ring-4 ring-sky-200 shadow-[0_14px_36px_rgba(2,6,23,0.18)]" : ""}`
                   }
                   onClick={() => {
-                    if (isCenter) onOpen(p);
+                    // only allow opening if center and not locked
+                    if (isCenter && !locked) onOpen(p);
                   }}
                 >
                   <div className="relative aspect-[11/9] md:aspect-[16/9] bg-gray-100">
@@ -381,31 +387,60 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                     <img
                       src={currentSrc}
                       alt={p.name}
-                      className="w-full h-full object-cover block transition-opacity duration-500"
+                      className={`w-full h-full object-cover block transition-opacity duration-500 ${locked ? "filter blur-sm scale-[1.02]" : ""}`}
                       style={{ opacity: 1 }}
                     />
 
-                    {/* small manual indicators (optional) */}
-                    {imgs.length > 1 ? (
-                      <div className="absolute left-3 top-3 rounded-full p-1 bg-white/80 dark:bg-neutral-900/70 flex gap-1">
-                        {imgs.map((_, j) => (
-                          <span
-                            key={j}
-                            className={`w-1.5 h-1.5 rounded-full transition-all ${j === curIdx ? "scale-100 bg-green-600" : "opacity-30 bg-neutral-400"}`}
-                          />
-                        ))}
+                    {/* LOCK overlay when project is locked */}
+                    {locked ? (
+                      // overlay sits on top of the image and blurs the background via backdrop-blur
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                        {/* translucent blurred panel */}
+                        <div className="rounded-lg p-4 w-full max-w-[360px] text-center bg-white/60 dark:bg-black/50 backdrop-blur-md border border-[rgba(0,0,0,0.06)]">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="p-3 rounded-full bg-white/70 dark:bg-black/60 inline-flex">
+                              <Lock className="w-10 h-10 text-neutral-800 dark:text-neutral-100" />
+                            </div>
+                            <div className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                              محتوای قفل شده
+                            </div>
+                            <div className="text-sm text-neutral-700 dark:text-neutral-300">
+                              {p.lockReason
+                                ? p.lockReason
+                                : "برای باز کردن این بخش باید فصل قبلی کامل شود یا پرداخت انجام شود."}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // small manual indicators (optional)
+                      imgs.length > 1 ? (
+                        <div className="absolute left-3 top-3 rounded-full p-1 bg-white/80 dark:bg-neutral-900/70 flex gap-1">
+                          {imgs.map((_, j) => (
+                            <span
+                              key={j}
+                              className={`w-1.5 h-1.5 rounded-full transition-all ${j === curIdx ? "scale-100 bg-green-600" : "opacity-30 bg-neutral-400"}`}
+                            />
+                          ))}
+                        </div>
+                      ) : null
+                    )}
+
+                    {/* Play button shown only when not locked */}
+                    {!locked ? (
+                      <div className="absolute right-3 bottom-3">
+                        <button
+                          onClick={() => {
+                            // only allow play if not locked
+                            if (!locked) onOpen(p);
+                          }}
+                          aria-label={`شروع ${p.name}`}
+                          className="rounded-full p-2 inline-flex items-center justify-center shadow-md bg-green-600 text-white"
+                        >
+                          <Play className="w-6 h-6" />
+                        </button>
                       </div>
                     ) : null}
-
-                    <div className="absolute right-3 bottom-3">
-                      <button
-                        onClick={() => onOpen(p)}
-                        aria-label={`شروع ${p.name}`}
-                        className="rounded-full p-2 inline-flex items-center justify-center shadow-md bg-green-600 text-white"
-                      >
-                        <Play className="w-6 h-6" />
-                      </button>
-                    </div>
                   </div>
 
                   <div className={`flex flex-col gap-3 mt-2 text-right p-3 ${isCenter ? "pointer-events-auto" : "pointer-events-none"}`}>
@@ -446,10 +481,13 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
         <button
           onClick={() => {
             const center = derivedProjects[logicalSelected];
-            if (center) onOpen(center);
+            // prevent opening locked project
+            if (center && !center.isLock) onOpen(center);
           }}
           className="w-full py-3 rounded-xl text-center font-semibold bg-green-600 text-white shadow-lg"
           aria-label="انتخاب پروژه"
+          // indicate disabled state if locked (visually unchanged but prevented)
+          aria-disabled={!!derivedProjects[logicalSelected]?.isLock}
         >
           انتخاب پروژه
         </button>

@@ -35,14 +35,17 @@ const DUMMY_PROJECTS = [
     // for test we reuse elevator story as you asked
     project: elevator,
     // reusing same imgsPath for now (adjust to your real folder if different)
-    imgsPath: "/scenes/elevator/chapters/",
+    imgsPath: "/scenes/crane/chapters/",
+    isLock: true,
+    lockReason: "محتوا در دست ساخت است"
   },
   {
     id: "gondola",
     name: "تله کابین",
     subtitle: "پروژه احداث تله کابین",
     project: elevator, // reuse elevator for test
-    imgsPath: "/scenes/elevator/chapters/",
+    imgsPath: "/scenes/crane/chapters/",
+    isLock: true
   },
 ];
 

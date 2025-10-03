@@ -459,7 +459,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             <div className="mt-3 text-right">
               <div className="text-sm font-medium mb-1">توضیحات مرحله</div>
               <div className="text-sm text-neutral-600 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-800 p-3 rounded-md">
-                {currentCheckpoint?.description ?? `توضیحات برای "${currentCheckpoint[0]["text"]}
+                {currentCheckpoint?.description ?? `توضیحات برای "${currentCheckpoint?.title ?? "مرحله"}" موجود نیست.`}
               </div>
             </div>
           </div>

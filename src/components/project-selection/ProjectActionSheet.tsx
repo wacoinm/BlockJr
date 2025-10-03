@@ -27,7 +27,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   const checkpoints = project.checkpoints ?? [];
   const [current, setCurrent] = useState<string | null>(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
 
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null); // <-- new: scrollable container ref
 
@@ -42,6 +42,10 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   useEffect(() => {
     setCurrent(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
   }, [project]); // eslint-disable-line
+
+  useEffect(() => {
+    requestAnimationFrame(() => setIsVisible(true));
+  }, [])
 
   const closeWithAnimation = () => {
     setIsVisible(false);

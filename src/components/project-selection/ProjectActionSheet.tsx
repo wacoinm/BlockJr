@@ -1,10 +1,14 @@
 // src/components/project-selection/ProjectActionSheet.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Play } from "lucide-react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 
-type Checkpoint = { id: string; title: string; locked?: boolean; description?: string };
+import { useNavigate } from "react-router";
+import { saveProjectFile, readProjectFile, loadProjects, saveProjects } from "../../utils/projectStorage";
+import { initSession } from "../../utils/sessionStorage";
+
+type Checkpoint = { id: string; title?: string; locked?: boolean; description?: string };
 type Project = {
   id: string;
   name: string;
@@ -13,6 +17,7 @@ type Project = {
   imgMobile?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
+  project?: any; // <-- added so we can accept the elevator object
 };
 
 type Props = {
@@ -24,12 +29,39 @@ const ANIM_MS = 320;
 const SWIPE_CLOSE_THRESHOLD = 80; // px to trigger close on swipe
 
 const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
-  const checkpoints = project.checkpoints ?? [];
-  const [current, setCurrent] = useState<string | null>(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
+  // derive checkpoints:
+  // 1) use explicit project.checkpoints if provided
+  // 2) otherwise, if project.project is an object (like your elevator import) map its top-level keys
+  const derivedCheckpoints = useMemo<Checkpoint[]>(() => {
+    if (Array.isArray(project.checkpoints) && project.checkpoints.length > 0) {
+      return project.checkpoints;
+    }
+    if (project.project && typeof project.project === "object") {
+      const keys = Object.keys(project.project);
+      return keys.map((k) => ({
+        id: k,
+        title: k, // you can replace this with prettier title mapping if desired
+        locked: false,
+        description: undefined,
+      }));
+    }
+    return [];
+  }, [project]);
+
+  // keep backwards-compatible name `checkpoints` used by the UI
+  const checkpoints = derivedCheckpoints;
+
+  const [current, setCurrent] = useState<string | null>(
+    checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null
+  );
+
+  useEffect(() => {
+    setCurrent(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
+  }, [project]); // eslint-disable-line
 
   const [isVisible, setIsVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null); // <-- new: scrollable container ref
+  const scrollRef = useRef<HTMLDivElement | null>(null); // <-- scrollable container ref
 
   const startYRef = useRef<number | null>(null);
   const lastTranslateRef = useRef(0);
@@ -40,12 +72,8 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   const startedInScrollRef = useRef(false);
 
   useEffect(() => {
-    setCurrent(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
-  }, [project]); // eslint-disable-line
-
-  useEffect(() => {
     requestAnimationFrame(() => setIsVisible(true));
-  }, [])
+  }, []);
 
   const closeWithAnimation = () => {
     setIsVisible(false);
@@ -111,6 +139,76 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
 
   const currentCheckpoint = checkpoints.find((c) => c.id === current) ?? null;
 
+  const navigate = useNavigate();
+
+  /**
+   * Play button handler:
+   * 1) ensure blocks.json exists for project (saveProjectFile)
+   * 2) ensure project is present in projects index (loadProjects + saveProjects)
+   * 3) initialize session (initSession)
+   * 4) navigate to /project/:id
+   */
+  const handlePlay = async () => {
+    try {
+      const projectId = project.id;
+      if (!projectId) {
+        console.warn("ProjectActionSheet: missing project.id");
+        return;
+      }
+
+      // 1) ensure blocks.json exists (use saveProjectFile util which handles web/native)
+      const existing = await readProjectFile(projectId, "blocks.json");
+      if (!existing) {
+        const ok = await saveProjectFile(projectId, "blocks.json", JSON.stringify([]));
+        if (!ok) {
+          console.warn("ProjectActionSheet: failed to create blocks.json via saveProjectFile, falling back to localStorage");
+          try {
+            const key = `bj_projects/${projectId}/blocks.json`;
+            if (typeof window !== "undefined" && window.localStorage) {
+              window.localStorage.setItem(key, JSON.stringify([]));
+            }
+          } catch (err) {
+            console.warn("fallback write to localStorage failed", err);
+          }
+        }
+      }
+
+      // 2) ensure project index contains this project id (so App load recognizes it)
+      try {
+        const idx = await loadProjects();
+        const exists = Array.isArray(idx) && idx.some((p: any) => p && p.id === projectId);
+        if (!exists) {
+          const newEntry: any = {
+            id: projectId,
+            name: project.name ?? projectId,
+            subtitle: project.subtitle ?? "",
+            img: project.img ?? "",
+          };
+          const next = Array.isArray(idx) ? [...idx, newEntry] : [newEntry];
+          await saveProjects(next);
+        }
+      } catch (err) {
+        console.warn("ProjectActionSheet: ensuring project index failed", err);
+      }
+
+      // 3) initialize session for project (step=1, progress=0)
+      try {
+        await initSession(projectId);
+      } catch (err) {
+        console.warn("ProjectActionSheet: initSession failed", err);
+      }
+
+      // 4) close sheet (animate) then navigate to /project/:id
+      setIsVisible(false);
+      setTimeout(() => {
+        onClose();
+        navigate(`/project/${encodeURIComponent(projectId)}`);
+      }, ANIM_MS + 10);
+    } catch (err) {
+      console.error("ProjectActionSheet: handlePlay error", err);
+    }
+  };
+
   return (
     // very high z to overlap header
     <div className="fixed inset-0 z-[9999] flex items-end justify-center">
@@ -167,8 +265,8 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
               />
 
               <button
-                onClick={() => {
-                  console.log("play", project.id, current);
+                onClick={async () => {
+                  await handlePlay();
                 }}
                 className="absolute right-3 bottom-3 rounded-full p-3 bg-green-500 text-white shadow"
                 aria-label="شروع"

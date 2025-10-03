@@ -113,15 +113,15 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
         ),
       title: 'حالت شب/روز',
     },
-    {
-      key: 'selectProject',
-      onClick: () => {
-        if (!selectVisible) dispatch(setSelectVisibleAction(true));
-        dispatch(setSelectOpenAction(!selectOpen));
-      },
-      content: <div className="w-6 h-6">📁</div>,
-      title: 'پروژه',
-    },
+    // {
+    //   key: 'selectProject',
+    //   onClick: () => {
+    //     if (!selectVisible) dispatch(setSelectVisibleAction(true));
+    //     dispatch(setSelectOpenAction(!selectOpen));
+    //   },
+    //   content: <div className="w-6 h-6">📁</div>,
+    //   title: 'پروژه',
+    // },
     {
       key: 'unit',
       onClick: cycleUnit,

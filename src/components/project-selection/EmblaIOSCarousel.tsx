@@ -9,7 +9,8 @@ type Project = {
   id: string;
   name: string;
   subtitle?: string;
-  img?: string;
+  // NEW: directory path to project's pngs (e.g. "/scenes/elevator/")
+  imgsPath?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
 };
@@ -26,6 +27,39 @@ type Props = {
   onOpen: (p: Project) => void;
   repeatCount?: number;
 };
+
+const IMAGE_PROBE_MAX = 12; // try 1..12 by default
+const ROTATE_MS = 3000; // 3 seconds
+
+// small helper to test whether an image URL loads successfully
+function probeImage(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let done = false;
+    const onLoad = () => {
+      if (done) return;
+      done = true;
+      resolve(true);
+    };
+    const onErr = () => {
+      if (done) return;
+      done = true;
+      resolve(false);
+    };
+    img.onload = onLoad;
+    img.onerror = onErr;
+    // some servers reject HEAD; using Image src to probe works in browser
+    img.src = url;
+    // safety: timeout if nothing happens (network weirdness)
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        // consider it missing on timeout
+        resolve(false);
+      }
+    }, 2500);
+  });
+}
 
 const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
   const projectCount = projects.length;
@@ -92,12 +126,23 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
 
   // Derived projects overlaying session data (progress & step) and trying to discover total chapters
   const [derivedProjects, setDerivedProjects] = useState<DerivedProject[]>(
-    () => projects.map((p) => ({ ...p, derivedProgress: p.progress ?? 0, totalChapters: p.checkpoints?.length ?? null }))
+    () =>
+      projects.map((p) => ({
+        ...p,
+        derivedProgress: p.progress ?? 0,
+        totalChapters: p.checkpoints?.length ?? null,
+      }))
   );
 
   useEffect(() => {
     // initialize with defaults based on incoming projects
-    setDerivedProjects(projects.map((p) => ({ ...p, derivedProgress: p.progress ?? 0, totalChapters: p.checkpoints?.length ?? null })));
+    setDerivedProjects(
+      projects.map((p) => ({
+        ...p,
+        derivedProgress: p.progress ?? 0,
+        totalChapters: p.checkpoints?.length ?? null,
+      }))
+    );
 
     let mounted = true;
 
@@ -117,7 +162,8 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
           const s = await getSession(p.id);
           if (!mounted) return;
           if (s) {
-            dp.derivedProgress = typeof s.progress === "number" ? s.progress : dp.derivedProgress;
+            dp.derivedProgress =
+              typeof s.progress === "number" ? s.progress : dp.derivedProgress;
             dp.sessionStep = typeof s.step === "number" ? s.step : null;
           }
         } catch (err) {
@@ -129,19 +175,13 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
         // If we don't have totalChapters, attempt to dynamically import a story module at ../../assets/stories/<id>
         if (dp.totalChapters == null) {
           try {
-            // dynamic import - may fail if there's no matching file; that's OK and expected for many projects
-            // try heuristics: module may export named object (e.g. export const elevator = {...}) or default
-            // attempt import; bundlers allow dynamic import but may not include every path — wrap in try/catch
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            // use import() so Vite/webpack handle it
-            // note: this dynamic import may be tree-shaken away in some bundlers if not present — catch failures
-            // Use relative path from this file to stories dir.
-            // We silence TS error by using any.
             // eslint-disable-next-line no-await-in-loop
-            const mod: any = await import(`../../assets/stories/${p.id}`).catch(() => null);
+            const mod: any = await import(`../../assets/stories/${p.id}`).catch(
+              () => null
+            );
             if (mod) {
-              // determine exported story object (named export or default)
-              const storyObj = mod[p.id] ?? mod.default ?? mod.elevator ?? mod;
+              const storyObj =
+                mod[p.id] ?? mod.default ?? mod.elevator ?? mod;
               if (storyObj && typeof storyObj === "object") {
                 const total = Object.keys(storyObj).length;
                 if (total > 0) dp.totalChapters = total;
@@ -166,11 +206,97 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     };
   }, [projects]);
 
-  const DotButton: React.FC<React.ComponentPropsWithRef<"button"> & { selected?: boolean }> = ({
-    children,
-    selected,
-    ...rest
-  }) => {
+  // ---------------------
+  // Image loading & rotation per project
+  // ---------------------
+  // Map project.id => array of discovered images (full URL)
+  const [projectImages, setProjectImages] = useState<Record<string, string[]>>(
+    {}
+  );
+
+  // per-project current index for auto-rotation
+  const [projectCurrentIdx, setProjectCurrentIdx] = useState<
+    Record<string, number>
+  >({});
+
+  useEffect(() => {
+    // (re)probe images for any project that has imgsPath
+    derivedProjects.forEach((p) => {
+      const pid = p.id;
+      if (!pid) return;
+      if (projectImages[pid] && projectImages[pid].length > 0) return; // already loaded
+
+      (async () => {
+        const imgs: string[] = [];
+
+        if (p.imgsPath) {
+          // Try numeric sequence 1..IMAGE_PROBE_MAX
+          for (let i = 1; i <= IMAGE_PROBE_MAX; i++) {
+            const url = `${p.imgsPath.replace(/\/?$/, "/")}${i}.png`;
+            // eslint-disable-next-line no-await-in-loop
+            const ok = await probeImage(url);
+            if (ok) imgs.push(url);
+          }
+
+          // also try a thumb.png fallback
+          if (imgs.length === 0) {
+            const thumb = `${p.imgsPath.replace(/\/?$/, "/")}thumb.png`;
+            if (await probeImage(thumb)) imgs.push(thumb);
+          }
+        }
+
+        // if nothing discovered, attempt to fallback to any existing img field (backwards compat)
+        if (imgs.length === 0 && (p as any).img) {
+          imgs.push((p as any).img);
+        }
+
+        // finally fallback placeholder
+        if (imgs.length === 0) {
+          imgs.push("https://placehold.co/800x600?text=no+image");
+        }
+
+        setProjectImages((prev) => ({ ...prev, [pid]: imgs }));
+        setProjectCurrentIdx((prev) => ({
+          ...prev,
+          [pid]: prev[pid] ?? 0,
+        }));
+      })();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [derivedProjects]);
+
+  // setup rotation intervals per-project
+  useEffect(() => {
+    const timers: Record<string, number> = {};
+
+    Object.keys(projectImages).forEach((pid) => {
+      const imgs = projectImages[pid] ?? [];
+      if (!imgs || imgs.length <= 1) return;
+
+      // rotate only if there isn't already a timer
+      if (timers[pid]) return;
+
+      // create interval
+      const id = window.setInterval(() => {
+        setProjectCurrentIdx((prev) => {
+          const cur = prev[pid] ?? 0;
+          const nextIdx = (cur + 1) % Math.max(1, imgs.length);
+          return { ...prev, [pid]: nextIdx };
+        });
+      }, ROTATE_MS);
+
+      timers[pid] = id;
+    });
+
+    return () => {
+      // clear all timers we created (we only created local ones)
+      Object.values(timers).forEach((t) => window.clearInterval(t));
+    };
+  }, [projectImages]);
+
+  const DotButton: React.FC<
+    React.ComponentPropsWithRef<"button"> & { selected?: boolean }
+  > = ({ children, selected, ...rest }) => {
     return (
       <button
         type="button"
@@ -193,10 +319,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
   };
 
   return (
-    <div
-      className="max-w-[48rem] mx-auto"
-      aria-roledescription="carousel"
-    >
+    <div className="max-w-[48rem] mx-auto" aria-roledescription="carousel">
       {/* viewport */}
       <div
         className="overflow-hidden"
@@ -209,9 +332,16 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
             const isCenter = i === logicalSelected;
 
             // compute displayed values: progress uses session overlay if present
-            const displayedProgress = typeof p.derivedProgress === "number" ? p.derivedProgress : p.progress ?? 0;
-            const sessionStep = typeof p.sessionStep === "number" ? p.sessionStep : null;
-            const totalChapters = typeof p.totalChapters === "number" ? p.totalChapters : (p.checkpoints?.length ?? null);
+            const displayedProgress =
+              typeof p.derivedProgress === "number"
+                ? p.derivedProgress
+                : p.progress ?? 0;
+            const sessionStep =
+              typeof p.sessionStep === "number" ? p.sessionStep : null;
+            const totalChapters =
+              typeof p.totalChapters === "number"
+                ? p.totalChapters
+                : p.checkpoints?.length ?? null;
 
             // show text for مرحله: prefer "current / total" when sessionStep available
             const chapterText =
@@ -222,6 +352,10 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                 : totalChapters != null
                 ? `${totalChapters} مرحله`
                 : `${p.checkpoints?.length ?? 0} مرحله`;
+
+            const imgs = projectImages[p.id] ?? [];
+            const curIdx = projectCurrentIdx[p.id] ?? 0;
+            const currentSrc = imgs[curIdx] ?? "https://placehold.co/800x600?text=no+image";
 
             return (
               <div
@@ -243,11 +377,26 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                   }}
                 >
                   <div className="relative aspect-[11/9] md:aspect-[16/9] bg-gray-100">
+                    {/* internal card carousel (auto-rotates every 3s) */}
                     <img
-                      src={p.img}
+                      src={currentSrc}
                       alt={p.name}
-                      className="w-full h-full object-cover block"
+                      className="w-full h-full object-cover block transition-opacity duration-500"
+                      style={{ opacity: 1 }}
                     />
+
+                    {/* small manual indicators (optional) */}
+                    {imgs.length > 1 ? (
+                      <div className="absolute left-3 top-3 rounded-full p-1 bg-white/80 dark:bg-neutral-900/70 flex gap-1">
+                        {imgs.map((_, j) => (
+                          <span
+                            key={j}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${j === curIdx ? "scale-100 bg-green-600" : "opacity-30 bg-neutral-400"}`}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+
                     <div className="absolute right-3 bottom-3">
                       <button
                         onClick={() => onOpen(p)}

@@ -4,6 +4,9 @@ import { useDialogue, DialogueMessage } from "dialogue-story";
 // messages array so we can attach `characterInfo` helper field without
 // causing strict type errors (cast to `any` when calling dialogue).
 
+// <-- NEW: load elevator story (adjust path if your file lives elsewhere)
+import { elevator } from "../assets/stories/elevator";
+
 const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { dialogue } = useDialogue();
 
@@ -47,99 +50,18 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
   };
 
   const start = async () => {
-    // raw messages: you may use "woody", "woody:left" or "woody:right"
-    const rawMessages: DialogueMessage[] = [
-      {
-        text: "در دوردستِ کوه‌ها، دهکده‌ای چشم‌انتظارِ مسیرِ جدید است.\nما امروز کابل‌ها و ایستگاه‌ها را می‌سازیم تا مردم به‌راحتی سفر کنند.\nهرکسی سهمی دارد — حالا دست به کار شویم.",
-        charecter: "ravi",
-        typeSpeed: 24,
-        textColor: "#ffffff",
-        bgColor: "#111827",
-        showTimes: true,
-        bgImage: "/scenes/1.Metting/overview.png",
-        filter: { fade: 0.05, blur: 0.2 },
-        fontSize: 30
-      },
-      {
-        text: "سلام! به پروژهٔ تله‌کابین خوش اومدی. امروز قراره با هم مسیر و کابین‌ها رو بسازیم.",
-        charecter: "woody", // will default to left => {name:"woody", forcedSide:"left"}
-        mode: "happy",
-        typeSpeed: 30,
-        textColor: "#ffffff",
-        bgColor: "#1f6feb",
-        showTimes: true,
-        bgImage: "/scenes/1.Metting/default.png",
-        filter: { fade: 0, blur: 0 },
-        fontSize: 30
-      },
-      {
-        text: "اول باید ستون‌ها و قرقره‌ها رو درست کنیم — زیگ و خانم سیب برنامه دارن.",
-        charecter: "buzz:right", // explicit: force buzz to the right side
-        mode: "brave",
-        typeSpeed: 28,
-        textColor: "#000000",
-        bgColor: "#ffd27f",
-        bgImage: "/scenes/1.Metting/busy.png",
-        filter: { fade: 0.15, blur: 0.6 },
-        forcedSide: "right",
-        fontSize: 30
-      },
-      {
-        text: "در دوردستِ کوه‌ها، دهکده‌ای چشم‌انتظارِ مسیرِ جدید است.\nما امروز کابل‌ها و ایستگاه‌ها را می‌سازیم تا مردم به‌راحتی سفر کنند.\nهرکسی سهمی دارد — حالا دست به کار شویم.",
-        charecter: "ravi",
-        typeSpeed: 24,
-        textColor: "#ffffff",
-        bgColor: "#111827",
-        showTimes: true,
-        bgImage: "/scenes/1.Metting/overview.png",
-        filter: { fade: 0.05, blur: 0.2 },
-        fontSize: 30
-      },
-      {
-        text: "من کتاب‌ها و بلوک‌ها رو چیدم تا برج‌ها شکل بگیرن — پایه‌ها آماده است.",
-        charecter: "andy:left", // explicit left
-        mode: "proud",
-        typeSpeed: 28,
-        textColor: "#000000",
-        bgColor: "#d1f7c4",
-        bgImage: "/scenes/1.Metting/minimalist.png",
-        filter: { fade: 0.05, blur: 0.2 },
-        fontSize: 30
-      },
-      {
-        text: "من قرقره‌ها و نخ‌ها رو چک می‌کنم؛ مطمئن می‌شم که همه محکم باشن.",
-        charecter: "slinky", // defaults to left
-        mode: "proud",
-        typeSpeed: 32,
-        textColor: "#ffffff",
-        bgColor: "#6aa84f",
-        fontSize: 30
-      },
-      {
-        text: "اگه گره بخوره چی؟ من یه کم نگرانم...",
-        charecter: "rex:right", // send rex to the right side explicitly
-        mode: "nervous",
-        typeSpeed: 30,
-        textColor: "#000000",
-        bgColor: "#ffd27f",
-        bgImage: "/scenes/1.Metting/evening-quiet.png",
-        filter: { fade: 0.65, blur: 1.0 },
-        fontSize: 30
-      },
-      {
-        text: "نترس رکس، همه با هم گره‌ها رو باز می‌کنیم — بزن بریم ساخت رو شروع کنیم!",
-        charecter: "ms-potato", // defaults to left
-        mode: "warm",
-        typeSpeed: 26,
-        textColor: "#ffffff",
-        bgColor: "#2a9d8f",
-        showTimes: true,
-        bgImage: "/scenes/1.Metting/busy.png",
-        filter: { fade: 0.0, blur: 0.3 },
-        fontSize: 80
-      },
-    ];
+    // --- CHANGED: load rawMessages from elevator story's first chapter ---
+    // Find the first top-level chapter key in the elevator object
+    const chapterKeys = Object.keys(elevator);
+    if (chapterKeys.length === 0) {
+      console.warn("elevator story has no chapters");
+      return;
+    }
+    const firstChapterKey = chapterKeys[0];
+    const firstChapter = elevator[firstChapterKey];
 
+    // defensive check: ensure it's an array of messages
+    const rawMessages: DialogueMessage[] = Array.isArray(firstChapter) ? (firstChapter as DialogueMessage[]) : [];
 
     // Normalize them into messages that also contain characterInfo
     const normalized = normalizeMessagesForSides(rawMessages);

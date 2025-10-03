@@ -9,7 +9,7 @@ export const elevator = {
       "showTimes": true,
       "bgImage": "/scenes/ch1/bedroom-night.png",
       "filter": { "fade": 0.05, "blur": 0.15 },
-      "fontSize": 24
+      "fontSize": 18
     },
     {
       "text": "وسط تخت خوابیده بود. چراغِ خوابِ کوچکی روی پاتختی روشن بود و بخشی از نورش را روی زمین انداخته بود. روی قالیچهٔ اتاق جمعی از اسباب‌بازی‌ها دور هم حلقه زده بودند. وودی با کلاه قهوه‌ای و آن لبخند همیشگی، دست به کمر ایستاده بود. جسی با گیس‌های بافته و کلاه قرمزش، پا روی پا انداخته بود. رکس، دایناسورِ سبز، خودش را بغل کرده بود و میلرزید.",
@@ -18,7 +18,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#071426",
       "showTimes": true,
-      "fontSize": 24
+      "fontSize": 18
     },
     {
       "text": "خب رفقا! اندی خوابیده. باید امشب را یک جای امن و گرم بگذرانیم.",
@@ -94,7 +94,7 @@ export const elevator = {
       "bgColor": "#0f1724",
       "showTimes": true,
       "bgImage": "/scenes/ch2/meeting-fort.png",
-      "fontSize": 22
+      "fontSize": 20
     },
     {
       "text": "من می‌تونم کش بیام. یک سرم پایینِ پاتختی، یک سرم بالا. از من مثل پل استفاده کنین.",

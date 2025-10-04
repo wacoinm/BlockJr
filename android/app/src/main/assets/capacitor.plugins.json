@@ -4,10 +4,6 @@
 		"classpath": "com.capacitorjs.community.plugins.bluetoothle.BluetoothLe"
 	},
 	{
-		"pkg": "@capacitor-community/safe-area",
-		"classpath": "com.getcapacitor.community.safearea.SafeAreaPlugin"
-	},
-	{
 		"pkg": "@capacitor/device",
 		"classpath": "com.capacitorjs.plugins.device.DevicePlugin"
 	},
@@ -22,6 +18,10 @@
 	{
 		"pkg": "@capacitor/splash-screen",
 		"classpath": "com.capacitorjs.plugins.splashscreen.SplashScreenPlugin"
+	},
+	{
+		"pkg": "@capawesome/capacitor-android-edge-to-edge-support",
+		"classpath": "io.capawesome.capacitorjs.plugins.androidedgetoedgesupport.EdgeToEdgePlugin"
 	},
 	{
 		"pkg": "@e-is/capacitor-bluetooth-serial",

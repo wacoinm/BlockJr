@@ -5,9 +5,6 @@ project(':capacitor-android').projectDir = new File('../node_modules/.pnpm/@capa
 include ':capacitor-community-bluetooth-le'
 project(':capacitor-community-bluetooth-le').projectDir = new File('../node_modules/.pnpm/@capacitor-community+bluetooth-le@7.2.0_@capacitor+core@7.4.3/node_modules/@capacitor-community/bluetooth-le/android')
 
-include ':capacitor-community-safe-area'
-project(':capacitor-community-safe-area').projectDir = new File('../node_modules/.pnpm/@capacitor-community+safe-area@7.0.0-alpha.1_@capacitor+core@7.4.3/node_modules/@capacitor-community/safe-area/android')
-
 include ':capacitor-device'
 project(':capacitor-device').projectDir = new File('../node_modules/.pnpm/@capacitor+device@7.0.2_@capacitor+core@7.4.3/node_modules/@capacitor/device/android')
 
@@ -19,6 +16,9 @@ project(':capacitor-preferences').projectDir = new File('../node_modules/.pnpm/@
 
 include ':capacitor-splash-screen'
 project(':capacitor-splash-screen').projectDir = new File('../node_modules/.pnpm/@capacitor+splash-screen@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/splash-screen/android')
+
+include ':capawesome-capacitor-android-edge-to-edge-support'
+project(':capawesome-capacitor-android-edge-to-edge-support').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-android-edge-to-edge-support@7.2.3_@capacitor+core@7.4.3/node_modules/@capawesome/capacitor-android-edge-to-edge-support/android')
 
 include ':e-is-capacitor-bluetooth-serial'
 project(':e-is-capacitor-bluetooth-serial').projectDir = new File('../node_modules/.pnpm/@e-is+capacitor-bluetooth-serial@6.0.3/node_modules/@e-is/capacitor-bluetooth-serial/android')

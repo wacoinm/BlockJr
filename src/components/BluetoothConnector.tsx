@@ -419,7 +419,7 @@ export const BluetoothConnector: React.FC<BluetoothConnectorProps> = (props) => 
         }
       `}</style>
 
-      <div className="absolute [top:calc(1rem+var(--safe-area-inset-top))] right-4 z-50">
+      <div className="absolute top-[1rem] right-4 z-50">
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className={`

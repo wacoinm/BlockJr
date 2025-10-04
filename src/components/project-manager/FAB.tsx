@@ -29,7 +29,7 @@ const FAB: React.FC<Props> = ({ onCreate }) => {
       <div
         className="fixed left-5 z-40 bg-sky-500 dark:bg-sky-700 rounded-2xl hover:scale-90 transform transition-transform duration-200"
         // use calc so desktop browsers without the var fall back to 1rem spacing
-        style={{ bottom: "calc(var(--safe-area-inset-bottom, 0px) + 1rem)" }}
+        style={{ bottom: "1rem" }}
       >
         <button
           onClick={() => setOpen((s) => !s)}
@@ -48,7 +48,7 @@ const FAB: React.FC<Props> = ({ onCreate }) => {
             onSubmit={submit}
             className="relative bg-white dark:bg-neutral-900 rounded-2xl p-4 w-full max-w-md shadow-xl z-10 text-right"
             // ensure modal content sits above device safe area (bottom)
-            style={{ paddingBottom: "calc(1rem + var(--safe-area-inset-bottom, 0px))" }}
+            style={{ paddingBottom: "1rem" }}
           >
             <div className="flex items-center gap-3 justify-between">
               <div className="text-sm font-semibold">ایجاد پروژه</div>

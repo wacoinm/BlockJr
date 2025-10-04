@@ -21,14 +21,8 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true
     },
-    SafeArea: {
-      enabled: true,
-      customColorsForSystemBars: true,
-      statusBarColor: "#000000",
-      statusBarContent: "light",
-      navigationBarColor: "#000000",
-      navigationBarContent: "light",
-      offset: 0
+    EdgeToEdge: {
+      backgroundColor: "#694db9",
     }
   }
 };

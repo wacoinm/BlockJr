@@ -22,7 +22,7 @@ const config: CapacitorConfig = {
       splashImmersive: true
     },
     EdgeToEdge: {
-      backgroundColor: "#ffffff",
+      backgroundColor: "#694db9",
     }
   }
 };

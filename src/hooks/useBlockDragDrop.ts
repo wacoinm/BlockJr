@@ -53,6 +53,112 @@ export function useBlockDragDrop({
     return arr.slice(startIndex).concat(arr.slice(0, startIndex));
   }, []);
 
+  //
+  // Safety helpers to avoid creating cycles in parent/child pointers.
+  // These check both existing blocks (blocksMap / blocksRef.current) and
+  // tentative updates in the provided Map.
+  //
+  const wouldCreateCycle = useCallback(
+    (
+      proposedParentId: string | null | undefined,
+      childId: string,
+      updatesMap: Map<string, Partial<Block>>,
+    ) => {
+      if (!proposedParentId) return false;
+      const blocksCur = blocksRef.current;
+      let cur: string | null | undefined = proposedParentId;
+      const seen = new Set<string>();
+      while (cur) {
+        if (cur === childId) return true;
+        if (seen.has(cur)) return true; // existing cycle in graph
+        seen.add(cur);
+
+        // If an update sets a new parent for `cur`, honor that while simulating
+        const upd = updatesMap.get(cur);
+        if (upd && Object.prototype.hasOwnProperty.call(upd, 'parentId')) {
+          cur = (upd as any).parentId ?? null;
+          continue;
+        }
+
+        // Otherwise read current parent from blocksMap or blocksRef
+        const bm = blocksMap.get(cur) ?? blocksCur.find((b) => b.id === cur);
+        cur = bm ? bm.parentId ?? null : null;
+      }
+      return false;
+    },
+    [blocksMap, blocksRef],
+  );
+
+  const sanitizeUpdates = useCallback(
+    (updates: Map<string, Partial<Block>>) => {
+      // Make a shallow copy we can mutate
+      const safe = new Map<string, Partial<Block>>();
+      for (const [k, v] of updates) safe.set(k, { ...v });
+
+      let changed = false;
+      // We'll iterate a few times to let interdependent updates settle.
+      for (let pass = 0; pass < 5; pass++) {
+        let passChanged = false;
+        for (const [id, upd] of Array.from(safe.entries())) {
+          const copy = { ...upd };
+
+          if (Object.prototype.hasOwnProperty.call(copy, 'parentId')) {
+            const proposedParent = (copy as any).parentId ?? null;
+            if (wouldCreateCycle(proposedParent, id, safe)) {
+              // drop the parentId to prevent cycle
+              // eslint-disable-next-line no-console
+              console.warn(`sanitizeUpdates: dropping parentId -> ${proposedParent} for ${id} (would create cycle)`);
+              delete (copy as any).parentId;
+              passChanged = true;
+            }
+          }
+
+          if (Object.prototype.hasOwnProperty.call(copy, 'childId')) {
+            const proposedChild = (copy as any).childId ?? null;
+            if (proposedChild && wouldCreateCycle(id, proposedChild, safe)) {
+              // drop the childId to prevent cycle
+              // eslint-disable-next-line no-console
+              console.warn(`sanitizeUpdates: dropping childId -> ${proposedChild} for ${id} (would create cycle)`);
+              delete (copy as any).childId;
+              passChanged = true;
+            }
+          }
+
+          // write back (may be identical)
+          safe.set(id, copy);
+        }
+        if (!passChanged) break;
+        changed = changed || passChanged;
+      }
+
+      return { safe, changed };
+    },
+    [wouldCreateCycle],
+  );
+
+  // Helper to apply updates after sanitizing; returns true if applied, false if nothing applied.
+  const applySanitizedUpdates = useCallback(
+    (updates: Map<string, Partial<Block>>) => {
+      if (!updates || updates.size === 0) {
+        submitCapture();
+        return false;
+      }
+      const { safe, changed } = sanitizeUpdates(updates);
+      if (changed) {
+        // eslint-disable-next-line no-console
+        console.warn('applySanitizedUpdates: sanitized incoming updates to avoid cycles.');
+      }
+      // If sanitization removed all effective keys, bail out.
+      if (!safe || safe.size === 0) {
+        submitCapture();
+        return false;
+      }
+      applyUpdatesAndNormalize(safe, true);
+      return true;
+    },
+    [applyUpdatesAndNormalize, sanitizeUpdates, submitCapture],
+  );
+
   const handleBlockDragStart = useCallback(
     (block: Block, e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
       const { clientX, clientY } = getClientXY(e);
@@ -243,7 +349,8 @@ export function useBlockDragDrop({
                 placeX += computeHorizStep(getBlockWidth(t), HORIZONTAL_SPACING ?? undefined);
               }
 
-              applyUpdatesAndNormalize(updates, true);
+              // sanitize and apply
+              if (!applySanitizedUpdates(updates)) return;
               playSnapSound();
               return;
             }
@@ -369,7 +476,7 @@ export function useBlockDragDrop({
               }
             }
 
-            applyUpdatesAndNormalize(updates, true);
+            if (!applySanitizedUpdates(updates)) return;
             playSnapSound();
             return;
           } else {
@@ -388,7 +495,7 @@ export function useBlockDragDrop({
               nextX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
             }
 
-            applyUpdatesAndNormalize(updates, true);
+            if (!applySanitizedUpdates(updates)) return;
             playSnapSound();
             return;
           }
@@ -437,7 +544,7 @@ export function useBlockDragDrop({
             });
           }
 
-          applyUpdatesAndNormalize(updates, true);
+          if (!applySanitizedUpdates(updates)) return;
           playSnapSound();
           return;
         }
@@ -473,7 +580,7 @@ export function useBlockDragDrop({
               newX += computeHorizStep(getBlockWidth(d), HORIZONTAL_SPACING ?? undefined);
             }
 
-            applyUpdatesAndNormalize(updates, true);
+            if (!applySanitizedUpdates(updates)) return;
             playSnapSound();
             return;
           }
@@ -496,6 +603,7 @@ export function useBlockDragDrop({
       screenToWorld,
       getBlockWidth,
       rotateChain,
+      applySanitizedUpdates,
     ],
   );
 

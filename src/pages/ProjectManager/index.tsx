@@ -220,8 +220,8 @@ const ProjectManager: React.FC = () => {
   return (
     <div
       style={{
-        paddingTop: "calc(var(--safe-area-inset-top, 0px) + 1rem)",
-        paddingBottom: "calc(var(--safe-area-inset-bottom, 0px) + 1rem)",
+        paddingTop: "1rem",
+        paddingBottom: "1rem",
         minHeight: "100svh",
       }}
     >

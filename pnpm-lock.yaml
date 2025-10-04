@@ -11,9 +11,6 @@ importers:
       '@capacitor-community/bluetooth-le':
         specifier: ^7.1.1
         version: 7.2.0(@capacitor/core@7.4.3)
-      '@capacitor-community/safe-area':
-        specifier: 7.0.0-alpha.1
-        version: 7.0.0-alpha.1(@capacitor/core@7.4.3)
       '@capacitor/android':
         specifier: ^7.4.2
         version: 7.4.3(@capacitor/core@7.4.3)
@@ -35,6 +32,9 @@ importers:
       '@capacitor/splash-screen':
         specifier: ^7.0.3
         version: 7.0.3(@capacitor/core@7.4.3)
+      '@capawesome/capacitor-android-edge-to-edge-support':
+        specifier: ^7.2.3
+        version: 7.2.3(@capacitor/core@7.4.3)
       '@e-is/capacitor-bluetooth-serial':
         specifier: ^6.0.3
         version: 6.0.3
@@ -234,11 +234,6 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
-  '@capacitor-community/safe-area@7.0.0-alpha.1':
-    resolution: {integrity: sha512-N6ktkRiofqrt+N/vQzh4jcWY8IzJ4TVw1tKAPssvbddWFTyZzXzSdBeX/l/nracJF0PZqmLdA7JYTBfnOxXQYw==}
-    peerDependencies:
-      '@capacitor/core': '>=7.0.0'
-
   '@capacitor/android@7.4.3':
     resolution: {integrity: sha512-VpjvnOcmYGPLgvXRhe3CGLs62Cg7sxOyp77NddCr+Y06qqgnoaj6OGeBVTc2DZlqZ6bSmh15JvFu82pkvmdgfQ==}
     peerDependencies:
@@ -284,6 +279,11 @@ packages:
 
   '@capacitor/synapse@1.0.4':
     resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
+
+  '@capawesome/capacitor-android-edge-to-edge-support@7.2.3':
+    resolution: {integrity: sha512-WtwXeU5Clg13t3SO6JvtIfJlpO+E48tHC+vNmC519zcS6GV9URl705UOvwOOvEyh6GFxAi2dHi8lj8iqIOYCdA==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -3370,10 +3370,6 @@ snapshots:
       '@capacitor/core': 7.4.3
       '@types/web-bluetooth': 0.0.20
 
-  '@capacitor-community/safe-area@7.0.0-alpha.1(@capacitor/core@7.4.3)':
-    dependencies:
-      '@capacitor/core': 7.4.3
-
   '@capacitor/android@7.4.3(@capacitor/core@7.4.3)':
     dependencies:
       '@capacitor/core': 7.4.3
@@ -3468,6 +3464,10 @@ snapshots:
       '@capacitor/core': 7.4.3
 
   '@capacitor/synapse@1.0.4': {}
+
+  '@capawesome/capacitor-android-edge-to-edge-support@7.2.3(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:

@@ -596,7 +596,7 @@ const App: React.FC = () => {
         style={{
           position: 'fixed',
           left: LEFT_TOGGLE_LEFT,
-          bottom: `calc(${LEFT_TOGGLE_BOTTOM}px + var(--safe-area-inset-bottom))`,
+          bottom: LEFT_TOGGLE_BOTTOM,
           zIndex: 70,
         }}
       >

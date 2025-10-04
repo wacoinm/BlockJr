@@ -586,7 +586,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close palette" : "Open palette"}
         onClick={toggleOpen}
-        className="fixed md:!hidden left-0 [bottom:calc(0px+var(--safe-area-inset-bottom))] z-50 focus:outline-none"
+        className="fixed md:!hidden left-0 bottom-0 z-50 focus:outline-none"
         style={{
           // use paletteHeight directly when measured (including 0), otherwise fallback 72
           height: paletteHeight !== null ? paletteHeight : 72,
@@ -625,7 +625,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
         style={{
           position: "fixed",
           right: 5,
-          bottom: `calc(${chooserBottom - 4}px + var(--safe-area-inset-bottom))`,
+          bottom: chooserBottom - 4,
           zIndex: 60,
         }}
       >
@@ -740,7 +740,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           ref={paletteRef}
           className={
             "flex overflow-x-auto overflow-y-hidden px-6 py-2 space-x-4 items-center " +
-            "xs:justify-start md:justify-start xl:justify-center mb-[calc(0.2rem+var(--safe-area-inset-bottom))] " +
+            "xs:justify-start md:justify-start xl:justify-center mb-[0.2rem] " +
             "md:px-[var(--h-margin)] mr-8"
           }
           style={{

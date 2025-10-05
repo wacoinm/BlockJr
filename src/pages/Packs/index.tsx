@@ -85,7 +85,7 @@ const PacksPage: React.FC = () => {
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">
       {confetti && <Confetti recycle={false} numberOfPieces={160} />}
 
-      <Header view={view === "list" ? "list" : "cards"} setView={(v: "cards" | "list") => setView(v === "list" ? "list" : "carousel")}>
+      <Header view={view === "list" ? "list" : "cards"} setView={(v: "cards" | "list") => setView(v === "list" ? "list" : "carousel")} dir="rtl">
         <IconViewToggle view={view === "list" ? "list" : "cards"} setView={(v: "cards" | "list") => setView(v === "list" ? "list" : "carousel")} />
       </Header>
 

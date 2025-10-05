@@ -782,7 +782,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
                 <BlockComponent
                   block={block}
                   isPaletteBlock
-                  style={{ width: 85, height: 85 }}
+                  style={{ width: 65, height: 65 }}
                 />
               </div>
             );

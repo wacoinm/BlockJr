@@ -118,7 +118,7 @@ const App: React.FC = () => {
 
   const HORIZONTAL_SPACING = GAP_BETWEEN_BLOCKS;
 
-  const { pan, zoom, screenToWorld, zoomBy, panBy } = usePanZoom({ x: 0, y: 0 }, 1);
+  const { pan, zoom, screenToWorld, zoomBy, panBy } = usePanZoom({ x: 0, y: 0 }, 0.5);
 
   const getChain = useCallback(
     (startBlockId: string): Block[] => {

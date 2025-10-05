@@ -1,5 +1,5 @@
 // src/components/packs/PacksGrid.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import PackCard from "./PackCard";
 
@@ -35,16 +35,23 @@ const PacksGrid: React.FC<{ packs: Pack[]; view: "list" | "carousel" }> = ({ pac
 
 export default PacksGrid;
 
-/* ---------- Embla infinite carousel ---------- */
+/* ---------- Embla infinite carousel (robust looping + responsive) ---------- */
 
 const EmblaInfiniteCarousel: React.FC<{ packs: Pack[] }> = ({ packs }) => {
-  // options: loop always true when more than 1 item
+  // slide width used for responsive sizing
+  const slideWidthCss = "clamp(260px, 86vw, 380px)";
+
   const options = useMemo(
     () => ({
+      // true loop when >1 slide
       loop: packs.length > 1,
-      align: "center",
-      containScroll: "trimSnaps",
+      align: "center" as const,
+      // allow cloning behavior to create true loop
+      containScroll: false,
       skipSnaps: false,
+      dragFree: false,
+      slidesToScroll: 1,
+      speed: 12,
     }),
     [packs.length]
   );
@@ -52,10 +59,43 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[] }> = ({ packs }) => {
   const [emblaRef, emblaApi] = useEmblaCarousel(options);
   const embla = emblaApi;
 
+  // Use Embla's API for prev/next (respects loop/clones)
   const scrollPrev = useCallback(() => embla?.scrollPrev(), [embla]);
   const scrollNext = useCallback(() => embla?.scrollNext(), [embla]);
 
-  // enable keyboard left/right
+  // Re-init strategy:
+  // - debounced reInit on resize
+  useEffect(() => {
+    if (!embla) return;
+    // initial safe reInit after a frame
+    requestAnimationFrame(() => {
+      try {
+        embla.reInit();
+      } catch {}
+    });
+
+    let t: number | null = null;
+    const onResize = () => {
+      if (t) window.clearTimeout(t);
+      t = window.setTimeout(() => embla.reInit(), 120);
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      if (t) window.clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [embla, packs.length]);
+
+  // pointerUp: snap to nearest to avoid fractional mid-states
+  useEffect(() => {
+    if (!embla) return;
+    const onPointerUp = () => embla.scrollTo(embla.selectedScrollSnap());
+    embla.on("pointerUp", onPointerUp);
+    return () => embla.off("pointerUp", onPointerUp);
+  }, [embla]);
+
+  // keyboard support
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") scrollPrev();
@@ -67,41 +107,65 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[] }> = ({ packs }) => {
 
   return (
     <div className="relative">
-      <div ref={emblaRef} className="embla overflow-hidden">
-        <div className="embla__container flex gap-4 px-4 py-6">
+      {/* Embla viewport: overflow hidden (standard pattern) */}
+      <div
+        ref={emblaRef}
+        className="embla overflow-hidden"
+        style={{ boxSizing: "border-box", WebkitOverflowScrolling: "touch" }}
+      >
+        {/* container: padding for centering (won't create a scroll gap because viewport is overflow-hidden) */}
+        <div
+          className="embla__container flex gap-4"
+          style={{
+            alignItems: "stretch",
+            // keep a modest container padding so center slide has breathing room on small screens
+            paddingInline: `max(0px, calc((100vw - ${slideWidthCss}) / 2))`,
+          }}
+        >
           {packs.map((p) => (
-            <div key={p.id} className="embla__slide flex-shrink-0" style={{ minWidth: 300 }}>
+            <div
+              key={p.id}
+              className="embla__slide"
+              style={{
+                flex: "0 0 auto",
+                width: slideWidthCss,
+                boxSizing: "border-box",
+                scrollSnapAlign: "center",
+              }}
+            >
               <PackCard {...p} big compactCarousel />
             </div>
           ))}
         </div>
       </div>
 
-      {/* controls */}
-      <div className="absolute left-2 top-1/2 -translate-y-1/2">
+      {/* Prev / Next buttons (always visible) */}
+      <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
         <button
           onClick={scrollPrev}
           aria-label="Previous pack"
           className="p-2 rounded-full bg-white/90 shadow dark:bg-[color:var(--card-dark)]"
+          style={{ width: 36, height: 36 }}
         >
           ‹
         </button>
       </div>
-      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
         <button
           onClick={scrollNext}
           aria-label="Next pack"
           className="p-2 rounded-full bg-white/90 shadow dark:bg-[color:var(--card-dark)]"
+          style={{ width: 36, height: 36 }}
         >
           ›
         </button>
       </div>
 
       <style>{`
-        /* small embla helpers (minimal CSS) */
-        .embla__container { display: flex; align-items: stretch; }
-        .embla__slide { scroll-snap-align: center; }
-        .embla { -webkit-overflow-scrolling: touch; }
+        .embla { scroll-snap-type: x mandatory; }
+        .embla__container { display:flex; }
+        .embla__slide { -webkit-overflow-scrolling: touch; }
       `}</style>
     </div>
   );

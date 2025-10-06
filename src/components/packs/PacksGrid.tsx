@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import PackCard from "./PackCard";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type Pack = {
   id: string;
@@ -11,7 +12,10 @@ type Pack = {
   qr?: string;
 };
 
-const PacksGrid: React.FC<{ packs: Pack[]; view: "list" | "carousel" }> = ({ packs, view }) => {
+const PacksGrid: React.FC<{ packs: Pack[]; view: "list" | "carousel" }> = ({
+  packs,
+  view,
+}) => {
   if (!packs || packs.length === 0) {
     return (
       <div className="p-6 rounded-2xl bg-surface dark:bg-[color:var(--card-dark)] text-center">
@@ -140,26 +144,18 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[] }> = ({ packs }) => {
       </div>
 
       {/* Prev / Next buttons (always visible) */}
-      <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
-        <button
+      <div className="absolute left-1 top-1/2 -translate-y-1/2 z-20">
+        <ChevronLeft
           onClick={scrollPrev}
-          aria-label="Previous pack"
-          className="p-2 rounded-full bg-white/90 shadow dark:bg-[color:var(--card-dark)]"
-          style={{ width: 36, height: 36 }}
-        >
-          ‹
-        </button>
+          className="bg-white/90 dark:bg-[color:var(--card-dark)] p-2 rounded-full w-8 h-8 md:w-10 md:h-10"
+        />
       </div>
 
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
-        <button
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 z-20">
+        <ChevronRight
           onClick={scrollNext}
-          aria-label="Next pack"
-          className="p-2 rounded-full bg-white/90 shadow dark:bg-[color:var(--card-dark)]"
-          style={{ width: 36, height: 36 }}
-        >
-          ›
-        </button>
+          className="p-2 rounded-full bg-white/90 shadow dark:bg-[color:var(--card-dark)] w-8 h-8 md:w-10 md:h-10"
+        />
       </div>
 
       <style>{`

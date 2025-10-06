@@ -89,10 +89,10 @@ const PacksPage: React.FC = () => {
         <IconViewToggle view={view === "list" ? "list" : "cards"} setView={(v: "cards" | "list") => setView(v === "list" ? "list" : "carousel")} />
       </Header>
 
-      <main className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+      <main className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 text-right flex flex-col gap-4">
         <div className="mb-4">
           <h1 className="text-3xl font-extrabold">پَک‌های آموزشی</h1>
-          <p className="text-neutral-500 mt-1">برای افزودن پَک‌ها از دکمهٔ اسکن استفاده کنید.</p>
+          <p className="text-neutral-500 mt-1">برای افزودن پَک‌ها از دکمهٔ اسکن استفاده کنید</p>
         </div>
 
         {grid}

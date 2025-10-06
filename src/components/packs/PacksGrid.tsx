@@ -8,7 +8,7 @@ type Pack = {
   id: string;
   name: string;
   description?: string;
-  items: string[];
+  items?: string[];
   qr?: string;
 };
 
@@ -16,11 +16,7 @@ const PacksGrid: React.FC<{
   packs: Pack[];
   view: "list" | "carousel";
   onSelectPack?: (packId: string) => void;
-}> = ({
-  packs,
-  view,
-  onSelectPack,
-}) => {
+}> = ({ packs, view, onSelectPack }) => {
   if (!packs || packs.length === 0) {
     return (
       <div className="p-6 rounded-2xl bg-surface dark:bg-[color:var(--card-dark)] text-center">
@@ -33,7 +29,12 @@ const PacksGrid: React.FC<{
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {packs.map((p) => (
-          <PackCard key={p.id} {...p} big onOpen={() => onSelectPack?.(p.id)} />
+          <PackCard
+            key={p.id}
+            {...p}
+            big
+            onOpen={() => onSelectPack?.(p.id)}
+          />
         ))}
       </div>
     );
@@ -46,16 +47,17 @@ export default PacksGrid;
 
 /* ---------- Embla infinite carousel (robust looping + responsive) ---------- */
 
-const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: string) => void }> = ({ packs, onSelectPack }) => {
+const EmblaInfiniteCarousel: React.FC<{
+  packs: Pack[];
+  onSelectPack?: (packId: string) => void;
+}> = ({ packs, onSelectPack }) => {
   // slide width used for responsive sizing
   const slideWidthCss = "clamp(260px, 86vw, 380px)";
 
   const options = useMemo(
     () => ({
-      // true loop when >1 slide
       loop: packs.length > 1,
       align: "center" as const,
-      // allow cloning behavior to create true loop
       containScroll: false,
       skipSnaps: false,
       dragFree: false,
@@ -68,15 +70,11 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: s
   const [emblaRef, emblaApi] = useEmblaCarousel(options);
   const embla = emblaApi;
 
-  // Use Embla's API for prev/next (respects loop/clones)
   const scrollPrev = useCallback(() => embla?.scrollPrev(), [embla]);
   const scrollNext = useCallback(() => embla?.scrollNext(), [embla]);
 
-  // Re-init strategy:
-  // - debounced reInit on resize
   useEffect(() => {
     if (!embla) return;
-    // initial safe reInit after a frame
     requestAnimationFrame(() => {
       try {
         embla.reInit();
@@ -96,7 +94,6 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: s
     };
   }, [embla, packs.length]);
 
-  // pointerUp: snap to nearest to avoid fractional mid-states
   useEffect(() => {
     if (!embla) return;
     const onPointerUp = () => embla.scrollTo(embla.selectedScrollSnap());
@@ -104,7 +101,6 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: s
     return () => embla.off("pointerUp", onPointerUp);
   }, [embla]);
 
-  // keyboard support
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") scrollPrev();
@@ -116,18 +112,15 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: s
 
   return (
     <div className="relative">
-      {/* Embla viewport: overflow hidden (standard pattern) */}
       <div
         ref={emblaRef}
         className="embla overflow-hidden"
         style={{ boxSizing: "border-box", WebkitOverflowScrolling: "touch" }}
       >
-        {/* container: padding for centering (won't create a scroll gap because viewport is overflow-hidden) */}
         <div
           className="embla__container flex gap-4"
           style={{
             alignItems: "stretch",
-            // keep a modest container padding so center slide has breathing room on small screens
             paddingInline: `max(0px, calc((100vw - ${slideWidthCss}) / 2))`,
           }}
         >
@@ -142,13 +135,17 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: s
                 scrollSnapAlign: "center",
               }}
             >
-              <PackCard {...p} big compactCarousel onOpen={() => onSelectPack?.(p.id)} />
+              <PackCard
+                {...p}
+                big
+                compactCarousel
+                onOpen={() => onSelectPack?.(p.id)}
+              />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Prev / Next buttons (always visible) */}
       <div className="absolute left-1 top-1/2 -translate-y-1/2 z-20">
         <ChevronLeft
           onClick={scrollPrev}

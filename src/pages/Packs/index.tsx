@@ -12,24 +12,14 @@ import "react-toastify/dist/ReactToastify.css";
 import { loadProjects, saveProjects, saveProjectFile } from "../../utils/projectStorage";
 import { toPackId } from "../../utils/slugifyPack";
 import { setSelectedPack } from "../../utils/packStorage";
+import { getAllPacks } from "../../utils/manifest";
 
-/** RAW packs — user cannot create; only scanning adds them */
-const RAW_PACKS = [
-  {
-    id: "pack-tele-elev-crane",
-    name: "پَک آسانسور و تله‌کابین",
-    description: "تله‌کابین، آسانسور، جرثقیل",
-    items: ["telecabin", "elevator", "crane"],
-    qrRaw: "ABCDEFGHIJKLMNOP",
-  },
-  {
-    id: "pack-lift-buildozer",
-    name: "پَک ماشین‌آلات سنگین",
-    description: "لیفت تراک، بلدوزر",
-    items: ["lift truck", "buildozer"],
-    qrRaw: "QRSTUVWXYZABCDEF",
-  },
-];
+/**
+ * PacksPage
+ * - reads packs from config/packs-manifest.json via getAllPacks()
+ * - clicking a pack persists selection (setSelectedPack) and navigates to /project
+ * - scanning behavior preserved: adds a pack as a saved project, persists selection and navigates
+ */
 
 const PacksPage: React.FC = () => {
   const [packs, setPacks] = useState<any[]>([]);
@@ -38,12 +28,21 @@ const PacksPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const computed = RAW_PACKS.map((p) => {
-      let qr = "";
+    // load manifest packs and normalize (ensure qr is present)
+    const manifestPacks = getAllPacks();
+    const computed = manifestPacks.map((p) => {
+      let qr = p.qrBase64 || "";
+      // ensure we have base64 encoded string; if not, compute from qrRaw
       try {
-        qr = typeof window !== "undefined" && (window as any).btoa ? (window as any).btoa(p.qrRaw) : Buffer.from(p.qrRaw, "binary").toString("base64");
+        if (!qr && p.qrRaw) {
+          qr = typeof window !== "undefined" && (window as any).btoa ? (window as any).btoa(p.qrRaw) : Buffer.from(p.qrRaw, "binary").toString("base64");
+        }
       } catch {
-        qr = Buffer.from(p.qrRaw, "binary").toString("base64");
+        try {
+          qr = Buffer.from((p.qrRaw || ""), "binary").toString("base64");
+        } catch {
+          qr = "";
+        }
       }
       return { ...p, qr };
     });
@@ -57,7 +56,6 @@ const PacksPage: React.FC = () => {
     } catch (e) {
       console.warn("Failed to persist selected pack", e);
     }
-    // go to project selection page
     navigate("/project");
   }
 
@@ -88,9 +86,9 @@ const PacksPage: React.FC = () => {
       setTimeout(() => setConfetti(false), 3200);
       toast.success(`پَک «${matched.name}» با موفقیت اضافه شد!`);
 
-      // Persist selection for the user and navigate to projects
+      // Persist selection and navigate to ProjectSelection
       try {
-        await setSelectedPack(finalId);
+        await setSelectedPack(matched.id || finalId);
       } catch (e) {
         console.warn("Failed to persist selected pack after scan", e);
       }
@@ -101,10 +99,7 @@ const PacksPage: React.FC = () => {
     }
   }
 
-  const grid = useMemo(
-    () => <PacksGrid packs={packs} view={view} onSelectPack={handlePackClick} />,
-    [packs, view]
-  );
+  const grid = useMemo(() => <PacksGrid packs={packs} view={view} onSelectPack={handlePackClick} />, [packs, view]);
 
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">

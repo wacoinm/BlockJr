@@ -1,81 +1,21 @@
 // src/pages/ProjectSelection/index.tsx
 import React, { useEffect, useState } from "react";
-import Header from "../../components/project-manager/Header"; // reuse header
+import Header from "../../components/project-manager/Header";
 import IconViewToggle from "../../components/project-manager/IconViewToggle";
 import EmblaIOSCarousel from "../../components/project-selection/EmblaIOSCarousel";
 import ProjectActionSheet from "../../components/project-selection/ProjectActionSheet";
 import ProjectListNew from "../../components/project-selection/ProjectListNew";
 
-import { elevator } from "../../assets/stories/elevator";
 import { initSession } from "../../utils/sessionStorage";
 import { loadProjects } from "../../utils/projectStorage";
 import { getSelectedPack } from "../../utils/packStorage";
+import { getAllProjects, getPackKeywords } from "../../utils/manifest";
 
 /**
  * ProjectSelection page
- * - toggle between ios-like carousel (mobile-first) and a new list view
- * - uses dummy data (Persian texts)
- *
- * NOTE: DUMMY_PROJECTS now use the single `imgsPath` key (directory containing PNGs),
- * so components will probe images inside that folder (e.g. "/scense/elevator/1.png", etc).
+ * - loads saved projects via loadProjects(); falls back to config/packs-manifest.json projects
+ * - reads persisted pack id and filters displayed projects using manifest.packToProjectKeywords
  */
-
-const DUMMY_PROJECTS = [
-  {
-    id: "elevator",
-    name: "آسانسور",
-    subtitle: "پروژه نصب و راه‌اندازی آسانسور",
-    project: elevator,
-    // single key pointing at the folder with pngs for this project
-    imgsPath: "/scenes/elevator/chapters/",
-  },
-  {
-    id: "crane",
-    name: "جرثقیل",
-    subtitle: "پروژه جرثقیل سقفی",
-    // for test we reuse elevator story as you asked
-    project: elevator,
-    // reusing same imgsPath for now (adjust to your real folder if different)
-    imgsPath: "/scenes/crane/chapters/",
-    isLock: true,
-    lockReason: "محتوا در دست ساخت است"
-  },
-  {
-    id: "gondola",
-    name: "تله کابین",
-    subtitle: "پروژه احداث تله کابین",
-    project: elevator, // reuse elevator for test
-    imgsPath: "/scenes/crane/chapters/",
-    isLock: true
-  },
-];
-
-/**
- * Map pack id -> array of category / name / id keywords to match projects.
- * Adjust these keywords if your real project categories/ids differ.
- *
- * This map ensures:
- * - clicking "پَک آسانسور و تله‌کابین" will show elevator, crane, gondola.
- * - clicking other packs shows projects that match their keywords.
- */
-const PACK_CATEGORY_MAP: Record<string, string[]> = {
-  "pack-tele-elev-crane": [
-    "آسانسور",
-    "تله کابین",
-    "جرثقیل",
-    "elevator",
-    "gondola",
-    "crane",
-  ],
-  "pack-lift-buildozer": [
-    "ماشین‌آلات",
-    "ماشین‌آلات سنگین",
-    "لیفت",
-    "بلدوزر",
-    "lift",
-    "buildozer",
-  ],
-};
 
 const ProjectSelection: React.FC = () => {
   const [view, setView] = useState<"carousel" | "list">("carousel");
@@ -86,12 +26,11 @@ const ProjectSelection: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
 
-  // load projects + selected pack, then filter
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        // 1) load saved projects index (if any)
+        // load saved projects (if any)
         let saved: any[] = [];
         try {
           const loaded = await loadProjects();
@@ -101,22 +40,21 @@ const ProjectSelection: React.FC = () => {
           saved = [];
         }
 
-        // 2) fallback to DUMMY_PROJECTS if none saved
-        const sourceProjects = saved.length > 0 ? saved : DUMMY_PROJECTS;
+        // fallback to manifest projects
+        const manifestProjects = getAllProjects();
+        const sourceProjects = saved.length > 0 ? saved : manifestProjects;
 
-        // 3) read selected pack id from storage
+        // read selected pack id
         const selPack = await getSelectedPack();
         setSelectedPackId(selPack);
 
-        // 4) filter based on pack
+        // filter by pack keywords (if pack selected)
         let filtered = sourceProjects;
         if (selPack) {
-          const keywords = PACK_CATEGORY_MAP[selPack] ?? [];
-          const lowerKeywords = keywords.map((k) => k.toLowerCase());
-
+          const keywords = getPackKeywords(selPack).map((k) => k.toLowerCase());
           filtered = sourceProjects.filter((proj: any) => {
             const searchable = `${proj.category || ""} ${proj.name || ""} ${proj.id || ""}`.toString().toLowerCase();
-            return lowerKeywords.some((kw) => searchable.includes(kw));
+            return keywords.some((kw) => searchable.includes(kw));
           });
         }
 
@@ -124,17 +62,13 @@ const ProjectSelection: React.FC = () => {
         setDisplayProjects(filtered);
       } catch (err) {
         console.warn("ProjectSelection load/filter failed", err);
-        setAllProjects(DUMMY_PROJECTS);
-        setDisplayProjects(DUMMY_PROJECTS);
+        const manifestProjects = getAllProjects();
+        setAllProjects(manifestProjects);
+        setDisplayProjects(manifestProjects);
       } finally {
         setLoading(false);
-        // ensure sessions exist for displayed projects
-        try {
-          await Promise.all((displayProjects || DUMMY_PROJECTS).map((p) => initSession(p.id)));
-        } catch {}
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ensure sessions exist for displayed projects whenever they change

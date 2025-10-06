@@ -12,9 +12,14 @@ type Pack = {
   qr?: string;
 };
 
-const PacksGrid: React.FC<{ packs: Pack[]; view: "list" | "carousel" }> = ({
+const PacksGrid: React.FC<{
+  packs: Pack[];
+  view: "list" | "carousel";
+  onSelectPack?: (packId: string) => void;
+}> = ({
   packs,
   view,
+  onSelectPack,
 }) => {
   if (!packs || packs.length === 0) {
     return (
@@ -28,20 +33,20 @@ const PacksGrid: React.FC<{ packs: Pack[]; view: "list" | "carousel" }> = ({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {packs.map((p) => (
-          <PackCard key={p.id} {...p} big />
+          <PackCard key={p.id} {...p} big onOpen={() => onSelectPack?.(p.id)} />
         ))}
       </div>
     );
   }
 
-  return <EmblaInfiniteCarousel packs={packs} />;
+  return <EmblaInfiniteCarousel packs={packs} onSelectPack={onSelectPack} />;
 };
 
 export default PacksGrid;
 
 /* ---------- Embla infinite carousel (robust looping + responsive) ---------- */
 
-const EmblaInfiniteCarousel: React.FC<{ packs: Pack[] }> = ({ packs }) => {
+const EmblaInfiniteCarousel: React.FC<{ packs: Pack[]; onSelectPack?: (packId: string) => void }> = ({ packs, onSelectPack }) => {
   // slide width used for responsive sizing
   const slideWidthCss = "clamp(260px, 86vw, 380px)";
 
@@ -137,7 +142,7 @@ const EmblaInfiniteCarousel: React.FC<{ packs: Pack[] }> = ({ packs }) => {
                 scrollSnapAlign: "center",
               }}
             >
-              <PackCard {...p} big compactCarousel />
+              <PackCard {...p} big compactCarousel onOpen={() => onSelectPack?.(p.id)} />
             </div>
           ))}
         </div>

@@ -1,5 +1,6 @@
 // src/pages/Packs/index.tsx
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import Header from "../../components/project-manager/Header";
 import IconViewToggle from "../../components/project-manager/IconViewToggle";
 import PacksGrid from "../../components/packs/PacksGrid";
@@ -10,6 +11,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import { loadProjects, saveProjects, saveProjectFile } from "../../utils/projectStorage";
 import { toPackId } from "../../utils/slugifyPack";
+import { setSelectedPack } from "../../utils/packStorage";
 
 /** RAW packs — user cannot create; only scanning adds them */
 const RAW_PACKS = [
@@ -33,6 +35,7 @@ const PacksPage: React.FC = () => {
   const [packs, setPacks] = useState<any[]>([]);
   const [view, setView] = useState<"list" | "carousel">("list"); // default = list
   const [confetti, setConfetti] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const computed = RAW_PACKS.map((p) => {
@@ -46,6 +49,17 @@ const PacksPage: React.FC = () => {
     });
     setPacks(computed);
   }, []);
+
+  // When user clicks a pack card
+  async function handlePackClick(packId: string) {
+    try {
+      await setSelectedPack(packId);
+    } catch (e) {
+      console.warn("Failed to persist selected pack", e);
+    }
+    // go to project selection page
+    navigate("/project");
+  }
 
   async function handleScanned(scanned: string) {
     const matched = packs.find((p) => p.qr === scanned.trim());
@@ -73,13 +87,24 @@ const PacksPage: React.FC = () => {
       setConfetti(true);
       setTimeout(() => setConfetti(false), 3200);
       toast.success(`پَک «${matched.name}» با موفقیت اضافه شد!`);
+
+      // Persist selection for the user and navigate to projects
+      try {
+        await setSelectedPack(finalId);
+      } catch (e) {
+        console.warn("Failed to persist selected pack after scan", e);
+      }
+      navigate("/project");
     } catch (e) {
       console.error("add pack error", e);
       toast.error("خطا در افزودن پَک.");
     }
   }
 
-  const grid = useMemo(() => <PacksGrid packs={packs} view={view} />, [packs, view]);
+  const grid = useMemo(
+    () => <PacksGrid packs={packs} view={view} onSelectPack={handlePackClick} />,
+    [packs, view]
+  );
 
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">

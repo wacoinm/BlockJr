@@ -6,9 +6,10 @@ import EmblaIOSCarousel from "../../components/project-selection/EmblaIOSCarouse
 import ProjectActionSheet from "../../components/project-selection/ProjectActionSheet";
 import ProjectListNew from "../../components/project-selection/ProjectListNew";
 
-// import the elevator story you added
 import { elevator } from "../../assets/stories/elevator";
 import { initSession } from "../../utils/sessionStorage";
+import { loadProjects } from "../../utils/projectStorage";
+import { getSelectedPack } from "../../utils/packStorage";
 
 /**
  * ProjectSelection page
@@ -49,20 +50,103 @@ const DUMMY_PROJECTS = [
   },
 ];
 
+/**
+ * Map pack id -> array of category / name / id keywords to match projects.
+ * Adjust these keywords if your real project categories/ids differ.
+ *
+ * This map ensures:
+ * - clicking "پَک آسانسور و تله‌کابین" will show elevator, crane, gondola.
+ * - clicking other packs shows projects that match their keywords.
+ */
+const PACK_CATEGORY_MAP: Record<string, string[]> = {
+  "pack-tele-elev-crane": [
+    "آسانسور",
+    "تله کابین",
+    "جرثقیل",
+    "elevator",
+    "gondola",
+    "crane",
+  ],
+  "pack-lift-buildozer": [
+    "ماشین‌آلات",
+    "ماشین‌آلات سنگین",
+    "لیفت",
+    "بلدوزر",
+    "lift",
+    "buildozer",
+  ],
+};
+
 const ProjectSelection: React.FC = () => {
   const [view, setView] = useState<"carousel" | "list">("carousel");
   const [openProject, setOpenProject] = useState<any | null>(null);
 
-  // ensure each project's session exists (step=1, progress=0%) when page mounts
+  const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [displayProjects, setDisplayProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
+
+  // load projects + selected pack, then filter
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        // 1) load saved projects index (if any)
+        let saved: any[] = [];
+        try {
+          const loaded = await loadProjects();
+          if (Array.isArray(loaded) && loaded.length > 0) saved = loaded;
+        } catch (e) {
+          console.warn("loadProjects failed", e);
+          saved = [];
+        }
+
+        // 2) fallback to DUMMY_PROJECTS if none saved
+        const sourceProjects = saved.length > 0 ? saved : DUMMY_PROJECTS;
+
+        // 3) read selected pack id from storage
+        const selPack = await getSelectedPack();
+        setSelectedPackId(selPack);
+
+        // 4) filter based on pack
+        let filtered = sourceProjects;
+        if (selPack) {
+          const keywords = PACK_CATEGORY_MAP[selPack] ?? [];
+          const lowerKeywords = keywords.map((k) => k.toLowerCase());
+
+          filtered = sourceProjects.filter((proj: any) => {
+            const searchable = `${proj.category || ""} ${proj.name || ""} ${proj.id || ""}`.toString().toLowerCase();
+            return lowerKeywords.some((kw) => searchable.includes(kw));
+          });
+        }
+
+        setAllProjects(sourceProjects);
+        setDisplayProjects(filtered);
+      } catch (err) {
+        console.warn("ProjectSelection load/filter failed", err);
+        setAllProjects(DUMMY_PROJECTS);
+        setDisplayProjects(DUMMY_PROJECTS);
+      } finally {
+        setLoading(false);
+        // ensure sessions exist for displayed projects
+        try {
+          await Promise.all((displayProjects || DUMMY_PROJECTS).map((p) => initSession(p.id)));
+        } catch {}
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ensure sessions exist for displayed projects whenever they change
   useEffect(() => {
     (async () => {
       try {
-        await Promise.all(DUMMY_PROJECTS.map((p) => initSession(p.id)));
+        await Promise.all((displayProjects || []).map((p) => initSession(p.id)));
       } catch (e) {
-        console.warn("Failed to init sessions for dummy projects", e);
+        // ignore
       }
     })();
-  }, []);
+  }, [displayProjects]);
 
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">
@@ -71,10 +155,17 @@ const ProjectSelection: React.FC = () => {
       </Header>
 
       <main className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-        {view === "list" ? (
-          <ProjectListNew projects={DUMMY_PROJECTS} onOpen={(p) => setOpenProject(p)} />
+        {loading ? (
+          <div className="py-20 text-center text-neutral-500">در حال بارگذاری...</div>
+        ) : selectedPackId && displayProjects.length === 0 ? (
+          <div className="py-12 text-center">
+            <h2 className="text-2xl font-semibold">هیچ پروژه‌ای در این پَک یافت نشد</h2>
+            <p className="mt-2 text-neutral-500">ممکن است هنوز پروژه‌ای به این پَک اضافه نشده باشد.</p>
+          </div>
+        ) : view === "list" ? (
+          <ProjectListNew projects={displayProjects} onOpen={(p) => setOpenProject(p)} />
         ) : (
-          <EmblaIOSCarousel projects={DUMMY_PROJECTS} onOpen={(p) => setOpenProject(p)} />
+          <EmblaIOSCarousel projects={displayProjects} onOpen={(p) => setOpenProject(p)} />
         )}
       </main>
 

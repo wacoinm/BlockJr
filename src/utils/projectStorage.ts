@@ -14,40 +14,85 @@ function isWeb(): boolean {
   }
 }
 
+/**
+ * Load project index.
+ *
+ * Defensive behavior:
+ * - If stored JSON is invalid or not an array, clear the key and return [].
+ * - On native, check Preferences first, then fallback to filesystem (projects.json).
+ */
 export async function loadProjects(): Promise<Project[]> {
   if (isWeb()) {
     try {
       const raw = window.localStorage.getItem(PROJECT_INDEX_KEY);
-      if (raw) return JSON.parse(raw) as Project[];
-      return [];
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed as Project[];
+        // unexpected non-array -> clear the key to avoid repeated failures
+        console.warn("loadProjects: pj_index_v1 contains non-array value. Clearing it.", parsed);
+        try {
+          window.localStorage.removeItem(PROJECT_INDEX_KEY);
+        } catch {}
+        return [];
+      } catch (parseErr) {
+        console.warn("loadProjects: JSON.parse failed for localStorage pj_index_v1. Clearing it.", parseErr);
+        try {
+          window.localStorage.removeItem(PROJECT_INDEX_KEY);
+        } catch {}
+        return [];
+      }
     } catch (e) {
       console.warn("loadProjects(localStorage) error", e);
       return [];
     }
   }
 
+  // Native (Capacitor)
   try {
     const kv = await Preferences.get({ key: PROJECT_INDEX_KEY });
     if (kv && kv.value) {
       try {
-        return JSON.parse(kv.value) as Project[];
-      } catch {
-        // fallthrough to filesystem attempt
+        const parsed = JSON.parse(kv.value);
+        if (Array.isArray(parsed)) return parsed as Project[];
+        console.warn("loadProjects: Preferences pj_index_v1 contains non-array value. Removing it.", parsed);
+        try {
+          await Preferences.remove({ key: PROJECT_INDEX_KEY });
+        } catch {}
+        // fall through to filesystem attempt
+      } catch (parseErr) {
+        console.warn("loadProjects: JSON.parse failed for Preferences pj_index_v1. Will try filesystem.", parseErr);
       }
     }
 
+    // Filesystem fallback
     try {
       const res = await Filesystem.readFile({
         path: `${PROJECT_FOLDER}/projects.json`,
         directory: Directory.Data,
         encoding: Encoding.UTF8,
       });
-      const list = JSON.parse(res.data) as Project[];
-      await Preferences.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(list) });
-      return list;
+      if (res && res.data) {
+        try {
+          const list = JSON.parse(res.data);
+          if (Array.isArray(list)) {
+            // Mirror into Preferences (best-effort)
+            try {
+              await Preferences.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(list) });
+            } catch {}
+            return list as Project[];
+          } else {
+            console.warn("loadProjects: projects.json parsed but not an array. Ignoring.");
+          }
+        } catch (err) {
+          console.warn("loadProjects: parsing projects.json failed", err);
+        }
+      }
     } catch {
-      return [];
+      // ignore filesystem read errors and return []
     }
+
+    return [];
   } catch (e) {
     console.warn("loadProjects(Preferences/Filesystem) error", e);
     return [];
@@ -55,9 +100,10 @@ export async function loadProjects(): Promise<Project[]> {
 }
 
 export async function saveProjects(projects: Project[]): Promise<void> {
+  const serialized = JSON.stringify(projects);
   if (isWeb()) {
     try {
-      window.localStorage.setItem(PROJECT_INDEX_KEY, JSON.stringify(projects));
+      window.localStorage.setItem(PROJECT_INDEX_KEY, serialized);
     } catch (e) {
       console.warn("saveProjects(localStorage) failed", e);
     }
@@ -65,7 +111,7 @@ export async function saveProjects(projects: Project[]): Promise<void> {
   }
 
   try {
-    await Preferences.set({ key: PROJECT_INDEX_KEY, value: JSON.stringify(projects) });
+    await Preferences.set({ key: PROJECT_INDEX_KEY, value: serialized });
   } catch (e) {
     console.warn("saveProjects(Preferences) failed", e);
   }
@@ -74,7 +120,7 @@ export async function saveProjects(projects: Project[]): Promise<void> {
     await Filesystem.mkdir({ path: PROJECT_FOLDER, directory: Directory.Data, recursive: true });
     await Filesystem.writeFile({
       path: `${PROJECT_FOLDER}/projects.json`,
-      data: JSON.stringify(projects),
+      data: serialized,
       directory: Directory.Data,
       encoding: Encoding.UTF8,
     });

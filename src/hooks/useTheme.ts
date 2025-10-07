@@ -3,10 +3,14 @@ import { useEffect, useState } from 'react';
 
 export type Theme = 'system' | 'light' | 'dark';
 
+// NOTE: unified key: "site-theme" (matches ThemeToggle)
+const STORAGE_KEY = 'site-theme';
+
 export default function useTheme(initial: Theme = 'system') {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      return (localStorage.getItem('theme') as Theme) ?? initial;
+      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+      return stored ?? initial;
     } catch {
       return initial;
     }
@@ -31,14 +35,13 @@ export default function useTheme(initial: Theme = 'system') {
       mq.addEventListener('change', handler);
       return () => mq.removeEventListener('change', handler);
     }
-    return;
   }, [theme]);
 
   const cycleTheme = () => {
     const next: Theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
     setTheme(next);
     try {
-      localStorage.setItem('theme', next);
+      localStorage.setItem(STORAGE_KEY, next);
     } catch {
       /* ignore */
     }

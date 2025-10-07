@@ -1,0 +1,101 @@
+{
+  "generatedAt": "2025-10-07T00:00:00Z",
+  "packStorageKey": "selected_pack_v1",
+  "packs": [
+    {
+      "id": "pack-tele-elev-crane",
+      "name": "پَک آسانسور و تله‌کابین",
+      "description": "تله‌کابین، آسانسور، جرثقیل",
+      "items": ["telecabin", "elevator", "crane"],
+      "qrRaw": "ABCDEFGHIJKLMNOP",
+      "qrBase64": "QUJDREVGR0hJSktMTU5PUA=="
+    },
+    {
+      "id": "pack-lift-buildozer",
+      "name": "پَک ماشین‌آلات سنگین",
+      "description": "لیفت تراک، بلدوزر",
+      "items": ["lift truck", "buildozer"],
+      "qrRaw": "QRSTUVWXYZABCDEF",
+      "qrBase64": "UVJTVFVWV1hZWkFCQ0RFRg=="
+    }
+  ],
+  "projects": [
+    {
+      "id": "elevator",
+      "name": "آسانسور",
+      "subtitle": "پروژه نصب و راه‌اندازی آسانسور",
+      "category": "آموزشی",
+      "imgsPath": "public/scenes/elevator/chapters/",
+      "storyModule": "src/assets/stories/elevator/index.ts",
+      "storyDir": "src/assets/stories/elevator",
+      "validatorPath": "src/utils/validators/elevator.validator.ts",
+      "isLock": false,
+      "notes": "Demo project used in ProjectSelection page."
+    },
+    {
+      "id": "crane",
+      "name": "جرثقیل",
+      "subtitle": "پروژه جرثقیل سقفی",
+      "category": "آموزشی",
+      "imgsPath": "public/scenes/crane/chapters/",
+      "storyModule": "src/assets/stories/crane/index.ts",
+      "storyDir": "src/assets/stories/crane",
+      "validatorPath": "src/utils/validators/crane.validator.ts",
+      "isLock": true,
+      "lockReason": "محتوا در دست ساخت است"
+    },
+    {
+      "id": "gondola",
+      "name": "تله کابین",
+      "subtitle": "پروژه احداث تله کابین",
+      "category": "آموزشی",
+      "imgsPath": "public/scenes/gondola/chapters/",
+      "storyModule": "src/assets/stories/gondola/index.ts",
+      "storyDir": "src/assets/stories/gondola",
+      "validatorPath": "src/utils/validators/gondola.validator.ts",
+      "isLock": true
+    }
+  ],
+  "stories": [
+    {
+      "projectId": "elevator",
+      "storyPath": "src/assets/stories/elevator",
+      "storyModule": "src/assets/stories/elevator/index.ts",
+      "validatorPath": "src/utils/validators/elevator.validator.ts",
+      "notes": "Main elevator story module (exported as `elevator` in your code)."
+    },
+    {
+      "projectId": "crane",
+      "storyPath": "src/assets/stories/crane",
+      "storyModule": "src/assets/stories/crane/index.ts",
+      "validatorPath": "src/utils/validators/crane.validator.ts",
+      "notes": "Reuses elevator demo story for UI tests; replace with real story when available."
+    },
+    {
+      "projectId": "gondola",
+      "storyPath": "src/assets/stories/gondola",
+      "storyModule": "src/assets/stories/gondola/index.ts",
+      "validatorPath": "src/utils/validators/gondola.validator.ts",
+      "notes": "Gondola/télé-cabin story placeholder."
+    }
+  ],
+  "packToProjectKeywords": {
+    "pack-tele-elev-crane": [
+      "آسانسور",
+      "تله کابین",
+      "جرثقیل",
+      "elevator",
+      "gondola",
+      "crane"
+    ],
+    "pack-lift-buildozer": [
+      "ماشین‌آلات",
+      "ماشین‌آلات سنگین",
+      "لیفت",
+      "بلدوزر",
+      "lift",
+      "buildozer"
+    ]
+  },
+  "notes": "This manifest centralizes packs, projects and story/validator paths for development. Update when adding new packs/projects/stories."
+}

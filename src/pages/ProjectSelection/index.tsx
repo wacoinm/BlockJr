@@ -1,68 +1,79 @@
 // src/pages/ProjectSelection/index.tsx
 import React, { useEffect, useState } from "react";
-import Header from "../../components/project-manager/Header"; // reuse header
+import Header from "../../components/project-manager/Header";
 import IconViewToggle from "../../components/project-manager/IconViewToggle";
 import EmblaIOSCarousel from "../../components/project-selection/EmblaIOSCarousel";
 import ProjectActionSheet from "../../components/project-selection/ProjectActionSheet";
 import ProjectListNew from "../../components/project-selection/ProjectListNew";
 
-// import the elevator story you added
-import { elevator } from "../../assets/stories/elevator";
 import { initSession } from "../../utils/sessionStorage";
+import { getSelectedPack } from "../../utils/packStorage";
+import { getAllProjects, getPackKeywords } from "../../utils/manifest";
 
 /**
  * ProjectSelection page
- * - toggle between ios-like carousel (mobile-first) and a new list view
- * - uses dummy data (Persian texts)
- *
- * NOTE: DUMMY_PROJECTS now use the single `imgsPath` key (directory containing PNGs),
- * so components will probe images inside that folder (e.g. "/scense/elevator/1.png", etc).
+ * - loads projects from manifest
+ * - reads persisted pack id and filters displayed projects using manifest.packToProjectKeywords
  */
 
-const DUMMY_PROJECTS = [
-  {
-    id: "elevator",
-    name: "آسانسور",
-    subtitle: "پروژه نصب و راه‌اندازی آسانسور",
-    project: elevator,
-    // single key pointing at the folder with pngs for this project
-    imgsPath: "/scenes/elevator/chapters/",
-  },
-  {
-    id: "crane",
-    name: "جرثقیل",
-    subtitle: "پروژه جرثقیل سقفی",
-    // for test we reuse elevator story as you asked
-    project: elevator,
-    // reusing same imgsPath for now (adjust to your real folder if different)
-    imgsPath: "/scenes/crane/chapters/",
-    isLock: true,
-    lockReason: "محتوا در دست ساخت است"
-  },
-  {
-    id: "gondola",
-    name: "تله کابین",
-    subtitle: "پروژه احداث تله کابین",
-    project: elevator, // reuse elevator for test
-    imgsPath: "/scenes/crane/chapters/",
-    isLock: true
-  },
-];
+type Project = {
+  id: string;
+  name?: string;
+  category?: string;
+  [key: string]: any;
+};
 
 const ProjectSelection: React.FC = () => {
   const [view, setView] = useState<"carousel" | "list">("carousel");
   const [openProject, setOpenProject] = useState<any | null>(null);
 
-  // ensure each project's session exists (step=1, progress=0%) when page mounts
+  const [displayProjects, setDisplayProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
+      setLoading(true);
       try {
-        await Promise.all(DUMMY_PROJECTS.map((p) => initSession(p.id)));
-      } catch (e) {
-        console.warn("Failed to init sessions for dummy projects", e);
+        // load projects from manifest
+        const sourceProjects = getAllProjects() as Project[];
+
+        // read selected pack id
+        const selPack = await getSelectedPack();
+        setSelectedPackId(selPack);
+
+        // filter by pack keywords (if a pack is selected)
+        let filtered = sourceProjects;
+        if (selPack) {
+          const keywords = getPackKeywords(selPack).map((k) => k.toLowerCase());
+          filtered = sourceProjects.filter((proj) => {
+            const searchable = `${proj.category || ""} ${proj.name || ""} ${proj.id || ""}`.toLowerCase();
+            return keywords.some((kw) => searchable.includes(kw));
+          });
+        }
+
+        setDisplayProjects(filtered);
+      } catch (err) {
+        console.warn("ProjectSelection load/filter failed", err);
+        // fallback: show manifest projects
+        const manifestProjects = getAllProjects() as Project[];
+        setDisplayProjects(manifestProjects);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
+
+  // ensure sessions exist for displayed projects whenever they change
+  useEffect(() => {
+    (async () => {
+      try {
+        await Promise.all((displayProjects || []).map((p) => initSession(p.id)));
+      } catch {
+        // ignore session init errors
+      }
+    })();
+  }, [displayProjects]);
 
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300">
@@ -71,18 +82,22 @@ const ProjectSelection: React.FC = () => {
       </Header>
 
       <main className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-        {view === "list" ? (
-          <ProjectListNew projects={DUMMY_PROJECTS} onOpen={(p) => setOpenProject(p)} />
+        {loading ? (
+          <div className="py-20 text-center text-neutral-500">در حال بارگذاری...</div>
+        ) : selectedPackId && displayProjects.length === 0 ? (
+          <div className="py-12 text-center">
+            <h2 className="text-2xl font-semibold">هیچ پروژه‌ای در این پَک یافت نشد</h2>
+            <p className="mt-2 text-neutral-500">ممکن است هنوز پروژه‌ای به این پَک اضافه نشده باشد.</p>
+          </div>
+        ) : view === "list" ? (
+          <ProjectListNew projects={displayProjects} onOpen={(p) => setOpenProject(p)} />
         ) : (
-          <EmblaIOSCarousel projects={DUMMY_PROJECTS} onOpen={(p) => setOpenProject(p)} />
+          <EmblaIOSCarousel projects={displayProjects} onOpen={(p) => setOpenProject(p)} />
         )}
       </main>
 
       {openProject && (
-        <ProjectActionSheet
-          project={openProject}
-          onClose={() => setOpenProject(null)}
-        />
+        <ProjectActionSheet project={openProject} onClose={() => setOpenProject(null)} />
       )}
     </div>
   );

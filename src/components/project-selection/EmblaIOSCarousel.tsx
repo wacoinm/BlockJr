@@ -9,18 +9,15 @@ type Project = {
   id: string;
   name: string;
   subtitle?: string;
-  // NEW: directory path to project's pngs (e.g. "/scenes/elevator/")
+  // directory path to project's pngs (e.g. "/scenes/elevator/")
   imgsPath?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
-  // NEW: lock flag (optional, default false)
   isLock?: boolean;
-  // NEW: optional human-readable reason why locked
   lockReason?: string;
 };
 
 type DerivedProject = Project & {
-  // overlays from session / discovered story
   sessionStep?: number | null;
   derivedProgress?: number;
   totalChapters?: number | null;
@@ -52,17 +49,43 @@ function probeImage(url: string): Promise<boolean> {
     };
     img.onload = onLoad;
     img.onerror = onErr;
-    // some servers reject HEAD; using Image src to probe works in browser
     img.src = url;
-    // safety: timeout if nothing happens (network weirdness)
     setTimeout(() => {
       if (!done) {
         done = true;
-        // consider it missing on timeout
         resolve(false);
       }
     }, 2500);
   });
+}
+
+/**
+ * Normalize imgsPath:
+ * - If it's an absolute URL (http/https) leave as-is (ensure trailing slash).
+ * - If it starts with "public/", convert to root-relative by removing "public/" and ensuring leading '/'.
+ * - If it doesn't start with '/', prefix with '/' to resolve from site root.
+ * - Ensure trailing slash.
+ */
+function normalizeImgsPath(raw?: string): string {
+  if (!raw || raw.trim() === "") return "/";
+  let p = raw.trim().replace(/\\/g, "/");
+
+  // If it's a full URL, keep scheme and hostname, just ensure trailing slash
+  if (/^https?:\/\//i.test(p)) {
+    if (!p.endsWith("/")) p += "/";
+    return p;
+  }
+
+  // convert public/... -> /...
+  if (p.startsWith("public/")) p = p.replace(/^public\//, "/");
+
+  // ensure leading slash
+  if (!p.startsWith("/")) p = "/" + p;
+
+  // ensure trailing slash
+  if (!p.endsWith("/")) p += "/";
+
+  return p;
 }
 
 const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
@@ -151,7 +174,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     let mounted = true;
 
     (async () => {
-      // for each project, read session and optionally try to infer total chapters from assets
+      // for each project, read session and optionally try to infer total chapters from assets or story modules
       const next: DerivedProject[] = [];
       for (const p of projects) {
         const dp: DerivedProject = {
@@ -162,7 +185,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
         };
 
         try {
-          // read session (if exists) and use its progress/step
           const s = await getSession(p.id);
           if (!mounted) return;
           if (s) {
@@ -171,8 +193,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
             dp.sessionStep = typeof s.step === "number" ? s.step : null;
           }
         } catch (err) {
-          // ignore session read errors
-          // eslint-disable-next-line no-console
           console.warn("EmblaIOSCarousel: getSession failed for", p.id, err);
         }
 
@@ -213,12 +233,10 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
   // ---------------------
   // Image loading & rotation per project
   // ---------------------
-  // Map project.id => array of discovered images (full URL)
   const [projectImages, setProjectImages] = useState<Record<string, string[]>>(
     {}
   );
 
-  // per-project current index for auto-rotation
   const [projectCurrentIdx, setProjectCurrentIdx] = useState<
     Record<string, number>
   >({});
@@ -234,9 +252,11 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
         const imgs: string[] = [];
 
         if (p.imgsPath) {
+          const base = normalizeImgsPath(p.imgsPath);
+
           // Try numeric sequence 1..IMAGE_PROBE_MAX
           for (let i = 1; i <= IMAGE_PROBE_MAX; i++) {
-            const url = `${p.imgsPath.replace(/\/?$/, "/")}${i}.png`;
+            const url = `${base}${i}.png`;
             // eslint-disable-next-line no-await-in-loop
             const ok = await probeImage(url);
             if (ok) imgs.push(url);
@@ -244,7 +264,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
 
           // also try a thumb.png fallback
           if (imgs.length === 0) {
-            const thumb = `${p.imgsPath.replace(/\/?$/, "/")}thumb.png`;
+            const thumb = `${base}thumb.png`;
             if (await probeImage(thumb)) imgs.push(thumb);
           }
         }
@@ -280,7 +300,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
       // rotate only if there isn't already a timer
       if (timers[pid]) return;
 
-      // create interval
       const id = window.setInterval(() => {
         setProjectCurrentIdx((prev) => {
           const cur = prev[pid] ?? 0;
@@ -293,7 +312,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     });
 
     return () => {
-      // clear all timers we created (we only created local ones)
       Object.values(timers).forEach((t) => window.clearInterval(t));
     };
   }, [projectImages]);
@@ -336,7 +354,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
             const isCenter = i === logicalSelected;
             const locked = !!p.isLock;
 
-            // compute displayed values: progress uses session overlay if present
             const displayedProgress =
               typeof p.derivedProgress === "number"
                 ? p.derivedProgress
@@ -348,7 +365,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                 ? p.totalChapters
                 : p.checkpoints?.length ?? null;
 
-            // show text for مرحله: prefer "current / total" when sessionStep available
             const chapterText =
               sessionStep != null
                 ? totalChapters != null
@@ -393,9 +409,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
 
                     {/* LOCK overlay when project is locked */}
                     {locked ? (
-                      // overlay sits on top of the image and blurs the background via backdrop-blur
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
-                        {/* translucent blurred panel */}
                         <div className="rounded-lg p-4 w-full max-w-[360px] text-center bg-white/60 dark:bg-black/50 backdrop-blur-md border border-[rgba(0,0,0,0.06)]">
                           <div className="flex flex-col items-center gap-2">
                             <div className="p-3 rounded-full bg-white/70 dark:bg-black/60 inline-flex">
@@ -413,7 +427,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                         </div>
                       </div>
                     ) : (
-                      // small manual indicators (optional)
                       imgs.length > 1 ? (
                         <div className="absolute left-3 top-3 rounded-full p-1 bg-white/80 dark:bg-neutral-900/70 flex gap-1">
                           {imgs.map((_, j) => (
@@ -431,7 +444,6 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
                       <div className="absolute right-3 bottom-3">
                         <button
                           onClick={() => {
-                            // only allow play if not locked
                             if (!locked) onOpen(p);
                           }}
                           aria-label={`شروع ${p.name}`}
@@ -481,12 +493,10 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
         <button
           onClick={() => {
             const center = derivedProjects[logicalSelected];
-            // prevent opening locked project
             if (center && !center.isLock) onOpen(center);
           }}
           className="w-full py-3 rounded-xl text-center font-semibold bg-green-600 text-white shadow-lg"
           aria-label="انتخاب پروژه"
-          // indicate disabled state if locked (visually unchanged but prevented)
           aria-disabled={!!derivedProjects[logicalSelected]?.isLock}
         >
           انتخاب پروژه

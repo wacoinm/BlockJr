@@ -7,21 +7,26 @@ import ProjectActionSheet from "../../components/project-selection/ProjectAction
 import ProjectListNew from "../../components/project-selection/ProjectListNew";
 
 import { initSession } from "../../utils/sessionStorage";
-import { loadProjects } from "../../utils/projectStorage";
 import { getSelectedPack } from "../../utils/packStorage";
 import { getAllProjects, getPackKeywords } from "../../utils/manifest";
 
 /**
  * ProjectSelection page
- * - loads saved projects via loadProjects(); falls back to config/packs-manifest.json projects
+ * - loads projects from manifest
  * - reads persisted pack id and filters displayed projects using manifest.packToProjectKeywords
  */
+
+type Project = {
+  id: string;
+  name?: string;
+  category?: string;
+  [key: string]: any;
+};
 
 const ProjectSelection: React.FC = () => {
   const [view, setView] = useState<"carousel" | "list">("carousel");
   const [openProject, setOpenProject] = useState<any | null>(null);
 
-  const [allProjects, setAllProjects] = useState<any[]>([]);
   const [displayProjects, setDisplayProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
@@ -30,40 +35,28 @@ const ProjectSelection: React.FC = () => {
     (async () => {
       setLoading(true);
       try {
-        // load saved projects (if any)
-        let saved: any[] = [];
-        try {
-          const loaded = await loadProjects();
-          if (Array.isArray(loaded) && loaded.length > 0) saved = loaded;
-        } catch (e) {
-          console.warn("loadProjects failed", e);
-          saved = [];
-        }
-
-        // fallback to manifest projects
-        const manifestProjects = getAllProjects();
-        const sourceProjects = saved.length > 0 ? saved : manifestProjects;
+        // load projects from manifest
+        const sourceProjects = getAllProjects() as Project[];
 
         // read selected pack id
         const selPack = await getSelectedPack();
         setSelectedPackId(selPack);
 
-        // filter by pack keywords (if pack selected)
+        // filter by pack keywords (if a pack is selected)
         let filtered = sourceProjects;
         if (selPack) {
           const keywords = getPackKeywords(selPack).map((k) => k.toLowerCase());
-          filtered = sourceProjects.filter((proj: any) => {
-            const searchable = `${proj.category || ""} ${proj.name || ""} ${proj.id || ""}`.toString().toLowerCase();
+          filtered = sourceProjects.filter((proj) => {
+            const searchable = `${proj.category || ""} ${proj.name || ""} ${proj.id || ""}`.toLowerCase();
             return keywords.some((kw) => searchable.includes(kw));
           });
         }
 
-        setAllProjects(sourceProjects);
         setDisplayProjects(filtered);
       } catch (err) {
         console.warn("ProjectSelection load/filter failed", err);
-        const manifestProjects = getAllProjects();
-        setAllProjects(manifestProjects);
+        // fallback: show manifest projects
+        const manifestProjects = getAllProjects() as Project[];
         setDisplayProjects(manifestProjects);
       } finally {
         setLoading(false);
@@ -76,8 +69,8 @@ const ProjectSelection: React.FC = () => {
     (async () => {
       try {
         await Promise.all((displayProjects || []).map((p) => initSession(p.id)));
-      } catch (e) {
-        // ignore
+      } catch {
+        // ignore session init errors
       }
     })();
   }, [displayProjects]);
@@ -104,10 +97,7 @@ const ProjectSelection: React.FC = () => {
       </main>
 
       {openProject && (
-        <ProjectActionSheet
-          project={openProject}
-          onClose={() => setOpenProject(null)}
-        />
+        <ProjectActionSheet project={openProject} onClose={() => setOpenProject(null)} />
       )}
     </div>
   );

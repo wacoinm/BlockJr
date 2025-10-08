@@ -119,12 +119,10 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
 
   const checkpoints = derivedCheckpoints;
 
-  const [current, setCurrent] = useState<string | null>(
-    checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null
-  );
+  const [current, setCurrent] = useState<string | null>(null);
 
   useEffect(() => {
-    setCurrent(checkpoints.find((c) => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
+    setCurrent([...checkpoints].reverse().find(c => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
   }, [project, checkpoints]); // eslint-disable-line
 
   const [isVisible, setIsVisible] = useState(false);
@@ -326,7 +324,20 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
       if (!mounted) return;
       const uniq = Array.from(new Set(discovered));
       setImageCandidates(uniq);
-      setCurrentImage((prev) => prev ?? uniq[0] ?? null);
+      let lastUnlockedIndex = -1;
+      for (let i = checkpoints.length - 1; i >= 0; i--) {
+        const c = checkpoints[i];
+        if (!c.locked) {
+          lastUnlockedIndex = i;
+          break;
+        }
+      }
+      if (lastUnlockedIndex >= 0) {
+        setCurrentImage(uniq[lastUnlockedIndex] ?? uniq[0] ?? null);
+      } else {
+        setCurrentImage(uniq[0] ?? null);
+      }
+
     })();
 
     return () => {

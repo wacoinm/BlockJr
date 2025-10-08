@@ -13,13 +13,23 @@ import { getAllProjects, getPackKeywords } from "../../utils/manifest";
 /**
  * ProjectSelection page
  * - loads projects from manifest
- * - reads persisted pack id and filters displayed projects using manifest.packToProjectKeywords
+ * - attempts to enrich each project by importing a story module from ../../assets/stories/<id>
+ * - attaches `.project` (story object) and `.checkpoints` derived from it when possible,
+ *   so downstream components (ProjectActionSheet / EmblaIOSCarousel) behave like the old dummy data.
  */
 
 type Project = {
   id: string;
   name?: string;
   category?: string;
+  subtitle?: string;
+  imgsPath?: string;
+  progress?: number;
+  isLock?: boolean;
+  lockReason?: string;
+  // enriched:
+  project?: any; // story module object (e.g. elevator)
+  checkpoints?: { id: string; title?: string }[];
   [key: string]: any;
 };
 
@@ -27,7 +37,7 @@ const ProjectSelection: React.FC = () => {
   const [view, setView] = useState<"carousel" | "list">("carousel");
   const [openProject, setOpenProject] = useState<any | null>(null);
 
-  const [displayProjects, setDisplayProjects] = useState<any[]>([]);
+  const [displayProjects, setDisplayProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
 
@@ -35,18 +45,51 @@ const ProjectSelection: React.FC = () => {
     (async () => {
       setLoading(true);
       try {
-        // load projects from manifest
-        const sourceProjects = getAllProjects() as Project[];
+        // load raw manifest projects
+        const sourceProjects = (getAllProjects() || []) as Project[];
 
-        // read selected pack id
+        // attempt to enrich projects by importing story modules from ../../assets/stories/<id>
+        const enriched = await Promise.all(
+          sourceProjects.map(async (p) => {
+            let storyObj: any = null;
+            try {
+              // dynamic import - match the same heuristic Embla uses
+              // bundlers will only include folders actually present (e.g. src/assets/stories/elevator)
+              // so this will succeed for the elevator demo and gracefully fail for others.
+              // eslint-disable-next-line no-await-in-loop
+              const mod: any = await import(`../../assets/stories/${p.id}`).catch(() => null);
+              if (mod) {
+                storyObj = mod[p.id] ?? mod.default ?? mod.elevator ?? mod;
+              }
+            } catch (err) {
+              // ignore - missing module is expected for many projects
+            }
+
+            // if the manifest already provided explicit checkpoints, keep them
+            let checkpoints = Array.isArray((p as any).checkpoints) ? (p as any).checkpoints : undefined;
+
+            // if no checkpoints but we have a story object, derive them from story keys
+            if ((!checkpoints || checkpoints.length === 0) && storyObj && typeof storyObj === "object") {
+              checkpoints = Object.keys(storyObj).map((k) => ({ id: k, title: k }));
+            }
+
+            return {
+              ...p,
+              project: storyObj ?? p.project, // attach story object if found
+              checkpoints: checkpoints ?? p.checkpoints ?? [],
+            } as Project;
+          })
+        );
+
+        // read persisted selected pack
         const selPack = await getSelectedPack();
         setSelectedPackId(selPack);
 
-        // filter by pack keywords (if a pack is selected)
-        let filtered = sourceProjects;
+        // filter by pack keywords if a pack is selected
+        let filtered = enriched;
         if (selPack) {
-          const keywords = getPackKeywords(selPack).map((k) => k.toLowerCase());
-          filtered = sourceProjects.filter((proj) => {
+          const keywords = getPackKeywords(selPack || "").map((k) => k.toLowerCase());
+          filtered = enriched.filter((proj) => {
             const searchable = `${proj.category || ""} ${proj.name || ""} ${proj.id || ""}`.toLowerCase();
             return keywords.some((kw) => searchable.includes(kw));
           });
@@ -55,9 +98,8 @@ const ProjectSelection: React.FC = () => {
         setDisplayProjects(filtered);
       } catch (err) {
         console.warn("ProjectSelection load/filter failed", err);
-        // fallback: show manifest projects
-        const manifestProjects = getAllProjects() as Project[];
-        setDisplayProjects(manifestProjects);
+        // fallback: show manifest projects un-enriched
+        setDisplayProjects((getAllProjects() || []) as Project[]);
       } finally {
         setLoading(false);
       }
@@ -96,9 +138,7 @@ const ProjectSelection: React.FC = () => {
         )}
       </main>
 
-      {openProject && (
-        <ProjectActionSheet project={openProject} onClose={() => setOpenProject(null)} />
-      )}
+      {openProject && <ProjectActionSheet project={openProject} onClose={() => setOpenProject(null)} />}
     </div>
   );
 };

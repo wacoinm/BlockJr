@@ -512,19 +512,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         </div>
 
         {/* footer buttons */}
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={closeWithAnimation} className="px-4 py-2 rounded-md border">
-            بستن
-          </button>
-          <button
-            onClick={() => {
-              console.log("load checkpoint", current);
-            }}
-            className="px-4 py-2 rounded-md bg-green-600 text-white"
-          >
-            رفتن به بخش
-          </button>
-        </div>
+        <hr className="border-t-2 border-emerald-800"/>
       </div>
     </div>
   );

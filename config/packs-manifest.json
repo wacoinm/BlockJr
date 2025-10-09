@@ -25,6 +25,7 @@
       "name": "آسانسور",
       "subtitle": "پروژه نصب و راه‌اندازی آسانسور",
       "category": "آموزشی",
+      "description": "آن شب، زمستان انگار تصمیم گرفته بود همهٔ پنجره‌های جهان را منجمد کند. پشت شیشهٔ اتاق اندی، دانه‌های برف آرام آرام بر روی هم می‌نشستند. بخاریِ سالن خاموش شده بود، و اندی آن‌قدر خسته بود که با لباس مدرسه و جوراب‌های راه‌راهش،",
       "imgsPath": "public/scenes/elevator/chapters/",
       "storyModule": "src/assets/stories/elevator/index.ts",
       "storyDir": "src/assets/stories/elevator",

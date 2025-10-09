@@ -10,6 +10,7 @@ import { store } from "./store";
 import "dialogue-story/style.css";
 import "./index.css";
 import "@fontsource/vazirmatn";
+import Container from "./components/Container";
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);
@@ -28,8 +29,10 @@ root.render(
         activeRedo
         canSkip
       >
-        <RouterProvider router={router} />
-        <ToastContain />
+        <Container>
+          <RouterProvider router={router} />
+          <ToastContain />
+        </Container>
       </DialogueProvider>
     </Provider>
   </React.StrictMode>

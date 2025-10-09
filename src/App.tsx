@@ -566,15 +566,15 @@ const App: React.FC = () => {
       content: theme === 'system' ? <Monitor className="w-6 h-6" /> : theme === 'light' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />,
       title: "حالت شب/روز"
     },
-    {
-      key: 'selectProject',
-      onClick: () => {
-        if (!selectVisible) openSelectPopup();
-        else closeSelectPopup();
-      },
-      content: <FolderOpenDot className="w-6 h-6" />,
-      title: "پروژه"
-    },
+    // {
+    //   key: 'selectProject',
+    //   onClick: () => {
+    //     if (!selectVisible) openSelectPopup();
+    //     else closeSelectPopup();
+    //   },
+    //   content: <FolderOpenDot className="w-6 h-6" />,
+    //   title: "پروژه"
+    // },
     {
       key: 'unit',
       onClick: cycleUnit,

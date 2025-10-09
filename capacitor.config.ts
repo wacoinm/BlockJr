@@ -23,6 +23,10 @@ const config: CapacitorConfig = {
     },
     EdgeToEdge: {
       backgroundColor: "#694db9",
+    },
+    ScreenOrientation: {
+      allowOrientationChange: false,
+      orientation: "portrait"
     }
   }
 };

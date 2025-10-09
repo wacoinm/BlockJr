@@ -1,14 +1,15 @@
 // src/utils/ensureBluetoothPermissions.ts
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
+import { Camera } from '@capacitor/camera';
 
 const platform = Capacitor.getPlatform();
 const isNative = platform !== 'web';
 
 /**
- * Best-effort check for Bluetooth usage prerequisites.
- * Returns true when Bluetooth is enabled and necessary conditions are met.
- * Returns false when user action is required (e.g., enable Bluetooth).
+ * Best-effort check for Bluetooth + Camera prerequisites.
+ * Returns true when Bluetooth is enabled and camera permission is granted.
+ * Returns false when user action is required (e.g., enable Bluetooth or grant Camera permission).
  */
 export async function ensureBluetoothPermissions(): Promise<boolean> {
   if (!isNative) {
@@ -18,8 +19,8 @@ export async function ensureBluetoothPermissions(): Promise<boolean> {
 
   // 1) Ensure Bluetooth is enabled
   let bluetoothEnabled = false;
-  let retries = 3;
-  while (retries > 0) {
+  let btRetries = 3;
+  while (btRetries > 0) {
     try {
       const { enabled } = await BluetoothSerial.isEnabled();
       bluetoothEnabled = enabled;
@@ -27,13 +28,14 @@ export async function ensureBluetoothPermissions(): Promise<boolean> {
         console.log('[ensureBluetoothPermissions] Bluetooth is enabled');
         break;
       }
-      console.log(`[ensureBluetoothPermissions] Bluetooth disabled, attempting to enable... (attempt ${4 - retries}/3)`);
+      console.log(`[ensureBluetoothPermissions] Bluetooth disabled, attempting to enable... (attempt ${4 - btRetries}/3)`);
       await BluetoothSerial.enable();
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for enable to take effect
+      // Wait briefly for the enable to take effect
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (e) {
-      console.warn(`[ensureBluetoothPermissions] Bluetooth enable attempt failed (attempt ${4 - retries}/3)`, e);
+      console.warn(`[ensureBluetoothPermissions] Bluetooth enable attempt failed (attempt ${4 - btRetries}/3)`, e);
     }
-    retries--;
+    btRetries--;
   }
 
   if (!bluetoothEnabled) {
@@ -41,7 +43,34 @@ export async function ensureBluetoothPermissions(): Promise<boolean> {
     return false;
   }
 
-  // All checks passed (Bluetooth enabled)
+  // 2) Ensure Camera permission is granted
+  let cameraAllowed = false;
+  try {
+    // checkPermissions returns an object like { camera: 'granted' | 'denied' | 'prompt', photos?: ... }
+    const current = await Camera.checkPermissions() as any;
+    if (current.camera === 'granted') {
+      cameraAllowed = true;
+      console.log('[ensureBluetoothPermissions] Camera permission already granted');
+    } else {
+      console.log('[ensureBluetoothPermissions] Camera permission not granted, requesting permission...');
+      const requested = await Camera.requestPermissions({ permissions: ['camera'] }) as any;
+      if (requested.camera === 'granted') {
+        cameraAllowed = true;
+        console.log('[ensureBluetoothPermissions] Camera permission granted after request');
+      } else {
+        console.warn('[ensureBluetoothPermissions] Camera permission denied or not granted');
+      }
+    }
+  } catch (e) {
+    console.warn('[ensureBluetoothPermissions] Camera permission check/request failed', e);
+  }
+
+  if (!cameraAllowed) {
+    console.warn('[ensureBluetoothPermissions] Camera permission required; user action required');
+    return false;
+  }
+
+  // All checks passed (Bluetooth enabled and Camera permission granted)
   console.log('[ensureBluetoothPermissions] All checks passed');
   return true;
 }

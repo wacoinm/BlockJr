@@ -31,3 +31,4 @@ local-maven/
 # Ignore todo lists
 *.todo
 cache
+stru.*

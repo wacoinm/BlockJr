@@ -575,7 +575,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
   useEffect(() => {
     if (typeof setBlockPaletteBottom === "function") {
       // pass an integer px value to keep things simple
-      setBlockPaletteBottom(Math.round(chooserBottom));
+      setBlockPaletteBottom(94);
     }
   }, [chooserBottom, setBlockPaletteBottom]);
 

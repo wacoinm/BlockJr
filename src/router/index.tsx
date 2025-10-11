@@ -10,23 +10,31 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <PacksPage />,
-    errorElement: <ErrorPage />
+    errorElement: <ErrorPage />,
   },
   {
     path: "/manage",
     element: <ProjectManager />,
-    errorElement: <ErrorPage />
+    errorElement: <ErrorPage />,
   },
+  // ✅ NEW explicit route for project selection by pack ID
+  {
+    path: "/project/p/:packId",
+    element: <ProjectSelection />,
+    errorElement: <ErrorPage />,
+  },
+  // keep original /project for backward compatibility
   {
     path: "/project",
     element: <ProjectSelection />,
-    errorElement: <ErrorPage />
+    errorElement: <ErrorPage />,
   },
+  // project viewer/player route (single project)
   {
     path: "/project/:id",
     element: <App />,
-    errorElement: <ErrorPage />
-  }
+    errorElement: <ErrorPage />,
+  },
 ]);
 
 export default router;

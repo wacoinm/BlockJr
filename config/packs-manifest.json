@@ -6,7 +6,7 @@
       "id": "pack-tele-elev-crane",
       "name": "پَک آسانسور و تله‌کابین",
       "description": "تله‌کابین، آسانسور، جرثقیل",
-      "items": ["telecabin", "elevator", "crane"],
+      "items": ["elevator", "crane", "gondola"],
       "qrRaw": "ABCDEFGHIJKLMNOP",
       "qrBase64": "QUJDREVGR0hJSktMTU5PUA=="
     },

@@ -25,50 +25,17 @@ const encodeBase64 = (s: string) => {
   return "";
 };
 
-/**
- * Better normalization for comparing incoming slugs/ids/names:
- * - decodeURIComponent if possible
- * - remove parentheses
- * - replace sequences of non-alphanumeric (including Persian letters) with single hyphen
- * - collapse multiple hyphens, trim leading/trailing hyphens
- * - lowercase
- */
 const normalizeKey = (s: any) => {
   if (s === null || s === undefined) return "";
   let str = String(s);
   try {
     str = decodeURIComponent(str);
-  } catch (e) {
-    // ignore decode failure
-  }
-  // remove parentheses and their contents? keep inner but remove parentheses characters
+  } catch (e) {}
   str = str.replace(/[()]/g, " ");
-  // replace any sequence of non-word characters with hyphen.
-  // \w matches ASCII letters/digits/underscore; to include unicode letters (Persian) use a unicode class:
-  // We'll replace anything that's not a letter or number with hyphen.
-  // Use a conservative regex that keeps Unicode letters and numbers.
-  str = str.replace(/[^\p{L}\p{N}]+/gu, "-"); // requires u flag for Unicode
-  // collapse multiple hyphens
+  str = str.replace(/[^À-\u017Fa-zA-Z0-9\p{L}\p{N}]+/gu, "-");
   str = str.replace(/-+/g, "-");
-  // trim hyphens
   str = str.replace(/^-|-$/g, "");
   return str.trim().toLowerCase();
-};
-
-const normalizePack = (p: any) => {
-  const qrRaw = p?.qrRaw ?? "";
-  const qrBase64 = p?.qrBase64 ?? (qrRaw ? encodeBase64(qrRaw) : p?.qr ?? "");
-  const id = p?.id ?? (p?.name ? toPackId(p.name, "آموزشی") : `pack-unknown-${Math.random().toString(36).slice(2, 9)}`);
-  const items = Array.isArray(p?.items) ? p.items : Array.isArray(p?.files) ? p.files : [];
-  return {
-    ...p,
-    id,
-    name: p?.name ?? p?.id ?? "بدون نام",
-    qrRaw,
-    qrBase64,
-    qr: p?.qr ?? qrBase64 ?? "",
-    items,
-  };
 };
 
 const PacksPage: React.FC = () => {
@@ -108,7 +75,6 @@ const PacksPage: React.FC = () => {
         try { return decodeURIComponent(raw); } catch { return raw; }
       })();
 
-      // try to find a manifest pack by id or name (using normalizeKey)
       const list = manifestRef.current || [];
       const found = list.find((p: any) =>
         normalizeKey(p.id) === normalizeKey(decoded) ||
@@ -117,10 +83,8 @@ const PacksPage: React.FC = () => {
         normalizeKey(p.name) === normalizeKey(raw)
       );
 
-      // canonical id: manifest id when found, otherwise use decoded/raw with .pack stripped
       const canonical = (found ? String(found.id) : String(decoded || raw)).replace(/\.pack$/i, "");
 
-      // persist and navigate using only the canonical id
       await setSelectedPack(canonical).catch(() => {});
       navigate(`/project/p/${encodeURIComponent(canonical)}`);
     } catch (e) {
@@ -130,6 +94,22 @@ const PacksPage: React.FC = () => {
     }
   }
 
+  // keep normalizePack close to this file so normalization is consistent with packs list
+  const normalizePack = (p: any) => {
+    const qrRaw = p?.qrRaw ?? "";
+    const qrBase64 = p?.qrBase64 ?? (qrRaw ? encodeBase64(qrRaw) : p?.qr ?? "");
+    const id = p?.id ?? (p?.name ? toPackId(p.name, "آموزشی") : `pack-unknown-${Math.random().toString(36).slice(2, 9)}`);
+    const items = Array.isArray(p?.items) ? p.items : Array.isArray(p?.files) ? p.files : [];
+    return {
+      ...p,
+      id,
+      name: p?.name ?? p?.id ?? "بدون نام",
+      qrRaw,
+      qrBase64,
+      qr: p?.qr ?? qrBase64 ?? "",
+      items,
+    };
+  };
 
   async function handleScanned(scanned: string) {
     const s = scanned?.trim?.() ?? "";
@@ -138,6 +118,7 @@ const PacksPage: React.FC = () => {
       return;
     }
 
+    // Try to find a manifest pack that matches the scanned code
     let matchedPack = manifestRef.current.find((p: any) => {
       if (!p) return false;
       if (p.qr && String(p.qr).trim() === s) return true;
@@ -146,6 +127,8 @@ const PacksPage: React.FC = () => {
       if (p.qrRaw && encodeBase64(String(p.qrRaw)).trim() === s) return true;
       return false;
     });
+
+    const matchedFromManifest = !!matchedPack;
 
     if (!matchedPack) {
       const generatedId = `scanned-${Date.now().toString(36)}.pack`;
@@ -162,10 +145,21 @@ const PacksPage: React.FC = () => {
 
     try {
       const projects = (await loadProjects()) || [];
-      const baseId = toPackId(matchedPack.name, "آموزشی");
-      let finalId = baseId;
-      if (projects.find((pj: any) => pj.id === baseId)) {
-        finalId = `${baseId.replace(/\.pack$/, "")}-${Date.now().toString(36)}.pack`;
+
+      // If the scanned pack is from the manifest, *preserve the manifest id* (do not regenerate
+      // using the localized name). For non-manifest scanned packs, keep the existing behavior
+      // (generate a slug using toPackId(name, category)).
+      let finalId: string;
+
+      if (matchedFromManifest && matchedPack && matchedPack.id) {
+        // use manifest id verbatim (strip .pack if present for consistency)
+        finalId = String(matchedPack.id).replace(/\.pack$/i, "");
+      } else {
+        const baseId = toPackId(matchedPack.name, "آموزشی");
+        finalId = baseId;
+        if (projects.find((pj: any) => pj.id === baseId)) {
+          finalId = `${baseId.replace(/\.pack$/i, "")}-${Date.now().toString(36)}.pack`;
+        }
       }
 
       const newProject = {
@@ -177,6 +171,7 @@ const PacksPage: React.FC = () => {
       };
 
       matchedPack.id = finalId;
+
       await saveProjects([newProject, ...projects]);
       await saveProjectFile(finalId, "pack.json", JSON.stringify({ ...matchedPack, addedAt: new Date().toISOString() }, null, 2));
       await addScannedPack(matchedPack);
@@ -190,7 +185,9 @@ const PacksPage: React.FC = () => {
       setConfetti(true);
       setTimeout(() => setConfetti(false), 3200);
       toast.success(`پک «${matchedPack.name}» با موفقیت اضافه شد!`);
-      await setSelectedPack(finalId);
+
+      // Persist selected pack and keep the canonical form (manifest id when available)
+      await setSelectedPack(String(finalId)).catch(() => {});
     } catch (e) {
       console.error("add pack error", e);
       toast.error("خطا در افزودن پک.");
@@ -215,7 +212,7 @@ const PacksPage: React.FC = () => {
 
         {packs.length === 0 ? (
           <div className="py-12 text-center">
-            <h2 className="text-2xl font-semibold">هیچ پکی یافت نشد</h2>
+            <h2 className="text-2xl font-semibold">هیچ پَکی یافت نشد</h2>
             <p className="mt-2 text-neutral-500">برای افزودن پک از QR استفاده کنید.</p>
           </div>
         ) : (

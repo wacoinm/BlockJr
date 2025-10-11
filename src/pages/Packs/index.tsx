@@ -92,7 +92,8 @@ const PacksPage: React.FC = () => {
     (async () => {
       try {
         const scanned = (await getScannedPacks().catch(() => [])) as any[];
-        setPacks(scanned);
+        const normalized = (scanned || []).map((s) => normalizePack(s));
+        setPacks(normalized);
       } catch (err) {
         console.warn("Failed to load scanned packs", err);
         setPacks([]);
@@ -101,35 +102,33 @@ const PacksPage: React.FC = () => {
   }, []);
 
   async function handlePackClick(packIdentifier: string) {
-  try {
-    const raw = String(packIdentifier ?? "");
-    const decoded = (() => {
-      try { return decodeURIComponent(raw); } catch { return raw; }
-    })();
-    console.log(raw)
+    try {
+      const raw = String(packIdentifier ?? "");
+      const decoded = (() => {
+        try { return decodeURIComponent(raw); } catch { return raw; }
+      })();
 
-    // try to find a manifest pack by id or name (using normalizeKey)
-    const list = manifestRef.current || [];
-    const found = list.find((p: any) =>
-      normalizeKey(p.id) === normalizeKey(decoded) ||
-      normalizeKey(p.name) === normalizeKey(decoded) ||
-      normalizeKey(p.id) === normalizeKey(raw) ||
-      normalizeKey(p.name) === normalizeKey(raw)
-    );
-    console.log(found)
+      // try to find a manifest pack by id or name (using normalizeKey)
+      const list = manifestRef.current || [];
+      const found = list.find((p: any) =>
+        normalizeKey(p.id) === normalizeKey(decoded) ||
+        normalizeKey(p.name) === normalizeKey(decoded) ||
+        normalizeKey(p.id) === normalizeKey(raw) ||
+        normalizeKey(p.name) === normalizeKey(raw)
+      );
 
-    // canonical id: manifest id when found, otherwise use decoded/raw with .pack stripped
-    const canonical = (found ? String(found.id) : String(decoded || raw)).replace(/\.pack$/i, "");
+      // canonical id: manifest id when found, otherwise use decoded/raw with .pack stripped
+      const canonical = (found ? String(found.id) : String(decoded || raw)).replace(/\.pack$/i, "");
 
-    // persist and navigate using only the canonical id
-    await setSelectedPack(canonical).catch(() => {});
-    navigate(`/project/p/${canonical}`);
-  } catch (e) {
-    console.warn("handlePackClick fallback:", e);
-    const fallback = String(packIdentifier ?? "").replace(/\.pack$/i, "");
-    navigate(`/project/p/${encodeURIComponent(fallback)}`);
+      // persist and navigate using only the canonical id
+      await setSelectedPack(canonical).catch(() => {});
+      navigate(`/project/p/${encodeURIComponent(canonical)}`);
+    } catch (e) {
+      console.warn("handlePackClick fallback:", e);
+      const fallback = String(packIdentifier ?? "").replace(/\.pack$/i, "");
+      navigate(`/project/p/${encodeURIComponent(fallback)}`);
+    }
   }
-}
 
 
   async function handleScanned(scanned: string) {

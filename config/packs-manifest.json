@@ -26,7 +26,7 @@
       "subtitle": "پروژه نصب و راه‌اندازی آسانسور",
       "category": "آموزشی",
       "description": "آن شب، زمستان انگار تصمیم گرفته بود همهٔ پنجره‌های جهان را منجمد کند. پشت شیشهٔ اتاق اندی، دانه‌های برف آرام آرام بر روی هم می‌نشستند. بخاریِ سالن خاموش شده بود، و اندی آن‌قدر خسته بود که با لباس مدرسه و جوراب‌های راه‌راهش،",
-      "imgsPath": "public/scenes/elevator/chapters/",
+      "imgsPath": "/scenes/elevator/chapters/",
       "storyModule": "src/assets/stories/elevator/index.ts",
       "storyDir": "src/assets/stories/elevator",
       "validatorPath": "src/utils/validators/elevator.validator.ts",
@@ -38,10 +38,10 @@
       "name": "جرثقیل",
       "subtitle": "پروژه جرثقیل سقفی",
       "category": "آموزشی",
-      "imgsPath": "public/scenes/crane/chapters/",
-      "storyModule": "src/assets/stories/crane/index.ts",
-      "storyDir": "src/assets/stories/crane",
-      "validatorPath": "src/utils/validators/crane.validator.ts",
+      "imgsPath": "public/scenes/elevator/chapters/",
+      "storyModule": "src/assets/stories/elevator/index.ts",
+      "storyDir": "src/assets/stories/elevator",
+      "validatorPath": "src/utils/validators/elevator.validator.ts",
       "isLock": true,
       "lockReason": "محتوا در دست ساخت است"
     },
@@ -50,10 +50,10 @@
       "name": "تله کابین",
       "subtitle": "پروژه احداث تله کابین",
       "category": "آموزشی",
-      "imgsPath": "public/scenes/gondola/chapters/",
-      "storyModule": "src/assets/stories/gondola/index.ts",
-      "storyDir": "src/assets/stories/gondola",
-      "validatorPath": "src/utils/validators/gondola.validator.ts",
+      "imgsPath": "public/scenes/elevator/chapters/",
+      "storyModule": "src/assets/stories/elevator/index.ts",
+      "storyDir": "src/assets/stories/elevator",
+      "validatorPath": "src/utils/validators/elevator.validator.ts",
       "isLock": true
     }
   ],
@@ -67,16 +67,16 @@
     },
     {
       "projectId": "crane",
-      "storyPath": "src/assets/stories/crane",
-      "storyModule": "src/assets/stories/crane/index.ts",
-      "validatorPath": "src/utils/validators/crane.validator.ts",
+      "storyPath": "src/assets/stories/elevator",
+      "storyModule": "src/assets/stories/elevator/index.ts",
+      "validatorPath": "src/utils/validators/elevator.validator.ts",
       "notes": "Reuses elevator demo story for UI tests; replace with real story when available."
     },
     {
       "projectId": "gondola",
-      "storyPath": "src/assets/stories/gondola",
-      "storyModule": "src/assets/stories/gondola/index.ts",
-      "validatorPath": "src/utils/validators/gondola.validator.ts",
+      "storyPath": "src/assets/stories/elevator",
+      "storyModule": "src/assets/stories/elevator/index.ts",
+      "validatorPath": "src/utils/validators/elevator.validator.ts",
       "notes": "Gondola/télé-cabin story placeholder."
     }
   ],

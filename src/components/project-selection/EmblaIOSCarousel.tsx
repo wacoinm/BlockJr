@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Play, Lock } from "lucide-react";
 import { getSession } from "../../utils/sessionStorage";
+import { getAllProjects as getManifestProjects } from "../../utils/manifest";
 
 type Checkpoint = { id: string; title?: string; locked?: boolean };
 type Project = {
@@ -31,6 +32,7 @@ type Props = {
 
 const IMAGE_PROBE_MAX = 12; // try 1..12 by default
 const ROTATE_MS = 3000; // 3 seconds
+const PLACEHOLDER_IMAGE = "https://placehold.co/800x600?text=no+image";
 
 // small helper to test whether an image URL loads successfully
 function probeImage(url: string): Promise<boolean> {
@@ -151,24 +153,43 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     ? ((selectedIndex % projectCount) + projectCount) % projectCount
     : 0;
 
+  // Get manifest projects once; manifest is considered the single source of truth for imgsPath.
+  const manifestProjects = useMemo(() => {
+    try {
+      const m = getManifestProjects();
+      return Array.isArray(m) ? m : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   // Derived projects overlaying session data (progress & step) and trying to discover total chapters
   const [derivedProjects, setDerivedProjects] = useState<DerivedProject[]>(
     () =>
-      projects.map((p) => ({
-        ...p,
-        derivedProgress: p.progress ?? 0,
-        totalChapters: p.checkpoints?.length ?? null,
-      }))
+      projects.map((p) => {
+        // enforce manifest imgsPath if present; manifest wins always
+        const mp = manifestProjects.find((m) => String(m.id) === String(p.id));
+        return {
+          ...p,
+          imgsPath: mp && mp.imgsPath ? mp.imgsPath : undefined,
+          derivedProgress: p.progress ?? 0,
+          totalChapters: p.checkpoints?.length ?? null,
+        };
+      })
   );
 
   useEffect(() => {
-    // initialize with defaults based on incoming projects
+    // initialize with defaults based on incoming projects BUT enforce manifest imgsPath
     setDerivedProjects(
-      projects.map((p) => ({
-        ...p,
-        derivedProgress: p.progress ?? 0,
-        totalChapters: p.checkpoints?.length ?? null,
-      }))
+      projects.map((p) => {
+        const mp = manifestProjects.find((m) => String(m.id) === String(p.id));
+        return {
+          ...p,
+          imgsPath: mp && mp.imgsPath ? mp.imgsPath : undefined,
+          derivedProgress: p.progress ?? 0,
+          totalChapters: p.checkpoints?.length ?? null,
+        };
+      })
     );
 
     let mounted = true;
@@ -177,8 +198,14 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
       // for each project, read session and optionally try to infer total chapters from assets or story modules
       const next: DerivedProject[] = [];
       for (const p of projects) {
+        // start from original project but override imgsPath with manifest's imgsPath when available
+        const manifestProj = manifestProjects.find(
+          (m) => String(m.id) === String(p.id)
+        );
+
         const dp: DerivedProject = {
           ...p,
+          imgsPath: manifestProj && manifestProj.imgsPath ? manifestProj.imgsPath : undefined, // manifest-only policy
           derivedProgress: p.progress ?? 0,
           sessionStep: null,
           totalChapters: p.checkpoints?.length ?? null,
@@ -228,7 +255,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     return () => {
       mounted = false;
     };
-  }, [projects]);
+  }, [projects, manifestProjects]);
 
   // ---------------------
   // Image loading & rotation per project
@@ -242,7 +269,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
   >({});
 
   useEffect(() => {
-    // (re)probe images for any project that has imgsPath
+    // (re)probe images for any project that has a manifest imgsPath.
     derivedProjects.forEach((p) => {
       const pid = p.id;
       if (!pid) return;
@@ -251,8 +278,13 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
       (async () => {
         const imgs: string[] = [];
 
-        if (p.imgsPath) {
-          const base = normalizeImgsPath(p.imgsPath);
+        // Enforce manifest-only images path. If manifest does not provide imgsPath, do not accept any other img values.
+        const manifestProj = manifestProjects.find(
+          (m) => String(m.id) === String(p.id)
+        );
+
+        if (manifestProj && manifestProj.imgsPath) {
+          const base = normalizeImgsPath(manifestProj.imgsPath);
 
           // Try numeric sequence 1..IMAGE_PROBE_MAX
           for (let i = 1; i <= IMAGE_PROBE_MAX; i++) {
@@ -262,21 +294,19 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
             if (ok) imgs.push(url);
           }
 
-          // also try a thumb.png fallback
+          // try thumb.png fallback under manifest path
           if (imgs.length === 0) {
             const thumb = `${base}thumb.png`;
             if (await probeImage(thumb)) imgs.push(thumb);
           }
+        } else {
+          // manifest does not declare imgsPath for this project -> do NOT accept any other path
+          // images will be a single placeholder
         }
 
-        // if nothing discovered, attempt to fallback to any existing img field (backwards compat)
-        if (imgs.length === 0 && (p as any).img) {
-          imgs.push((p as any).img);
-        }
-
-        // finally fallback placeholder
+        // finally fallback placeholder if nothing discovered
         if (imgs.length === 0) {
-          imgs.push("https://placehold.co/800x600?text=no+image");
+          imgs.push(PLACEHOLDER_IMAGE);
         }
 
         setProjectImages((prev) => ({ ...prev, [pid]: imgs }));
@@ -287,7 +317,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
       })();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [derivedProjects]);
+  }, [derivedProjects, manifestProjects]);
 
   // setup rotation intervals per-project
   useEffect(() => {
@@ -376,7 +406,8 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
 
             const imgs = projectImages[p.id] ?? [];
             const curIdx = projectCurrentIdx[p.id] ?? 0;
-            const currentSrc = imgs[curIdx] ?? "https://placehold.co/800x600?text=no+image";
+            const currentSrc =
+              imgs[curIdx] ?? PLACEHOLDER_IMAGE;
 
             return (
               <div

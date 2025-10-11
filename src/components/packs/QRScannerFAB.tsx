@@ -51,6 +51,12 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
 
   async function stopScanSafe() {
     try {
+      // restore webview/html background so app UI is visible again
+      try {
+        await (BarcodeScanner as any).showBackground?.();
+      } catch {}
+    } catch {}
+    try {
       await (BarcodeScanner as any).stopScan?.();
     } catch {}
     try {
@@ -145,6 +151,11 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         return;
       }
 
+      // make webview/html background transparent so native camera preview is visible behind it
+      try {
+        await (BarcodeScanner as any).hideBackground?.();
+      } catch {}
+
       // cleanup previous listeners
       try {
         await (BarcodeScanner as any).removeAllListeners?.();
@@ -219,14 +230,11 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     // Manual input is expected to be qrRaw (per your instruction)
     const allowed = isManualRawInManifest(val);
     if (!allowed) {
-      // Show error and keep modal open so user can correct
       toast.error("کد وارد شده متعلق به هیچ پَک موجود در مَنیفست نیست.");
       return;
     }
     setShowManual(false);
     setManualCode("");
-    // per your contract: manual input is raw; to keep behavior consistent with scanning,
-    // pass the raw value (the caller/handleScanned should detect/normalize if needed)
     onScanned(val);
   }
 
@@ -250,17 +258,22 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       {/* Scanning overlay (while scanning) */}
       {scanning && !showManual && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => stopScanSafe()} />
-          <div className="relative z-50 w-full max-w-md bg-white dark:bg-neutral-900 rounded-lg p-6 shadow-xl text-center">
-            <div className="text-lg font-semibold">در حال اسکن...</div>
-            <div className="mt-2 text-sm text-neutral-500">دوربین را به کد QR نزدیک کنید</div>
+          <div className="absolute inset-0 bg-black/20" onClick={() => stopScanSafe()} />
+          <div className="relative z-50 w-full max-w-md bg-transparent rounded-lg p-6 shadow-none text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="text-lg font-semibold text-white">در حال اسکن...</div>
+            <div className="mt-2 text-sm text-white/90">دوربین را به کد QR نزدیک کنید</div>
+
+            {/* visible frame box so user can see where to position code */}
+            <div className="mt-4 mx-auto w-[280px] h-[200px] rounded-md border-2 border-white/80 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="text-sm text-white/80">قاب اسکن</div>
+            </div>
 
             <div className="mt-4 flex gap-3 justify-center">
               <button
                 onClick={() => {
                   openManualEntry();
                 }}
-                className="px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700"
+                className="px-4 py-2 rounded-md border border-white/30 text-white/95 bg-white/10 backdrop-blur-sm"
               >
                 ورود دستی
               </button>
@@ -274,7 +287,7 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
                 بستن
               </button>
             </div>
-            <div className="mt-3 text-xs text-neutral-400">اگر اسکن طولانی شد، می‌توانید به صورت دستی کد را وارد کنید.</div>
+            <div className="mt-3 text-xs text-white/70">اگر اسکن طولانی شد، می‌توانید به صورت دستی کد را وارد کنید.</div>
           </div>
         </div>
       )}

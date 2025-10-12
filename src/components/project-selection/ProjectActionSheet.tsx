@@ -467,9 +467,12 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
               </div>
             </div>
           </div>
-
+          <div className="text-right">
+            <div className="font-semibold text-2xl">{project.name}</div>
+            <div className="text-md text-neutral-500 mt-1">{project.subtitle}</div>
+          </div>
           {/* CHECKPOINT column: make this the only scrollable area */}
-          <div
+          {/* <div
             ref={scrollRef}
             className="flex-1 text-right w-full md:w-1/2"
             style={{
@@ -483,8 +486,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
                 {project.description || currentCheckpoint?.description || ""}
               </div>
             </div>
-            <div className="font-semibold text-lg">{project.name}</div>
-            <div className="text-sm text-neutral-500 mt-1">{project.subtitle}</div>
+            
 
             <div className="mt-3">
               <div className="text-sm font-medium mb-2">مراحل (Checkpoint)</div>
@@ -518,11 +520,11 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
                 })}
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* footer buttons */}
-        <hr className="border-t-2 border-emerald-800"/>
+        <hr className="border-t-2 mt-4 border-emerald-800"/>
       </div>
     </div>
   );

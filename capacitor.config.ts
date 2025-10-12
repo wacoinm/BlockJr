@@ -4,10 +4,10 @@ const config: CapacitorConfig = {
   appId: 'me.sharik.blockjr',
   appName: 'BlockJr',
   webDir: 'dist',
-  // server: {
-  //   url: 'http://localhost:5173',
-  //   cleartext: true
-  // },
+  server: {
+    url: 'http://192.168.0.109:5173',
+    cleartext: true
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 3000,

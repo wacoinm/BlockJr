@@ -31,7 +31,7 @@
     "@fontsource/vazirmatn": "^5.2.8",
     "@reduxjs/toolkit": "^2.9.0",
     "actionsheet-react": "^2.0.2",
-    "dialogue-story": "^1.4.6",
+    "dialogue-story": "^1.4.9",
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",

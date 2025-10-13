@@ -126,7 +126,7 @@ export default function BatteryGauge({
 
   const displayIsNumber =
     typeof displayPctNumber === "number" && !Number.isNaN(displayPctNumber);
-  const displayText = displayIsNumber ? `${displayPctNumber}%` : "Load";
+  const displayText = displayIsNumber ? `${displayPctNumber}%` : "دریافت";
 
   const textColorClass =
     displayIsNumber && displayPctNumber < 20

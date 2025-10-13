@@ -4,6 +4,7 @@ import { Camera } from "lucide-react";
 import { toast } from "react-toastify";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 import { getAllPacks } from "../../utils/manifest";
+import { Capacitor } from "@capacitor/core";
 
 type Props = {
   onScanned: (s: string) => void;
@@ -11,14 +12,11 @@ type Props = {
 
 const SCAN_TIMEOUT_MS = 12000; // if no barcode in this time, show manual entry
 
-/** small helper: base64 encode with safe fallbacks */
 const encodeBase64 = (s: string) => {
   try {
     if (typeof window !== "undefined" && (window as any).btoa) return (window as any).btoa(s);
   } catch {}
   try {
-    // node/bundler fallback
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof (globalThis as any).Buffer !== "undefined") return (globalThis as any).Buffer.from(s, "binary").toString("base64");
   } catch {}
   return "";
@@ -31,6 +29,10 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
   const scanTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const manualInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Keep previous body/html styles to restore
+  const savedBodyStyle = useRef<{ background?: string; opacity?: string | null } | null>(null);
+  const savedHtmlStyle = useRef<{ background?: string | null } | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -49,6 +51,44 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     }
   }
 
+  async function restoreBodyStyles() {
+    try {
+      if (savedBodyStyle.current) {
+        document.body.style.background = savedBodyStyle.current.background ?? "";
+        document.body.style.opacity = savedBodyStyle.current.opacity ?? "";
+        savedBodyStyle.current = null;
+      } else {
+        document.body.style.background = "";
+        document.body.style.opacity = "";
+      }
+    } catch {}
+    try {
+      if (savedHtmlStyle.current) {
+        (document.documentElement as HTMLElement).style.background = savedHtmlStyle.current.background ?? "";
+        savedHtmlStyle.current = null;
+      } else {
+        (document.documentElement as HTMLElement).style.background = "";
+      }
+    } catch {}
+  }
+
+  async function makeBodyTransparentForCamera() {
+    try {
+      // save current styles
+      savedBodyStyle.current = {
+        background: document.body.style.background || "",
+        opacity: document.body.style.opacity || "",
+      };
+      savedHtmlStyle.current = {
+        background: (document.documentElement as HTMLElement).style.background || "",
+      };
+      // make transparent so native camera preview behind webview is visible
+      document.body.style.background = "transparent";
+      // keep UI visible by leaving opacity as-is (plugin/hideBackground handles native webview bg)
+      (document.documentElement as HTMLElement).style.background = "transparent";
+    } catch {}
+  }
+
   async function stopScanSafe() {
     try {
       // restore webview/html background so app UI is visible again
@@ -62,6 +102,7 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     try {
       await (BarcodeScanner as any).removeAllListeners?.();
     } catch {}
+    await restoreBodyStyles();
     setScanning(false);
     clearScanTimer();
   }
@@ -73,17 +114,14 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     setTimeout(() => manualInputRef.current?.focus(), 80);
   }
 
-  /** Validate a camera-scanned code (we expect scanner to usually deliver base64) */
   function isScannedCodeInManifest(scanned: string): boolean {
     if (!scanned) return false;
     const s = scanned.trim();
     try {
       const packs = getAllPacks() || [];
       for (const p of packs) {
-        // manifest usually contains both qrRaw and qrBase64
         const raw = (p?.qrRaw ?? "").toString().trim();
         const b64 = (p?.qrBase64 ?? "").toString().trim();
-        // Accept if scanned matches stored base64 OR raw OR encoded raw
         if (b64 && s === b64) return true;
         if (raw && s === raw) return true;
         if (raw && encodeBase64(raw) === s) return true;
@@ -94,7 +132,6 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     return false;
   }
 
-  /** Validate a manual-entered code (user types qrRaw) */
   function isManualRawInManifest(rawInput: string): boolean {
     if (!rawInput) return false;
     const r = rawInput.trim();
@@ -110,24 +147,38 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     return false;
   }
 
+  // ---- WEB removed: no startScanWeb or BarcodeDetector usage ----
+
   async function startScan() {
     try {
-      // check plugin support
-      let supported = true;
+      // Determine platform: we only support native scanning here.
+      const platform = Capacitor.getPlatform?.() ?? "web";
+      const isWeb = platform === "web";
+
+      if (isWeb) {
+        // Explicitly do not attempt web scanning — open manual entry.
+        openManualEntry();
+        return;
+      }
+
+      // On native platforms, check plugin support properly.
+      let supported = false;
       try {
         const sup = await (BarcodeScanner as any).isSupported?.();
-        supported = sup === undefined ? true : (sup?.isSupported ?? !!sup);
+        if (typeof sup === "boolean") supported = sup;
+        else if (sup && typeof sup === "object") supported = !!(sup.isSupported ?? sup.supported ?? sup.available);
+        else supported = false;
       } catch {
         supported = false;
       }
 
       if (!supported) {
         openManualEntry();
-        toast.info("اسکنر در این محیط پشتیبانی نمی‌شود — لطفاً کد را به صورت دستی وارد کنید.");
+        toast.info("اسکنر در این دستگاه/نسخه پشتیبانی نمی‌شود — لطفاً کد را به صورت دستی وارد کنید.");
         return;
       }
 
-      // request permissions
+      // request camera permissions
       let granted = false;
       try {
         const perm = await (BarcodeScanner as any).requestPermissions?.();
@@ -151,17 +202,19 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         return;
       }
 
-      // make webview/html background transparent so native camera preview is visible behind it
+      // prepare background transparency & safe-area: try plugin helper then CSS fallback
       try {
         await (BarcodeScanner as any).hideBackground?.();
-      } catch {}
+      } catch (e) {
+        // fallback: try to make body transparent (some plugin versions require this)
+        makeBodyTransparentForCamera();
+      }
 
-      // cleanup previous listeners
       try {
         await (BarcodeScanner as any).removeAllListeners?.();
       } catch {}
 
-      // add listener(s). We'll validate the scanned code against manifest before accepting.
+      // listeners
       const handleBarcodes = async (ev: any) => {
         const arr = ev?.barcodes ?? (ev?.barcode ? [ev.barcode] : []);
         if (Array.isArray(arr) && arr.length > 0) {
@@ -172,7 +225,6 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
             const allowed = isScannedCodeInManifest(trimmed);
             if (!allowed) {
               toast.error("کد QR متعلق به هیچ پَک موجود در مَنیفست نیست.");
-              // don't stop scanning; user can try again or choose manual entry
               return;
             }
             await stopScanSafe();
@@ -204,7 +256,6 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
 
       setScanning(true);
 
-      // timeout to open manual entry if nothing scanned in time
       clearScanTimer();
       scanTimerRef.current = window.setTimeout(() => {
         if (!mountedRef.current) return;
@@ -212,6 +263,7 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         toast.info("کد از طریق اسکن دریافت نشد — می‌توانید آن را به صورت دستی وارد کنید.");
       }, SCAN_TIMEOUT_MS);
 
+      // finally start native scan
       await (BarcodeScanner as any).startScan?.();
     } catch (err) {
       console.error("startScan error", err);
@@ -227,7 +279,6 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       toast.error("لطفاً یک کد وارد کنید.");
       return;
     }
-    // Manual input is expected to be qrRaw (per your instruction)
     const allowed = isManualRawInManifest(val);
     if (!allowed) {
       toast.error("کد وارد شده متعلق به هیچ پَک موجود در مَنیفست نیست.");
@@ -257,15 +308,23 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
 
       {/* Scanning overlay (while scanning) */}
       {scanning && !showManual && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* dim layer */}
           <div className="absolute inset-0 bg-black/20" onClick={() => stopScanSafe()} />
-          <div className="relative z-50 w-full max-w-md bg-transparent rounded-lg p-6 shadow-none text-center" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative z-50 w-full max-w-md bg-transparent rounded-lg p-6 shadow-none text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="text-lg font-semibold text-white">در حال اسکن...</div>
             <div className="mt-2 text-sm text-white/90">دوربین را به کد QR نزدیک کنید</div>
 
-            {/* visible frame box so user can see where to position code */}
-            <div className="mt-4 mx-auto w-[280px] h-[200px] rounded-md border-2 border-white/80 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)" }}>
-              <div className="text-sm text-white/80">قاب اسکن</div>
+            {/* transparent scan frame so camera preview is visible through it */}
+            <div
+              className="mt-4 mx-auto w-[280px] h-[200px] rounded-md border-2 border-white/80 flex items-center justify-center"
+              style={{ background: "transparent" }}
+            >
+              {/* only small label inside frame; frame interior is transparent to show camera */}
+              <div className="text-sm text-white/80 pointer-events-none">قاب اسکن</div>
             </div>
 
             <div className="mt-4 flex gap-3 justify-center">

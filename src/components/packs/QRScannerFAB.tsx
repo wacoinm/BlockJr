@@ -27,6 +27,9 @@ const encodeBase64 = (s: string) => {
 const FRAME_W = 280;
 const FRAME_H = 200;
 
+// id used for injected style element
+const GLOBAL_STYLE_ID = "qr-scan-exempt-style";
+
 const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
   const [scanning, setScanning] = useState(false);
   const [showManual, setShowManual] = useState(false);
@@ -49,6 +52,7 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       mountedRef.current = false;
       stopScanSafe();
       clearScanTimer();
+      removeGlobalExemptMode();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -57,6 +61,56 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     if (scanTimerRef.current !== null) {
       window.clearTimeout(scanTimerRef.current);
       scanTimerRef.current = null;
+    }
+  }
+
+  // Inject CSS that hides everything except elements with .qr-scan-exempt (and their children).
+  function injectGlobalExemptStyle() {
+    if (typeof document === "undefined") return;
+    if (document.getElementById(GLOBAL_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = GLOBAL_STYLE_ID;
+    style.innerHTML = `
+      /* When qr-scan-active is present on html, hide everything except .qr-scan-exempt and its descendants */
+      html.qr-scan-active *:not(.qr-scan-exempt):not(.qr-scan-exempt *) {
+        visibility: hidden !important;
+      }
+      /* ensure backgrounds are transparent so native preview shows */
+      html.qr-scan-active, html.qr-scan-active body {
+        background: transparent !important;
+        background-color: transparent !important;
+      }
+      /* keep pointer events only on exempted UI */
+      html.qr-scan-active *:not(.qr-scan-exempt):not(.qr-scan-exempt *) {
+        pointer-events: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function removeGlobalExemptStyle() {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(GLOBAL_STYLE_ID);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
+  function applyGlobalExemptMode() {
+    try {
+      if (typeof document === "undefined") return;
+      injectGlobalExemptStyle();
+      document.documentElement.classList.add("qr-scan-active");
+    } catch (e) {
+      console.warn("applyGlobalExemptMode failed", e);
+    }
+  }
+
+  function removeGlobalExemptMode() {
+    try {
+      if (typeof document === "undefined") return;
+      document.documentElement.classList.remove("qr-scan-active");
+      removeGlobalExemptStyle();
+    } catch (e) {
+      console.warn("removeGlobalExemptMode failed", e);
     }
   }
 
@@ -103,7 +157,6 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       // make transparent so native camera preview behind webview is visible
       document.body.style.background = "transparent";
       document.body.style.backgroundColor = "transparent";
-      // keep UI visible by leaving opacity as-is (plugin/hideBackground handles native webview bg)
       (document.documentElement as HTMLElement).style.background = "transparent";
       (document.documentElement as HTMLElement).style.backgroundColor = "transparent";
     } catch (e) {
@@ -133,6 +186,10 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       // ignore
     }
 
+    // remove our global "only-exempt-visible" mode
+    removeGlobalExemptMode();
+
+    // restore CSS styles
     await restoreBodyStyles();
     setScanning(false);
     clearScanTimer();
@@ -241,6 +298,9 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         // fallback: try to make body transparent (some plugin versions require this)
         await makeBodyTransparentForCamera();
       }
+
+      // IMPORTANT: now make entire app visually hidden except our exempt UI
+      applyGlobalExemptMode();
 
       try {
         await (BarcodeScanner as any).removeAllListeners?.();
@@ -420,103 +480,106 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         <Camera className="w-6 h-6" />
       </button>
 
-      {/* Scanning overlay (while scanning) */}
-      {scanning && !showManual && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* We replaced a single full-screen semi-opaque layer with 4 parts so the center remains transparent */}
-          <div
-            className="absolute inset-0"
-            style={{ pointerEvents: "auto" }}
-            // clicks on outer overlays will stop scan (handled in overlayParts)
-          >
-            {overlayParts}
-          </div>
-
-          <div
-            className="relative z-50 w-full max-w-md bg-transparent rounded-lg p-6 shadow-none text-center"
-            onClick={(e) => e.stopPropagation()}
-            style={{ pointerEvents: "auto" }}
-          >
-            <div className="text-lg font-semibold text-white">در حال اسکن...</div>
-            <div className="mt-2 text-sm text-white/90">دوربین را به کد QR نزدیک کنید</div>
+      {/* Scanning overlay & Manual modal are wrapped in .qr-scan-exempt so they remain visible during global masking */}
+      <div className="qr-scan-exempt">
+        {/* Scanning overlay (while scanning) */}
+        {scanning && !showManual && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* We replaced a single full-screen semi-opaque layer with 4 parts so the center remains transparent */}
+            <div
+              className="absolute inset-0"
+              style={{ pointerEvents: "auto" }}
+              // clicks on outer overlays will stop scan (handled in overlayParts)
+            >
+              {overlayParts}
+            </div>
 
             <div
-              className="mt-4 mx-auto rounded-md flex items-center justify-center"
-              style={{
-                width: FRAME_W,
-                height: FRAME_H,
-                background: "transparent",
-                pointerEvents: "none",
-              }}
+              className="relative z-50 w-full max-w-md bg-transparent rounded-lg p-6 shadow-none text-center"
+              onClick={(e) => e.stopPropagation()}
+              style={{ pointerEvents: "auto" }}
             >
-              {/* frame interior is transparent to show camera behind the webview */}
-            </div>
+              <div className="text-lg font-semibold text-white">در حال اسکن...</div>
+              <div className="mt-2 text-sm text-white/90">دوربین را به کد QR نزدیک کنید</div>
 
-            <div className="mt-4 flex gap-3 justify-center">
-              <button
-                onClick={() => {
-                  openManualEntry();
+              <div
+                className="mt-4 mx-auto rounded-md flex items-center justify-center"
+                style={{
+                  width: FRAME_W,
+                  height: FRAME_H,
+                  background: "transparent",
+                  pointerEvents: "none",
                 }}
-                className="px-4 py-2 rounded-md border border-white/30 text-white/95 bg-white/10 backdrop-blur-sm"
               >
-                ورود دستی
-              </button>
+                {/* frame interior is transparent to show camera behind the webview */}
+              </div>
 
-              <button
-                onClick={() => {
-                  stopScanSafe();
-                }}
-                className="px-4 py-2 rounded-md bg-red-500 text-white"
-              >
-                بستن
-              </button>
-            </div>
-            <div className="mt-3 text-xs text-white/70">
-              اگر اسکن طولانی شد، می‌توانید به صورت دستی کد را وارد کنید.
+              <div className="mt-4 flex gap-3 justify-center">
+                <button
+                  onClick={() => {
+                    openManualEntry();
+                  }}
+                  className="px-4 py-2 rounded-md border border-white/30 text-white/95 bg-white/10 backdrop-blur-sm"
+                >
+                  ورود دستی
+                </button>
+
+                <button
+                  onClick={() => {
+                    stopScanSafe();
+                  }}
+                  className="px-4 py-2 rounded-md bg-red-500 text-white"
+                >
+                  بستن
+                </button>
+              </div>
+              <div className="mt-3 text-xs text-white/70">
+                اگر اسکن طولانی شد، می‌توانید به صورت دستی کد را وارد کنید.
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Manual entry modal */}
-      {showManual && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={cancelManual} />
-          <div className="relative z-50 w-full max-w-lg bg-white dark:bg-neutral-900 rounded-lg p-6 shadow-xl">
-            <h3 className="text-lg font-semibold">وارد کردن کد به صورت دستی</h3>
-            <p className="mt-2 text-sm text-neutral-500">
-              اگر قادر به اسکن نیستید، کد (qrRaw) را در کادر زیر وارد کنید.
-            </p>
+        {/* Manual entry modal */}
+        {showManual && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={cancelManual} />
+            <div className="relative z-50 w-full max-w-lg bg-white dark:bg-neutral-900 rounded-lg p-6 shadow-xl">
+              <h3 className="text-lg font-semibold">وارد کردن کد به صورت دستی</h3>
+              <p className="mt-2 text-sm text-neutral-500">
+                اگر قادر به اسکن نیستید، کد (qrRaw) را در کادر زیر وارد کنید.
+              </p>
 
-            <div className="mt-4">
-              <input
-                ref={manualInputRef}
-                value={manualCode}
-                onChange={(e) => setManualCode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") submitManual();
-                  if (e.key === "Escape") cancelManual();
-                }}
-                placeholder="کد (qrRaw) را اینجا وارد کنید"
-                className="w-full px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 focus:outline-none"
-                aria-label="Manual QR raw input"
-              />
-            </div>
+              <div className="mt-4">
+                <input
+                  ref={manualInputRef}
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitManual();
+                    if (e.key === "Escape") cancelManual();
+                  }}
+                  placeholder="کد (qrRaw) را اینجا وارد کنید"
+                  className="w-full px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 focus:outline-none"
+                  aria-label="Manual QR raw input"
+                />
+              </div>
 
-            <div className="mt-4 flex justify-end gap-3">
-              <button
-                onClick={cancelManual}
-                className="px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700"
-              >
-                انصراف
-              </button>
-              <button onClick={submitManual} className="px-4 py-2 rounded-md bg-brand-plain text-white">
-                ثبت کد
-              </button>
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  onClick={cancelManual}
+                  className="px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700"
+                >
+                  انصراف
+                </button>
+                <button onClick={submitManual} className="px-4 py-2 rounded-md bg-brand-plain text-white">
+                  ثبت کد
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 };

@@ -6,7 +6,7 @@
       "id": "pack-tele-elev-crane",
       "name": "پَک آسانسور و تله‌کابین",
       "description": "تله‌کابین، آسانسور، جرثقیل",
-      "items": ["elevator", "crane", "gondola"],
+      "items": ["آسانسور", "جرثقیل", "تله کابین"],
       "qrRaw": "ABCDEFGHIJKLMNOP",
       "qrBase64": "QUJDREVGR0hJSktMTU5PUA=="
     },
@@ -21,7 +21,7 @@
   ],
   "projects": [
     {
-      "id": "elevator",
+      "id": "آسانسور",
       "name": "آسانسور",
       "subtitle": "پروژه نصب و راه‌اندازی آسانسور",
       "category": "آموزشی",
@@ -34,7 +34,7 @@
       "notes": "Demo project used in ProjectSelection page."
     },
     {
-      "id": "crane",
+      "id": "جرثقیل",
       "name": "جرثقیل",
       "subtitle": "پروژه جرثقیل سقفی",
       "category": "آموزشی",
@@ -46,7 +46,7 @@
       "lockReason": "محتوا در دست ساخت است"
     },
     {
-      "id": "gondola",
+      "id": "تله کابین",
       "name": "تله کابین",
       "subtitle": "پروژه احداث تله کابین",
       "category": "آموزشی",

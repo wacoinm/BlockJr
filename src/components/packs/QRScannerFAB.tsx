@@ -64,25 +64,45 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     }
   }
 
-  // Inject CSS that hides everything except elements with .qr-scan-exempt (and their children).
+  // Inject CSS that hides everything under #root except elements with .qr-scan-exempt (and their descendants).
   function injectGlobalExemptStyle() {
     if (typeof document === "undefined") return;
     if (document.getElementById(GLOBAL_STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = GLOBAL_STYLE_ID;
+
+    // Key idea:
+    // 1) hide all elements under #root
+    // 2) re-enable .qr-scan-exempt and its children
+    // 3) make <html> / body transparent so native preview can show
     style.innerHTML = `
-      /* When qr-scan-active is present on html, hide everything except .qr-scan-exempt and its descendants */
-      html.qr-scan-active *:not(.qr-scan-exempt):not(.qr-scan-exempt *) {
+      /* hide everything inside #root while scan is active */
+      html.qr-scan-active #root * {
         visibility: hidden !important;
+        pointer-events: none !important;
+        user-select: none !important;
       }
-      /* ensure backgrounds are transparent so native preview shows */
-      html.qr-scan-active, html.qr-scan-active body {
+
+      /* make exempt elements visible & interactive again */
+      html.qr-scan-active .qr-scan-exempt,
+      html.qr-scan-active .qr-scan-exempt * {
+        visibility: visible !important;
+        pointer-events: auto !important;
+        user-select: text !important;
+      }
+
+      /* keep the top-level exempt container on top (in case stacking contexts differ) */
+      html.qr-scan-active .qr-scan-exempt {
+        position: relative !important;
+        z-index: 2147483647 !important; /* very high */
+      }
+
+      /* ensure backgrounds are transparent so native preview shows through */
+      html.qr-scan-active,
+      html.qr-scan-active body,
+      html.qr-scan-active #root {
         background: transparent !important;
         background-color: transparent !important;
-      }
-      /* keep pointer events only on exempted UI */
-      html.qr-scan-active *:not(.qr-scan-exempt):not(.qr-scan-exempt *) {
-        pointer-events: none !important;
       }
     `;
     document.head.appendChild(style);
@@ -108,7 +128,8 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     try {
       if (typeof document === "undefined") return;
       document.documentElement.classList.remove("qr-scan-active");
-      removeGlobalExemptStyle();
+      // small delay to allow any UI transitions to finish -> then remove style
+      setTimeout(removeGlobalExemptStyle, 50);
     } catch (e) {
       console.warn("removeGlobalExemptMode failed", e);
     }
@@ -189,7 +210,7 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     // remove our global "only-exempt-visible" mode
     removeGlobalExemptMode();
 
-    // restore CSS styles
+    // restore CSS styles after removing class
     await restoreBodyStyles();
     setScanning(false);
     clearScanTimer();

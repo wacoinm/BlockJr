@@ -14,13 +14,18 @@ const SCAN_TIMEOUT_MS = 12000; // if no barcode in this time, show manual entry
 
 const encodeBase64 = (s: string) => {
   try {
-    if (typeof window !== "undefined" && (window as any).btoa) return (window as any).btoa(s);
+    if (typeof window !== "undefined" && (window as any).btoa)
+      return (window as any).btoa(s);
   } catch {}
   try {
-    if (typeof (globalThis as any).Buffer !== "undefined") return (globalThis as any).Buffer.from(s, "binary").toString("base64");
+    if (typeof (globalThis as any).Buffer !== "undefined")
+      return (globalThis as any).Buffer.from(s, "binary").toString("base64");
   } catch {}
   return "";
 };
+
+const FRAME_W = 280;
+const FRAME_H = 200;
 
 const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
   const [scanning, setScanning] = useState(false);
@@ -30,9 +35,13 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
   const mountedRef = useRef(true);
   const manualInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Keep previous body/html styles to restore
-  const savedBodyStyle = useRef<{ background?: string; opacity?: string | null } | null>(null);
-  const savedHtmlStyle = useRef<{ background?: string | null } | null>(null);
+  // Keep previous body/html styles to restore (save both background and backgroundColor + opacity)
+  const savedBodyStyle = useRef<{
+    background?: string;
+    backgroundColor?: string;
+    opacity?: string | null;
+  } | null>(null);
+  const savedHtmlStyle = useRef<{ background?: string; backgroundColor?: string } | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -55,19 +64,25 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     try {
       if (savedBodyStyle.current) {
         document.body.style.background = savedBodyStyle.current.background ?? "";
+        document.body.style.backgroundColor = savedBodyStyle.current.backgroundColor ?? "";
         document.body.style.opacity = savedBodyStyle.current.opacity ?? "";
         savedBodyStyle.current = null;
       } else {
         document.body.style.background = "";
+        document.body.style.backgroundColor = "";
         document.body.style.opacity = "";
       }
     } catch {}
     try {
       if (savedHtmlStyle.current) {
-        (document.documentElement as HTMLElement).style.background = savedHtmlStyle.current.background ?? "";
+        (document.documentElement as HTMLElement).style.background =
+          savedHtmlStyle.current.background ?? "";
+        (document.documentElement as HTMLElement).style.backgroundColor =
+          savedHtmlStyle.current.backgroundColor ?? "";
         savedHtmlStyle.current = null;
       } else {
         (document.documentElement as HTMLElement).style.background = "";
+        (document.documentElement as HTMLElement).style.backgroundColor = "";
       }
     } catch {}
   }
@@ -77,31 +92,47 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       // save current styles
       savedBodyStyle.current = {
         background: document.body.style.background || "",
+        backgroundColor: document.body.style.backgroundColor || "",
         opacity: document.body.style.opacity || "",
       };
       savedHtmlStyle.current = {
         background: (document.documentElement as HTMLElement).style.background || "",
+        backgroundColor:
+          (document.documentElement as HTMLElement).style.backgroundColor || "",
       };
       // make transparent so native camera preview behind webview is visible
       document.body.style.background = "transparent";
+      document.body.style.backgroundColor = "transparent";
       // keep UI visible by leaving opacity as-is (plugin/hideBackground handles native webview bg)
       (document.documentElement as HTMLElement).style.background = "transparent";
-    } catch {}
+      (document.documentElement as HTMLElement).style.backgroundColor = "transparent";
+    } catch (e) {
+      console.warn("makeBodyTransparentForCamera failed", e);
+    }
   }
 
   async function stopScanSafe() {
     try {
-      // restore webview/html background so app UI is visible again
+      // stop native scanning first
       try {
-        await (BarcodeScanner as any).showBackground?.();
-      } catch {}
+        await (BarcodeScanner as any).stopScan?.();
+      } catch (e) {
+        // ignore
+      }
     } catch {}
+
     try {
-      await (BarcodeScanner as any).stopScan?.();
-    } catch {}
-    try {
+      // remove any listeners
       await (BarcodeScanner as any).removeAllListeners?.();
     } catch {}
+
+    try {
+      // restore native webview background (plugin helper)
+      await (BarcodeScanner as any).showBackground?.();
+    } catch (e) {
+      // ignore
+    }
+
     await restoreBodyStyles();
     setScanning(false);
     clearScanTimer();
@@ -147,8 +178,6 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     return false;
   }
 
-  // ---- WEB removed: no startScanWeb or BarcodeDetector usage ----
-
   async function startScan() {
     try {
       // Determine platform: we only support native scanning here.
@@ -166,7 +195,8 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       try {
         const sup = await (BarcodeScanner as any).isSupported?.();
         if (typeof sup === "boolean") supported = sup;
-        else if (sup && typeof sup === "object") supported = !!(sup.isSupported ?? sup.supported ?? sup.available);
+        else if (sup && typeof sup === "object")
+          supported = !!(sup.isSupported ?? sup.supported ?? sup.available);
         else supported = false;
       } catch {
         supported = false;
@@ -174,7 +204,9 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
 
       if (!supported) {
         openManualEntry();
-        toast.info("اسکنر در این دستگاه/نسخه پشتیبانی نمی‌شود — لطفاً کد را به صورت دستی وارد کنید.");
+        toast.info(
+          "اسکنر در این دستگاه/نسخه پشتیبانی نمی‌شود — لطفاً کد را به صورت دستی وارد کنید."
+        );
         return;
       }
 
@@ -207,7 +239,7 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         await (BarcodeScanner as any).hideBackground?.();
       } catch (e) {
         // fallback: try to make body transparent (some plugin versions require this)
-        makeBodyTransparentForCamera();
+        await makeBodyTransparentForCamera();
       }
 
       try {
@@ -219,7 +251,8 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
         const arr = ev?.barcodes ?? (ev?.barcode ? [ev.barcode] : []);
         if (Array.isArray(arr) && arr.length > 0) {
           const first = arr[0];
-          const text = first?.rawValue ?? first?.displayValue ?? first?.value ?? first?.text ?? null;
+          const text =
+            first?.rawValue ?? first?.displayValue ?? first?.value ?? first?.text ?? null;
           if (text) {
             const trimmed = String(text).trim();
             const allowed = isScannedCodeInManifest(trimmed);
@@ -264,7 +297,15 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       }, SCAN_TIMEOUT_MS);
 
       // finally start native scan
-      await (BarcodeScanner as any).startScan?.();
+      try {
+        await (BarcodeScanner as any).startScan?.();
+      } catch (e) {
+        // if startScan throws, ensure we cleanup and fallback to manual
+        console.warn("startScan plugin error", e);
+        await stopScanSafe();
+        openManualEntry();
+        toast.error("خطا در باز کردن اسکنر. لطفاً کد را به صورت دستی وارد کنید.");
+      }
     } catch (err) {
       console.error("startScan error", err);
       await stopScanSafe();
@@ -294,6 +335,79 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
     setManualCode("");
   }
 
+  // Build a 4-part overlay that leaves a transparent center (قاب)
+  const overlayParts = (
+    <>
+      {/* top */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          height: `calc(50% - ${FRAME_H / 2}px)`,
+          background: "rgba(0,0,0,0.64)",
+        }}
+        onClick={() => stopScanSafe()}
+      />
+      {/* bottom */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: `calc(50% - ${FRAME_H / 2}px)`,
+          background: "rgba(0,0,0,0.64)",
+        }}
+        onClick={() => stopScanSafe()}
+      />
+      {/* left */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: `calc(50% - ${FRAME_H / 2}px)`,
+          bottom: `calc(50% - ${FRAME_H / 2}px)`,
+          width: `calc(50% - ${FRAME_W / 2}px)`,
+          background: "rgba(0,0,0,0.64)",
+        }}
+        onClick={() => stopScanSafe()}
+      />
+      {/* right */}
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          top: `calc(50% - ${FRAME_H / 2}px)`,
+          bottom: `calc(50% - ${FRAME_H / 2}px)`,
+          width: `calc(50% - ${FRAME_W / 2}px)`,
+          background: "rgba(0,0,0,0.64)",
+        }}
+        onClick={() => stopScanSafe()}
+      />
+      {/* frame border */}
+      <div
+        style={{
+          position: "absolute",
+          left: `calc(50% - ${FRAME_W / 2}px)`,
+          top: `calc(50% - ${FRAME_H / 2}px)`,
+          width: `${FRAME_W}px`,
+          height: `${FRAME_H}px`,
+          borderRadius: 12,
+          boxSizing: "border-box",
+          border: "2px solid rgba(255,255,255,0.22)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>قاب اسکن</div>
+      </div>
+    </>
+  );
+
   return (
     <>
       {/* FAB */}
@@ -309,22 +423,33 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
       {/* Scanning overlay (while scanning) */}
       {scanning && !showManual && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* dim layer */}
-          <div className="absolute inset-0 bg-black/20" onClick={() => stopScanSafe()} />
+          {/* We replaced a single full-screen semi-opaque layer with 4 parts so the center remains transparent */}
+          <div
+            className="absolute inset-0"
+            style={{ pointerEvents: "auto" }}
+            // clicks on outer overlays will stop scan (handled in overlayParts)
+          >
+            {overlayParts}
+          </div>
+
           <div
             className="relative z-50 w-full max-w-md bg-transparent rounded-lg p-6 shadow-none text-center"
             onClick={(e) => e.stopPropagation()}
+            style={{ pointerEvents: "auto" }}
           >
             <div className="text-lg font-semibold text-white">در حال اسکن...</div>
             <div className="mt-2 text-sm text-white/90">دوربین را به کد QR نزدیک کنید</div>
 
-            {/* transparent scan frame so camera preview is visible through it */}
             <div
-              className="mt-4 mx-auto w-[280px] h-[200px] rounded-md border-2 border-white/80 flex items-center justify-center"
-              style={{ background: "transparent" }}
+              className="mt-4 mx-auto rounded-md flex items-center justify-center"
+              style={{
+                width: FRAME_W,
+                height: FRAME_H,
+                background: "transparent",
+                pointerEvents: "none",
+              }}
             >
-              {/* only small label inside frame; frame interior is transparent to show camera */}
-              <div className="text-sm text-white/80 pointer-events-none">قاب اسکن</div>
+              {/* frame interior is transparent to show camera behind the webview */}
             </div>
 
             <div className="mt-4 flex gap-3 justify-center">
@@ -346,7 +471,9 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
                 بستن
               </button>
             </div>
-            <div className="mt-3 text-xs text-white/70">اگر اسکن طولانی شد، می‌توانید به صورت دستی کد را وارد کنید.</div>
+            <div className="mt-3 text-xs text-white/70">
+              اگر اسکن طولانی شد، می‌توانید به صورت دستی کد را وارد کنید.
+            </div>
           </div>
         </div>
       )}
@@ -357,7 +484,9 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
           <div className="absolute inset-0 bg-black/50" onClick={cancelManual} />
           <div className="relative z-50 w-full max-w-lg bg-white dark:bg-neutral-900 rounded-lg p-6 shadow-xl">
             <h3 className="text-lg font-semibold">وارد کردن کد به صورت دستی</h3>
-            <p className="mt-2 text-sm text-neutral-500">اگر قادر به اسکن نیستید، کد (qrRaw) را در کادر زیر وارد کنید.</p>
+            <p className="mt-2 text-sm text-neutral-500">
+              اگر قادر به اسکن نیستید، کد (qrRaw) را در کادر زیر وارد کنید.
+            </p>
 
             <div className="mt-4">
               <input
@@ -375,7 +504,10 @@ const QRScannerFAB: React.FC<Props> = ({ onScanned }) => {
             </div>
 
             <div className="mt-4 flex justify-end gap-3">
-              <button onClick={cancelManual} className="px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700">
+              <button
+                onClick={cancelManual}
+                className="px-4 py-2 rounded-md border border-neutral-200 dark:border-neutral-700"
+              >
                 انصراف
               </button>
               <button onClick={submitManual} className="px-4 py-2 rounded-md bg-brand-plain text-white">

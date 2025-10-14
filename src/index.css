@@ -52,3 +52,23 @@ html, body, #root {
     background-color: var(--app-surface);
   }
 }
+
+
+/* custom dialogue story package styles */
+[id^="dial-charecter-text-"]{
+  text-align: start !important;
+  line-height: 1.4rem !important;
+  padding: 0.2rem !important;
+}
+
+[id^="dial-charecter-title-"]{
+  color: orange !important;
+  font-size: 1.2rem !important;
+}
+
+
+[id^="dial-ravi-name-"]{
+  align-self: flex-start !important;
+  color: orange !important;
+  font-size: 1.1rem !important;
+}

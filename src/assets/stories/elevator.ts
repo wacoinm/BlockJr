@@ -9,7 +9,7 @@ export const elevator = {
       "showTimes": true,
       "bgImage": "/scenes/ch1/bedroom-night.png",
       "filter": { "fade": 0.05, "blur": 0.15 },
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "وسط تخت خوابیده بود. چراغِ خوابِ کوچکی روی پاتختی روشن بود و بخشی از نورش را روی زمین انداخته بود. روی قالیچهٔ اتاق جمعی از اسباب‌بازی‌ها دور هم حلقه زده بودند. وودی با کلاه قهوه‌ای و آن لبخند همیشگی، دست به کمر ایستاده بود. جسی با گیس‌های بافته و کلاه قرمزش، پا روی پا انداخته بود. رکس، دایناسورِ سبز، خودش را بغل کرده بود و میلرزید.",
@@ -18,7 +18,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#071426",
       "showTimes": true,
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "خب رفقا! اندی خوابیده. باید امشب را یک جای امن و گرم بگذرانیم.",
@@ -27,7 +27,7 @@ export const elevator = {
       "typeSpeed": 30,
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "با این سرما، حتی سازه‌های فضایی هم یخ می‌زنند. به نظرم باید به پناهگاه اصلی برسیم — یعنی زیر پتو.",
@@ -36,7 +36,7 @@ export const elevator = {
       "typeSpeed": 30,
       "textColor": "#000000",
       "bgColor": "#ffd27f",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "ولی پتو بالاست، روی تختِ اندی. پاتختی هم اندازهٔ یک کوه است! من با این دست‌های کوچولو... نه، حتما سر می‌خورم!",
@@ -45,7 +45,7 @@ export const elevator = {
       "typeSpeed": 32,
       "textColor": "#000000",
       "bgColor": "#ffd27f",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "نه عزیزم، کسی خرد نمی‌شود. اما من می‌ترسم که اعضای بدنمان گم بشود.",
@@ -54,7 +54,7 @@ export const elevator = {
       "typeSpeed": 30,
       "textColor": "#ffffff",
       "bgColor": "#2a9d8f",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "مثلاً دفعهٔ قبل دماغم رفت زیر تخت و موشِ اسباب‌بازی آن را قلقلک می‌داد!",
@@ -63,7 +63,7 @@ export const elevator = {
       "typeSpeed": 30,
       "textColor": "#000000",
       "bgColor": "#ffd27f",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "همه خندیدند.",
@@ -81,7 +81,7 @@ export const elevator = {
       "typeSpeed": 30,
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -292,7 +292,7 @@ export const elevator = {
       "bgColor": "#071426",
       "showTimes": true,
       "bgImage": "/scenes/ch3/workshop.png",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "باز (Buzz)، تو مسئول موتور و گیربکس هستی.",
@@ -363,7 +363,7 @@ export const elevator = {
       "typeSpeed": 26,
       "textColor": "#ffffff",
       "bgColor": "#071426",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "این موتور با یک گیربکسِ ضریب بالا می‌تواند نیروی کافی بدهد. فقط باید چرخ‌دنده‌های مناسبش را پیدا کنم.",
@@ -432,7 +432,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#071426",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "عالیه! فقط باید نقطهٔ اتصال اولیهٔ نخ امن باشه.",
@@ -468,7 +468,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#071426",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -534,7 +534,7 @@ export const elevator = {
       "typeSpeed": 26,
       "textColor": "#ffffff",
       "bgColor": "#07132a",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "من... دارم میرم بالا! و نمی‌افتم! وای! خیلی هم آرامه.",
@@ -561,7 +561,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#07132a",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -591,7 +591,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#081426",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "تق!",
@@ -617,7 +617,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#081426",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "اگر دماغم افتاد، کسی دنبالش نگرده. من یکی یدکی دارم!",
@@ -701,7 +701,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#0b1520",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "دندهٔ سوم لق شده. باید مهرهٔ آن را کمی سفت کنیم.",
@@ -728,7 +728,7 @@ export const elevator = {
       "typeSpeed": 34,
       "textColor": "#ffffff",
       "bgColor": "#6aa84f",
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -741,7 +741,7 @@ export const elevator = {
       "bgColor": "#071426",
       "showTimes": true,
       "bgImage": "/scenes/ch7/plan.png",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "اول سبک‌ها، بعد سنگین‌ها، بعد قطعه‌دارها!",
@@ -839,7 +839,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "فروز خجالتی بود، اما وقتی سوار اتاقک شد همه دست تکان دادند تا روحیه‌اش بالا بره. او کنار رکس جا گرفت و با زمزمه گفت: من دوستدار زمستانم، ولی زیر پتو هم می‌تونه بهشتِ آدم‌برفی‌ها باشه!",
@@ -848,7 +848,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#071426",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -915,7 +915,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#071426",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "میدونی، باز... بعضی وقت‌ها فکر می‌کنم این همه ماجراجویی برای اسباب‌بازی‌ها زیادیه.",
@@ -1028,7 +1028,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -1041,7 +1041,7 @@ export const elevator = {
       "bgColor": "#071426",
       "showTimes": true,
       "bgImage": "/scenes/ch12/settling.png",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "بچه‌ها، فردا صبح باید آسانسور را جمع کنیم. اندی نباید بفهمد.",
@@ -1068,7 +1068,7 @@ export const elevator = {
       "typeSpeed": 28,
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "۲- نوبت‌دهی: ترتیبِ مناسب باعث سرعت و امنیت می‌شود.",
@@ -1077,7 +1077,7 @@ export const elevator = {
       "typeSpeed": 28,
       "textColor": "#000000",
       "bgColor": "#ffd27f",
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "۳- نگهداری: بعد از هر بار استفاده، به موتور استراحت بدهید.",
@@ -1086,7 +1086,7 @@ export const elevator = {
       "typeSpeed": 28,
       "textColor": "#ffffff",
       "bgColor": "#6aa84f",
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "۴- ارتباط آرام: در شرایط باد یا لرزش، همه باید آرامش داشته باشند.",
@@ -1095,7 +1095,7 @@ export const elevator = {
       "typeSpeed": 28,
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "۵- تشویق: کسی را که می‌ترسد تشویق کنید تا اعتماد پیدا کند.",
@@ -1104,7 +1104,7 @@ export const elevator = {
       "typeSpeed": 28,
       "textColor": "#ffffff",
       "bgColor": "#6aa84f",
-      "fontSize": 18
+      "fontSize": 14
     },
     {
       "text": "۶- شوخی: شوخی، ترس را آب می‌کند؛ مثل کره روی نان داغ.",
@@ -1113,7 +1113,7 @@ export const elevator = {
       "typeSpeed": 28,
       "textColor": "#000000",
       "bgColor": "#ffd27f",
-      "fontSize": 18
+      "fontSize": 14
     }
   ],
 
@@ -1154,7 +1154,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#1f6feb",
       "showTimes": true,
-      "fontSize": 22
+      "fontSize": 15
     }
   ],
 
@@ -1167,7 +1167,7 @@ export const elevator = {
       "bgColor": "#071426",
       "showTimes": true,
       "bgImage": "/scenes/ch14/keepsake.png",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "رکس یاد گرفته بود که می‌تواند با ترسش کنار بیاید و حتی راه را برای دیگران باز کند.",
@@ -1206,7 +1206,7 @@ export const elevator = {
       "bgColor": "#071426",
       "showTimes": true,
       "bgImage": "/scenes/ch15/new-plan.png",
-      "fontSize": 22
+      "fontSize": 15
     },
     {
       "text": "آسانسورِ نسخهٔ دو؛ با دو صندلی!",
@@ -1246,7 +1246,7 @@ export const elevator = {
     }
   ],
 
-  "chapter-16": [
+  "chapter-14": [
     {
       "text": "شب‌های بعد، وقتی باد پشت شیشه می‌رقصید و برف روی حاشیهٔ پنجره می‌نشست، آنها دیگر نمی‌ترسیدند. زیر پتو، کنار اندی، صدای خنده‌های بی‌صدا و قصه‌های آرام می‌آمد. گاهی وودی قصه می‌گفت، گاهی جسی آواز کم‌صدا می‌خواند، گاهی باز باز از کهکشان‌ها حرف می‌زد و اگر دقیق گوش بدی، می‌شنی که پتو نجوا می‌کند.",
       "charecter": "ravi",
@@ -1254,7 +1254,7 @@ export const elevator = {
       "textColor": "#ffffff",
       "bgColor": "#020814",
       "showTimes": true,
-      "bgImage": "/scenes/ch16/whispering-blanket.png",
+      "bgImage": "/scenes/ch14/whispering-blanket.png",
       "fontSize": 24
     },
     {

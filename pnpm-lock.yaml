@@ -54,8 +54,8 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       dialogue-story:
-        specifier: ^1.4.9
-        version: 1.4.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.4.13
+        version: 1.4.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@18.3.1)
@@ -1562,8 +1562,8 @@ packages:
   dezalgo@1.0.4:
     resolution: {integrity: sha512-rXSP0bf+5n0Qonsb+SVVfNfIsimO4HEtmnIpPHY8Q1UCzKlQrDMfdobr8nJOOsRgWCyMRqeSBQzmWUMq7zvVig==}
 
-  dialogue-story@1.4.9:
-    resolution: {integrity: sha512-gEuvg7brn0xKSAbqbxCpVfchJwfQWawTTHBUxxW3+Vv1PDzBa3eZETdLaXoZO6XK0CKqqBvrdELdT8FEvg4KBw==}
+  dialogue-story@1.4.13:
+    resolution: {integrity: sha512-r1AUg8vKu/jjt78ceRQcUhHJqnsIF7cbksPSiyPa759KxFXHvx3ClLS6j0ZpxxGe8ItatvCsS85QeMxSdnpaRg==}
     peerDependencies:
       react: ^18 || ^19
       react-dom: ^18 || ^19
@@ -4756,7 +4756,7 @@ snapshots:
       asap: 2.0.6
       wrappy: 1.0.2
 
-  dialogue-story@1.4.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  dialogue-story@1.4.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       '@fontsource/vazirmatn': 5.2.8
       react: 18.3.1

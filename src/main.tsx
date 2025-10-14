@@ -8,9 +8,9 @@ import { DialogueProvider } from "dialogue-story";
 import router from "./router";
 import { store } from "./store";
 import "dialogue-story/style.css";
-import "./index.css";
 import "@fontsource/vazirmatn";
 import Container from "./components/Container";
+import "./index.css";
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);

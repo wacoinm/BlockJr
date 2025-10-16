@@ -54,8 +54,8 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       dialogue-story:
-        specifier: ^1.4.13
-        version: 1.4.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.4.15
+        version: 1.4.15(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@18.3.1)
@@ -83,6 +83,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      react-joystick-component:
+        specifier: ^6.2.1
+        version: 6.2.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-redux:
         specifier: ^9.2.0
         version: 9.2.0(@types/react@18.3.24)(react@18.3.1)(redux@5.0.1)
@@ -1562,8 +1565,8 @@ packages:
   dezalgo@1.0.4:
     resolution: {integrity: sha512-rXSP0bf+5n0Qonsb+SVVfNfIsimO4HEtmnIpPHY8Q1UCzKlQrDMfdobr8nJOOsRgWCyMRqeSBQzmWUMq7zvVig==}
 
-  dialogue-story@1.4.13:
-    resolution: {integrity: sha512-r1AUg8vKu/jjt78ceRQcUhHJqnsIF7cbksPSiyPa759KxFXHvx3ClLS6j0ZpxxGe8ItatvCsS85QeMxSdnpaRg==}
+  dialogue-story@1.4.15:
+    resolution: {integrity: sha512-m+HWq0BkNVN9qzd1TnQFUi1nHtjAsRwwZTZTs4+NfkMh6iPhaf7AogRq0bcdBtQq0tkfcHmxfTufFUuJjh20og==}
     peerDependencies:
       react: ^18 || ^19
       react-dom: ^18 || ^19
@@ -2608,6 +2611,12 @@ packages:
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
+
+  react-joystick-component@6.2.1:
+    resolution: {integrity: sha512-0G5Y5aX4hNuXB3xJCwz6Q+nYQOtC6kprNGKmZxmfoPvhepNYUiid0DbLEGZxmr/UKip3S/LUbcQUobtRCuB8IQ==}
+    peerDependencies:
+      react: '>=17.0.2'
+      react-dom: '>=17.0.2'
 
   react-redux@9.2.0:
     resolution: {integrity: sha512-ROY9fvHhwOD9ySfrF0wmvu//bKCQ6AeZZq1nJNtbDC+kk5DuSuNX/n6YWYF/SYy7bSba4D4FSz8DJeKY/S/r+g==}
@@ -4756,7 +4765,7 @@ snapshots:
       asap: 2.0.6
       wrappy: 1.0.2
 
-  dialogue-story@1.4.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  dialogue-story@1.4.15(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       '@fontsource/vazirmatn': 5.2.8
       react: 18.3.1
@@ -5776,6 +5785,11 @@ snapshots:
       scheduler: 0.23.2
 
   react-is@16.13.1: {}
+
+  react-joystick-component@6.2.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   react-redux@9.2.0(@types/react@18.3.24)(react@18.3.1)(redux@5.0.1):
     dependencies:

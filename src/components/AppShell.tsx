@@ -7,6 +7,10 @@ import { Workspace } from "./Workspace";
 import { BlockPalette } from "./BlockPalette";
 import { useAppSelector } from "../store/hooks";
 import type { RootState } from "../store";
+import { useNavigate } from "react-router";
+import { toast } from "react-toastify";
+import GamepadPng from "../assets/images/gamepad.png"; // <-- your PNG (you said you'll add this)
+import BatteryGauge from "./BatteryGauge";
 
 export type FabItem = {
   key: string;
@@ -76,6 +80,8 @@ export default function AppShell(props: AppShellProps) {
   const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? s.ui.bluetoothOpen : undefined));
   const reduxInteractionMode = useAppSelector((s: RootState) => (s.ui ? s.ui.interactionMode : undefined));
 
+  const navigate = useNavigate();
+
   // prefer props when provided, else fall back to redux or defaults
   const {
     blocks,
@@ -113,6 +119,17 @@ export default function AppShell(props: AppShellProps) {
   const setBluetoothOpen = props.setBluetoothOpen ?? (() => {});
   const onBluetoothConnectionChange = props.onBluetoothConnectionChange ?? (() => {});
   const interactionMode = typeof props.interactionMode !== "undefined" ? props.interactionMode : reduxInteractionMode ?? "runner";
+
+  // Handler to open gamepad page for the currently selected project
+  const openGamepadForProject = (id?: string | null) => {
+    const pid = id ?? selectedProject;
+    if (!pid) {
+      toast.warn("یک پروژه انتخاب نشده — ابتدا پروژه‌ای انتخاب کنید.");
+      return;
+    }
+    // navigate to gamepad page
+    navigate(`/gamepad/${encodeURIComponent(String(pid))}`);
+  };
 
   return (
     <>
@@ -166,6 +183,22 @@ export default function AppShell(props: AppShellProps) {
         blockPaletteBottom={blockPaletteBottom}
         setBlockPaletteBottom={setBlockPaletteBottom}
       />
+
+      {/* Left-top helper UI (zoom + battery + gamepad button) */}
+      <div style={{ position: 'absolute', left: 8, top: 200, zIndex: 80 }}>
+          <button
+            type="button"
+            onClick={() => openGamepadForProject(selectedProject)}
+            className={
+              "mt-2 w-12 h-12 rounded-full flex items-center justify-center shadow-inner transition-transform active:scale-95 " +
+              "bg-white/90 dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
+            }
+            title="Gamepad"
+            aria-label="Open gamepad"
+          >
+            <img src={GamepadPng} alt="gamepad" className="w-7 h-7" />
+          </button>
+      </div>
     </>
   );
 }

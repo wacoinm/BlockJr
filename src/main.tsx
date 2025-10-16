@@ -28,6 +28,7 @@ root.render(
         rtl={true}
         activeRedo
         canSkip
+        skipMessage="رد شدن"
       >
         <Container>
           <RouterProvider router={router} />

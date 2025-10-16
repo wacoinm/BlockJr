@@ -583,7 +583,7 @@ const App: React.FC = () => {
     },
   ];
 
-  const projects = ['elevator', 'bulldozer', 'lift truck'];
+  const projects = ['آسانسور', 'جرثقیل', 'تله کابین'];
   const LEFT_TOGGLE_LEFT = 6;
   const LEFT_TOGGLE_BOTTOM = blockPaletteBottom;
   const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));
@@ -605,7 +605,7 @@ const App: React.FC = () => {
           onClick={toggleInteraction}
           className={`
             inline-flex items-center justify-center
-            w-12 h-12 rounded-full shadow-lg
+            w-12 h-16 rounded-t-full shadow-lg
             cursor-pointer select-none
             transition-transform duration-200 hover:scale-105 active:scale-95
             bg-white dark:bg-slate-800
@@ -614,11 +614,18 @@ const App: React.FC = () => {
           `}
           title={interactionMode === 'runner' ? 'Switch to delete mode' : 'Switch to run mode'}
         >
+          <div className='flex flex-col gap-2 justify-center items-center'>
           {interactionMode === 'runner' ? (
-            <MousePointer2 className="w-5 h-5" />
+              <>
+                <MousePointer2 className="w-5 h-5 mt-2" />
+                <span className='text-xs'>اجرا</span></>
           ) : (
-            <Trash2 className="w-5 h-5" />
-          )}
+              <>
+                <Trash2 className="w-5 h-5 mt-2" />
+                <span className='text-xs'>حذف</span>
+              </>
+            )}
+            </div>
         </button>
       </div>
 

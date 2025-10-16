@@ -5,6 +5,8 @@ import ProjectManager from "../pages/ProjectManager";
 import ProjectSelection from "../pages/ProjectSelection";
 import PacksPage from "../pages/Packs";
 import ErrorPage from "../pages/Error";
+import GamepadPage from "../pages/Gamepad"; // <-- new page
+import GamePadPage from "../pages/test";
 
 const router = createBrowserRouter([
   {
@@ -17,19 +19,23 @@ const router = createBrowserRouter([
     element: <ProjectManager />,
     errorElement: <ErrorPage />,
   },
-  // explicit route for project selection by pack ID
   {
     path: "/project/p/:packId",
     element: <ProjectSelection />,
     errorElement: <ErrorPage />,
   },
-  // keep original /project for backward compatibility
   {
     path: "/project",
     element: <ProjectSelection />,
     errorElement: <ErrorPage />,
   },
-  // project viewer/player route (single project)
+  // NEW: gamepad page for project control
+  {
+    path: "/gamepad/:id",
+    element: <GamepadPage />,
+    errorElement: <ErrorPage />,
+  },
+  // project viewer/player (single project)
   {
     path: "/project/:id",
     element: <App />,

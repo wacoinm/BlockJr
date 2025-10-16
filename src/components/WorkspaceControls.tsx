@@ -380,7 +380,7 @@ const WorkspaceControls: React.FC<WorkspaceControlsProps> = (props) => {
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <div className="text-sm capitalize">{p}</div>
-                      {selectedProject === p && <div className="text-xs text-slate-500">Selected</div>}
+                      {selectedProject === p && <div className="text-xs text-slate-500">انتخاب شده</div>}
                     </button>
                   );
                 })}

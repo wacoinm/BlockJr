@@ -116,7 +116,7 @@ const PackCard: React.FC<
         <div className="min-w-0">
           <div className="text-lg md:text-xl font-bold">{name}</div>
           {description && <div className="text-sm opacity-90 mt-1">{description}</div>}
-          <div className="mt-3 flex gap-2 flex-wrap">
+          <div className="mt-3 flex gap-2 flex-wrap justify-end">
             {items.map((it) => (
               <div key={it} className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-xs">
                 <span className="text-sm">{pickEmoji(it)}</span>

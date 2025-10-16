@@ -2,10 +2,10 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'me.sharik.blockjr',
-  appName: 'BlockJr',
+  appName: 'کمانک',
   webDir: 'dist',
   // server: {
-  //   url: 'http://localhost:5173',
+  //   url: 'http://192.168.0.109:5173',
   //   cleartext: true
   // },
   plugins: {

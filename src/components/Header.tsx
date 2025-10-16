@@ -100,7 +100,7 @@ const Header: React.FC<HeaderProps> = ({
             `}
           >
             <ChevronLeft className="w-4 h-4" />
-            <span className="select-none">Prev</span>
+            <span className="select-none">قبلی</span>
           </button>
         </div>
 
@@ -135,7 +135,7 @@ const Header: React.FC<HeaderProps> = ({
               ${hasNext ? 'opacity-100' : 'opacity-40 pointer-events-none'}
             `}
           >
-            <span className="select-none">Next</span>
+            <span className="select-none">بعدی</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

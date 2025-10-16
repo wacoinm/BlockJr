@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^7.1.1",
-    "@capacitor-mlkit/barcode-scanning": "^7.3.0",
     "@capacitor/android": "^7.4.2",
     "@capacitor/app": "^7.1.0",
     "@capacitor/camera": "^7.0.2",
@@ -31,8 +30,9 @@
     "@fontsource/vazirmatn": "^5.2.8",
     "@reduxjs/toolkit": "^2.9.0",
     "actionsheet-react": "^2.0.2",
-    "dialogue-story": "^1.4.6",
+    "dialogue-story": "^1.4.13",
     "embla-carousel-react": "^8.6.0",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-circular-progressbar": "^2.2.0",

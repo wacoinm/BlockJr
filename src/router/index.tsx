@@ -17,7 +17,7 @@ const router = createBrowserRouter([
     element: <ProjectManager />,
     errorElement: <ErrorPage />,
   },
-  // ✅ NEW explicit route for project selection by pack ID
+  // explicit route for project selection by pack ID
   {
     path: "/project/p/:packId",
     element: <ProjectSelection />,

@@ -253,7 +253,7 @@ export default function GamepadPage() {
           {projectId === "تله کابین" && (
             <>
               <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: فقط محور X (چپ/راست)</div>
-              <div className="w-full flex justify-center">
+              <div className="w-full flex justify-center my-8">
                 <Joystick
                   size={joystickSize}
                   controlPlaneShape={JoystickShape.AxisX}  // <-- X axis only

@@ -152,8 +152,8 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
 
   // Project -> types mapping
   const projectMap: Record<string, string[]> = {
-    elevator: ["green-flag", "up", "down", "delay"],
-    bulldozer: [
+    "آسانسور": ["green-flag", "up", "down", "delay"],
+    "تله کابین": [
       "green-flag",
       "forward",
       "backward",
@@ -161,7 +161,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       "countclockwise",
       "delay",
     ],
-    "lift truck": [
+    "جرثقیل": [
       "green-flag",
       "forward",
       "backward",

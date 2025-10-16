@@ -583,7 +583,7 @@ const App: React.FC = () => {
     },
   ];
 
-  const projects = ['elevator', 'bulldozer', 'lift truck'];
+  const projects = ['آسانسور', 'جرثقیل', 'تله کابین'];
   const LEFT_TOGGLE_LEFT = 6;
   const LEFT_TOGGLE_BOTTOM = blockPaletteBottom;
   const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));

@@ -205,7 +205,7 @@ export default function GamepadPage() {
             </button>
         </header>
 
-        <div className="flex flex-col gap-6 mt-[20vh] items-center">
+        <div className="flex flex-col gap-6 mt-[14vh] items-center">
           {projectId === "آسانسور" && (
             <>
               <div className="text-sm text-center  text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
@@ -226,7 +226,7 @@ export default function GamepadPage() {
             <>
               <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex-1 flex flex-col items-center gap-2">
-                  <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">حرکت: جلو/عقب/چپ/راست</div>
+                  <div className="text-sm my-8 text-center text-neutral-600 dark:text-neutral-300">حرکت: جلو/عقب/چپ/راست</div>
                   <Joystick
                     size={joystickSize}
                     controlPlaneShape={JoystickShape.Plane} // full plane (default)
@@ -237,7 +237,7 @@ export default function GamepadPage() {
                 </div>
 
                 <div className="flex-1 flex flex-col items-center gap-2">
-                  <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">بالا/پایین (محدود روی Y)</div>
+                  <div className="text-sm my-8 text-center text-neutral-600 dark:text-neutral-300">بالا/پایین (محدود روی Y)</div>
                   <Joystick
                     size={joystickSize}
                     controlPlaneShape={JoystickShape.AxisY} // Y axis only

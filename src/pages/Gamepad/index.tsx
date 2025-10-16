@@ -182,19 +182,8 @@ export default function GamepadPage() {
   return (
     <div className="min-h-screen bg-page-light dark:bg-page-dark transition-colors duration-300 p-4">
       <div className="max-w-lg mx-auto">
-        <header className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-semibold">{projectId}</h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
-          </div>
+        <header className="flex items-center justify-between mb-4 flex-row-reverse">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800"
-            >
-              بازگشت
-            </button>
-
             <button
               onClick={toggleLight}
               aria-pressed={lightOn}
@@ -204,13 +193,23 @@ export default function GamepadPage() {
               <Lightbulb className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`} />
             </button>
           </div>
+          <div className="text-end">
+            <h1 className="text-xl font-semibold">{projectId}</h1>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
+          </div>
+          <button
+              onClick={() => navigate(-1)}
+              className="px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800"
+            >
+              بازگشت
+            </button>
         </header>
 
-        <div className="flex flex-col gap-6 items-center">
+        <div className="flex flex-col gap-6 mt-[20vh] items-center">
           {projectId === "آسانسور" && (
             <>
-              <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
-              <div className="w-full flex justify-center">
+              <div className="text-sm text-center  text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
+              <div className="w-full flex justify-center my-8">
                 <Joystick
                   size={joystickSize}
                   controlPlaneShape={JoystickShape.AxisY}   // <-- Y axis only
@@ -291,7 +290,7 @@ export default function GamepadPage() {
           )}
         </div>
 
-        <footer className="mt-8 text-xs text-neutral-500 dark:text-neutral-400 text-center">
+        <footer dir="rtl" className="mt-8 text-xs text-neutral-500 dark:text-neutral-400 text-center">
           توجه: قبل از استفاده، از طریق بخش بلوتوث به دستگاه متصل شوید.
         </footer>
       </div>

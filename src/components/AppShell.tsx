@@ -185,7 +185,7 @@ export default function AppShell(props: AppShellProps) {
       />
 
       {/* Left-top helper UI (zoom + battery + gamepad button) */}
-      {/* <div style={{ position: 'absolute', left: 8, top: 200, zIndex: 80 }}>
+      <div style={{ position: 'absolute', left: 8, top: 200, zIndex: 80 }}>
           <button
             type="button"
             onClick={() => openGamepadForProject(selectedProject)}
@@ -198,7 +198,7 @@ export default function AppShell(props: AppShellProps) {
           >
             <img src={GamepadPng} alt="gamepad" className="w-7 h-7" />
           </button>
-      </div> */}
+      </div>
     </>
   );
 }

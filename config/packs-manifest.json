@@ -80,6 +80,78 @@
       "notes": "Gondola/télé-cabin story placeholder."
     }
   ],
+  "tasklists": [
+    {
+      "projectId": "آسانسور",
+      "chapterKey": "chapter-1",
+      "tasks": [
+        {
+          "id": "elev-1-1",
+          "title": "بازدید محل نصب",
+          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
+          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
+          "type": "image",
+          "mediaText": "بازدید محل نصب",
+          "locked": false,
+          "mediaUrl": "https://placehold.co/800x600?text=project"
+        },
+        {
+          "id": "elev-1-2",
+          "title": "تماشای ویدیوی معرفی",
+          "shortDescription": "ویدیوی ۳ دقیقه‌ای معرفی",
+          "description": "ویدیو کوتاه راهنمای نصب آسانسور را تماشا کنید.",
+          "type": "video",
+          "mediaUrl": "https://example.com/dummy-video",
+          "mediaText": "ویدیو آموزشی",
+          "locked": true
+        },
+        {
+          "id": "elev-1-1",
+          "title": "بازدید محل نصب",
+          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
+          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
+          "type": "image",
+          "mediaText": "بازدید محل نصب",
+          "locked": false,
+          "mediaUrl": "https://placehold.co/800x600?text=project"
+        },{
+          "id": "elev-1-1",
+          "title": "بازدید محل نصب",
+          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
+          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
+          "type": "image",
+          "mediaText": "بازدید محل نصب",
+          "locked": false,
+          "mediaUrl": "https://placehold.co/800x600?text=project"
+        },{
+          "id": "elev-1-1",
+          "title": "بازدید محل نصب",
+          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
+          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
+          "type": "image",
+          "mediaText": "بازدید محل نصب",
+          "locked": false,
+          "mediaUrl": "https://placehold.co/800x600?text=project"
+        }
+      ]
+    },
+    {
+      "projectId": "آسانسور",
+      "chapterKey": "chapter-2",
+      "tasks": [
+        {
+          "id": "elev-2-1",
+          "title": "ثبت عکس محل",
+          "shortDescription": "آپلود عکس محل نصب",
+          "description": "یک عکس از محل نصب آپلود کنید و توضیحات مختصری بنویسید.",
+          "type": "image",
+          "mediaText": "ثبت عکس",
+          "locked": false,
+          "mediaUrl": "https://placehold.co/800x600?text=project"
+        }
+      ]
+    }
+  ],
   "packToProjectKeywords": {
     "pack-tele-elev-crane": [
       "آسانسور",

@@ -45,6 +45,10 @@ import { elevator } from './assets/stories/elevator';
 import validateElevatorChapter from './assets/stories/elevator-validate';
 import { advanceSessionStep, getSession } from './utils/sessionStorage';
 
+/* Timeline tasklist imports */
+import TimelineTaskList, { TaskItem } from './components/TimelineTaskList';
+import { getTaskListForProject } from './utils/manifest';
+
 export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
@@ -75,6 +79,10 @@ const App: React.FC = () => {
 
   // sound
   const playSnapSound = useSnapSound();
+
+  // timeline tasklist UI state (show after dialogue ends)
+  const [showTaskList, setShowTaskList] = useState<boolean>(false);
+  const [activeTaskList, setActiveTaskList] = useState<TaskItem[] | null>(null);
 
   // derived map for quick lookup
   const blocksMap = useMemo(() => new Map<string, Block>(blocks.map((b) => [b.id, b])), [blocks]);
@@ -468,11 +476,24 @@ const App: React.FC = () => {
         setCurrentDialogueChapter(key);
         const normalized = normalizeMessagesForSides(rawMessages);
         await dialogue(normalized as any);
+
+        // After dialogue finishes, show tasklist popup if exists for selected project + chapter.
+        try {
+          const projId = selectedProjectRef.current ?? selectedProject ?? 'آسانسور';
+          const chapterKeyForTasklist = key;
+          const t = getTaskListForProject(projId, chapterKeyForTasklist);
+          if (t && t.tasks && t.tasks.length > 0) {
+            setActiveTaskList(t.tasks as TaskItem[]);
+            setShowTaskList(true);
+          }
+        } catch (err) {
+          console.warn('failed to load tasklist for project after dialogue', err);
+        }
       } catch (err) {
         console.warn("startDialogueForChapter failed", err);
       }
     },
-    [dialogue],
+    [dialogue, selectedProject],
   );
 
   // If navigated with state requesting autoStartDialogue, start it
@@ -682,6 +703,19 @@ const App: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* Timeline TaskList modal (shown after dialogue ends) */}
+        {showTaskList && activeTaskList ? (
+          <TimelineTaskList
+            visible={showTaskList}
+            onClose={() => {
+              setShowTaskList(false);
+              setActiveTaskList(null);
+            }}
+            tasks={activeTaskList}
+            title={`${selectedProjectRef.current ?? selectedProject ?? ""} — تسک‌های فصل`}
+          />
+        ) : null}
       </div>
     </SoundContext.Provider>
   );

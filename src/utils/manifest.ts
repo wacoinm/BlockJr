@@ -1,6 +1,6 @@
 // src/utils/manifest.ts
 // Small wrapper around config/packs-manifest.json to provide typed access.
-// Make sure tsconfig has "resolveJsonModule": true OR add `declare module '*.json'`.
+// Extended to support tasklists per project AND per chapter (chapterKey).
 import rawManifest from "../../config/packs-manifest.json";
 
 export type PackEntry = {
@@ -30,8 +30,27 @@ export type StoryEntry = {
   projectId: string;
   storyPath: string;
   storyModule: string;
-  validatorPath: string;
+  validatorPath?: string;
   notes?: string;
+};
+
+/** Tasklist types - support chapterKey */
+export type TaskItem = {
+  id: string;
+  title: string;
+  description?: string;
+  shortDescription?: string;
+  type?: "image" | "video" | "text";
+  mediaUrl?: string;
+  mediaText?: string;
+  locked?: boolean;
+};
+
+export type TaskListEntry = {
+  projectId: string;
+  // optional: if present this entry is for a specific chapterKey
+  chapterKey?: string;
+  tasks: TaskItem[];
 };
 
 export type Manifest = {
@@ -40,6 +59,7 @@ export type Manifest = {
   packs: PackEntry[];
   projects: ProjectEntry[];
   stories: StoryEntry[];
+  tasklists?: TaskListEntry[]; // optional
   packToProjectKeywords?: Record<string, string[]>;
   notes?: string;
 };
@@ -59,4 +79,29 @@ export function getAllStories(): StoryEntry[] {
 export function getPackKeywords(packId: string): string[] {
   return (manifest.packToProjectKeywords && manifest.packToProjectKeywords[packId]) || [];
 }
+
+/** tasklist getters */
+/**
+ * Get all tasklists (raw)
+ */
+export function getAllTaskLists(): TaskListEntry[] {
+  return manifest.tasklists || [];
+}
+
+/**
+ * Get tasklist for a project.
+ * If chapterKey provided, try to find a tasklist entry with matching projectId+chapterKey.
+ * If not found, fallback to any entry that matches only projectId (legacy behavior).
+ */
+export function getTaskListForProject(projectId: string, chapterKey?: string): TaskListEntry | undefined {
+  const lists = manifest.tasklists || [];
+  if (chapterKey) {
+    const exact = lists.find((t) => t.projectId === projectId && t.chapterKey === chapterKey);
+    if (exact) return exact;
+  }
+  // fallback: any entry with projectId and no chapterKey or matching projectId
+  const fallback = lists.find((t) => t.projectId === projectId && !t.chapterKey) || lists.find((t) => t.projectId === projectId);
+  return fallback;
+}
+
 export default manifest;

@@ -5,6 +5,7 @@ import { Block } from "../types/Block";
 import { ChevronDown, ListFilter, Move, Wrench } from "lucide-react";
 import { useAppSelector } from "../store/hooks";
 import type { RootState } from "../store";
+import { useSnapSound } from "../utils/soundEffects";
 
 interface BlockPaletteProps {
   onBlockDrag?: (
@@ -128,6 +129,9 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
     typeof selectedProjectProp !== "undefined"
       ? selectedProjectProp
       : reduxSelectedProject ?? null;
+
+  // sound hook (plays deterministic color-based tones)
+  const playColorSound = useSnapSound();
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -377,7 +381,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       if (!paletteRect) return;
 
       // Determine whether palette is visually near the bottom or near the top
-      const anchoredBottom = paletteRect.top > (window.innerHeight / 2);
+      const anchoredBottom = paletteRect.top > window.innerHeight / 2;
 
       if (anchoredBottom) {
         // palette is bottom-anchored: user must move upward (y decreases) to start drag
@@ -439,7 +443,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       if (!paletteRect) return;
 
       // determine if palette is bottom-anchored or top-anchored and use appropriate direction
-      const anchoredBottom = paletteRect.top > (window.innerHeight / 2);
+      const anchoredBottom = paletteRect.top > window.innerHeight / 2;
 
       if (anchoredBottom) {
         // bottom palette: start drag when pointer moves above palette top
@@ -481,6 +485,15 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
     block: Block,
     e: React.MouseEvent | React.TouchEvent
   ) => {
+    // play the block's color sound immediately on user press (deterministic)
+    try {
+      playColorSound(block);
+    } catch (err) {
+      // ignore sound errors
+      // eslint-disable-next-line no-console
+      console.warn("playColorSound failed", err);
+    }
+
     // store active block (we will only trigger onBlockDrag if pointer moves above palette after hold)
     activeBlockRef.current = block;
     movedTooFarBeforeHoldRef.current = false;
@@ -731,7 +744,7 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
           "left-6 md:left-[var(--h-margin)] md:right-[var(--h-margin)]"
         }
         style={{
-          ['--h-margin' as string]: `${H_MARGIN}px`,
+          ["--h-margin" as string]: `${H_MARGIN}px`,
           transform: paletteTransform,
           transition: paletteTransition,
         }}

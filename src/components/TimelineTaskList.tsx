@@ -3,12 +3,17 @@ import React, { useEffect, useState, useRef } from "react";
 import { X, Play, CheckCircle, Lock, Circle } from "lucide-react";
 
 /*
-  TimelineTaskList (Final Revision)
+  TimelineTaskList (Final Revision with built-in animations)
   - Prevents horizontal scroll.
   - Uses clamp() for responsive font sizes on titles/buttons.
   - Glassmorphism background with backdrop blur.
   - Dark mode supported.
   - Collapsible timeline items, only one open at a time.
+  - When an item is opened:
+      * All timeline icons slide to the right (out of view).
+      * The vertical timeline line fades/moves away.
+      * The opened task card expands to take full available width.
+      * Animations are pure CSS (no external libs).
   - No overflow/overlap even on very small screens.
 */
 
@@ -80,6 +85,11 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
     );
   };
 
+  // CSS injected locally to provide the animations and prevent horizontal scroll.
+  // We use a container class `.timeline-expanded` when any item is open to animate icons out
+  // and let the selected card expand to full width.
+  const expanded = openIndex !== null;
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[999]" aria-modal="true" role="dialog">
       {/* background blur */}
@@ -92,7 +102,9 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
       {/* main modal container */}
       <div
         ref={containerRef}
-        className="relative w-full max-w-5xl mx-2 sm:mx-4 rounded-2xl overflow-hidden overflow-x-hidden"
+        className={`relative w-full max-w-5xl mx-2 sm:mx-4 rounded-2xl overflow-hidden overflow-x-hidden timeline-container ${
+          expanded ? "timeline-expanded" : ""
+        }`}
         style={{
           maxHeight: "calc(100vh - 72px)",
           background: "rgba(255,255,255,0.75)",
@@ -102,6 +114,68 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
         }}
       >
+        {/* Local CSS for the fancy animations (no external libs). */}
+        <style>{`
+          /* Prevent any horizontal overscroll caused by transforms */
+          .timeline-container { overflow-x: hidden; }
+
+          /* timeline vertical line */
+          .timeline-line {
+            transition: transform 420ms cubic-bezier(.2,.9,.2,1), opacity 320ms ease;
+            transform-origin: left center;
+          }
+          .timeline-expanded .timeline-line {
+            transform: translateX(120px) scaleX(0.9);
+            opacity: 0;
+          }
+
+          /* icon column animations */
+          .icon-col {
+            transition:
+              transform 420ms cubic-bezier(.2,.9,.2,1),
+              width 420ms cubic-bezier(.2,.9,.2,1),
+              opacity 320ms ease,
+              padding 320ms ease;
+            transform-origin: left center;
+            will-change: transform, opacity, width;
+          }
+          .timeline-expanded .icon-col {
+            transform: translateX(120%) translateZ(0);
+            opacity: 0;
+            width: 0 !important;
+            padding-right: 0 !important;
+            pointer-events: none;
+          }
+
+          /* the task card expands when timeline-expanded is active.
+             the open item gets a slight raise (z-index) to feel focused. */
+          .task-card {
+            transition: flex-basis 420ms cubic-bezier(.2,.9,.2,1), width 420ms cubic-bezier(.2,.9,.2,1), margin 320ms ease, box-shadow 320ms ease;
+            will-change: flex-basis, width;
+          }
+          .timeline-expanded .task-card {
+            flex-basis: 100% !important;
+            width: 100% !important;
+            margin-left: 0 !important;
+          }
+
+          /* make the opened card pop above neighbors */
+          .task-card.open {
+            z-index: 30;
+          }
+
+          /* Smooth collapse content height when opening/closing */
+          .collapse-body {
+            transition: max-height 360ms cubic-bezier(.2,.9,.2,1), opacity 320ms ease;
+          }
+
+          /* safety: ensure no horizontal scroll on small devices when icons translate */
+          @media (max-width: 640px) {
+            .timeline-expanded .timeline-line { transform: translateX(96px); }
+            .timeline-expanded .icon-col { transform: translateX(140%); }
+          }
+        `}</style>
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md">
           <div className="text-right flex-1 min-w-0">
@@ -114,7 +188,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           </div>
           <button
             onClick={onClose}
-            className="flex-shrink-0 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex-shrink-0 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 ml-4"
           >
             <X className="w-5 h-5 text-slate-700 dark:text-slate-200" />
           </button>
@@ -128,7 +202,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           <div className="relative w-full">
             {/* timeline line */}
             <div
-              className="absolute top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-400/30 to-blue-300/10 sm:left-[70px] left-[48px]"
+              className="timeline-line absolute top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-400/30 to-blue-300/10 sm:left-[70px] right-[50px]"
               aria-hidden
             />
 
@@ -137,14 +211,21 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
                 const s = statuses[i] ?? "locked";
                 const open = openIndex === i;
                 return (
-                  <div key={t.id} className="relative flex items-start w-full overflow-x-hidden">
+                  <div
+                    key={t.id}
+                    className="relative flex items-start w-full overflow-x-hidden"
+                    // keep RTL friendliness
+                    dir="rtl"
+                  >
                     {/* icon column */}
-                    <div className="z-10 flex-shrink-0 w-24 sm:w-36 pr-2 sm:pr-3 flex flex-col items-center">
+                    <div
+                      className={`z-10 flex-shrink-0 icon-col w-24 sm:w-36 pr-2 sm:pr-3 flex flex-col items-center`}
+                    >
                       {icon(s)}
                     </div>
 
                     {/* task card */}
-                    <div className="flex-1 z-20 w-full overflow-hidden">
+                    <div className={`flex-1 z-20 w-full overflow-hidden task-card ${open ? "open" : ""}`}>
                       <div
                         className={`rounded-xl overflow-hidden transition-all duration-300 ${
                           open ? "shadow-lg" : "shadow-sm"
@@ -194,9 +275,9 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
 
                         {/* collapsible section */}
                         <div
-                          className="px-3 sm:px-4 overflow-hidden transition-[max-height,opacity] duration-300 ease-[cubic-bezier(.2,.9,.2,1)]"
+                          className="px-3 sm:px-4 overflow-hidden collapse-body"
                           style={{
-                            maxHeight: open ? 600 : 0,
+                            maxHeight: open ? 800 : 0,
                             opacity: open ? 1 : 0,
                           }}
                         >

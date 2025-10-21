@@ -35,7 +35,7 @@ interface BlockComponentProps {
   size?: number;
 }
 
-const clampDelay = (v: number) => Math.max(1, Math.min(10, v));
+const clampDelay = (v: number) => Math.max(1, Math.min(10, Math.round(v)));
 
 export const BlockComponent: React.FC<BlockComponentProps> = ({
   block: blockProp,
@@ -88,7 +88,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
 
   const borderRadiusPx = Math.round(finalSize * (isPaletteBlock ? 0.24 : 0.18));
   const removeBtnSize = Math.max(16, Math.round(finalSize * 0.22));
-  const delayBadgeSize = Math.max(12, Math.round(finalSize * 0.18));
+  const delayBadgeSize = Math.max(25, Math.round(finalSize * 0.18));
 
   // ---------- COLORS ----------
   const getBlockColor = (type: string) => {
@@ -147,23 +147,43 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     }
   };
 
-  // ---------- HANDLERS ----------
-  const handleDelayIncrease = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const current = typeof block.value === 'number' ? block.value : 1;
-    const next = clampDelay(current + 1);
-    if (onDelayChange) onDelayChange(next);
-    else dispatch(updateBlockAction({ ...block, value: next }));
-    playSnapSound?.();
+  // ---------- Delay-in-block support ----------
+  // These action types should get the internal delay control UI (but speed & lamp are excluded)
+  const internalDelayTypes = new Set<Block['type']>([
+    'up',
+    'down',
+    'forward',
+    'backward',
+    'clockwise',
+    'countclockwise',
+    'delay'
+  ]);
+
+  const showInternalDelayControls = !isPaletteBlock && internalDelayTypes.has(block.type);
+
+  // displayed value (fallback to 1)
+  const displayedValue = typeof block.value === 'number' ? clampDelay(block.value) : 1;
+
+  const applyNewValue = (newV: number) => {
+    const v = clampDelay(newV);
+    if (onDelayChange) {
+      onDelayChange(v);
+    } else {
+      dispatch(updateBlockAction({ ...block, value: v }));
+    }
+    try { playSnapSound?.(); } catch { /* ignore */ }
   };
 
-  const handleDelayDecrease = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const current = typeof block.value === 'number' ? block.value : 1;
-    const next = clampDelay(current - 1);
-    if (onDelayChange) onDelayChange(next);
-    else dispatch(updateBlockAction({ ...block, value: next }));
-    playSnapSound?.();
+  const increaseValue = (ev?: React.MouseEvent | React.PointerEvent) => {
+    ev?.stopPropagation();
+    ev?.preventDefault?.();
+    applyNewValue(displayedValue + 1);
+  };
+
+  const decreaseValue = (ev?: React.MouseEvent | React.PointerEvent) => {
+    ev?.stopPropagation();
+    ev?.preventDefault?.();
+    applyNewValue(displayedValue - 1);
   };
 
   const handleRemove = () => {
@@ -187,49 +207,69 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
     ...style
   };
 
+  // ---------- Delay Controls components ----------
+  // Generic chevrons used for both standalone delay block and eligible action blocks.
+  // colorType selects which block color to use for the chevron buttons (ensures color matches block).
+  const DelayBlockChevrons = ({ colorType = 'delay', chevronScale = 0.18, chevronWidth = 0.36 }: { colorType?: string; chevronScale?: number; chevronWidth?: number }) => (
+    <>
+      <button
+        type="button"
+        onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onPointerUp={(e) => { e.stopPropagation(); e.preventDefault(); increaseValue(e); }}
+        onClick={(e) => { e.stopPropagation(); increaseValue(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); }}
+        aria-label="increase delay"
+        title="Increase delay"
+        style={{
+          position: 'absolute',
+          bottom: '100%',    // flush to block body (no gap)
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: Math.round(finalSize * chevronWidth),
+          height: Math.round(finalSize * 0.24),
+          borderRadius: Math.round(finalSize * 0.08),
+          WebkitTapHighlightColor: 'transparent',
+        }}
+        className={`${getBlockColor(colorType)} flex items-center justify-center border-2 border-white/20 dark:border-slate-700 text-white`}
+      >
+        <ChevronUp size={Math.round(finalSize * chevronScale)} />
+      </button>
+
+      <button
+        type="button"
+        onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onPointerUp={(e) => { e.stopPropagation(); e.preventDefault(); decreaseValue(e); }}
+        onClick={(e) => { e.stopPropagation(); decreaseValue(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); }}
+        aria-label="decrease delay"
+        title="Decrease delay"
+        style={{
+          position: 'absolute',
+          top: '100%',      // flush to block body (no gap)
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: Math.round(finalSize * chevronWidth),
+          height: Math.round(finalSize * 0.24),
+          borderRadius: Math.round(finalSize * 0.08),
+          WebkitTapHighlightColor: 'transparent',
+        }}
+        className={`${getBlockColor(colorType)} flex items-center justify-center border-2 border-white/20 dark:border-slate-700 text-white`}
+      >
+        <ChevronDown size={Math.round(finalSize * chevronScale)} />
+      </button>
+    </>
+  );
+
   return (
     <div className="relative group" style={{ width: finalSize, height: finalSize }}>
-      {/* Delay chevrons (workspace only) */}
+      {/* If this is a standalone delay block: show the original chevrons (using delay color) */}
       {block.type === 'delay' && !isPaletteBlock && (
-        <>
-          <button
-            onClick={handleDelayIncrease}
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-label="increase delay"
-            title="Increase delay"
-            style={{
-              position: 'absolute',
-              bottom: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: Math.round(finalSize * 0.36),   // bigger
-              height: Math.round(finalSize * 0.24),  // bigger
-              borderRadius: Math.round(finalSize * 0.08),
-            }}
-            className={`${getBlockColor('delay')} flex items-center justify-center border-2 border-white/20 dark:border-slate-700 text-white`}
-          >
-            <ChevronUp size={Math.round(finalSize * 0.18)} /> {/* bigger */}
-          </button>
+        <DelayBlockChevrons colorType="delay" chevronScale={0.18} chevronWidth={0.36} />
+      )}
 
-          <button
-            onClick={handleDelayDecrease}
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-label="decrease delay"
-            title="Decrease delay"
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: Math.round(finalSize * 0.36),
-              height: Math.round(finalSize * 0.24),
-              borderRadius: Math.round(finalSize * 0.08),
-            }}
-            className={`${getBlockColor('delay')} flex items-center justify-center border-2 border-white/20 dark:border-slate-700 text-white`}
-          >
-            <ChevronDown size={Math.round(finalSize * 0.18)} />
-          </button>
-        </>
+      {/* If this is an eligible action block, show the same style chevrons but colored to match the block */}
+      {showInternalDelayControls && (
+        <DelayBlockChevrons colorType={block.type} chevronScale={0.18} chevronWidth={0.36} />
       )}
 
       {/* MAIN BLOCK */}
@@ -245,8 +285,8 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
           {getBlockIcon()}
 
-          {/* delay badge */}
-          {block.type === 'delay' && (
+          {/* delay badge (standalone delay block) */}
+          {showInternalDelayControls && (
             <div style={{
               position: 'absolute',
               right: Math.round(finalSize * 0.06),
@@ -259,9 +299,9 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: Math.max(10, Math.round(finalSize * 0.28)),
+              fontSize: Math.max(10, Math.round(finalSize * 0.18)),
               fontWeight: 700,
-              border: '2px solid rgba(255,255,255,0.3)'
+              border: '2px solid rgba(255,255,255,0.3)',
             }}>
               {typeof block.value === 'number' ? block.value : 1}
             </div>

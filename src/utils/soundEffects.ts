@@ -81,7 +81,7 @@ function playTone(
   const harsh = !!opts.harsh;
 
   const masterGain = audioContext.createGain();
-  masterGain.gain.setValueAtTime(baseGain * (harsh ? 1.8 : 1.0), now);
+  masterGain.gain.setValueAtTime(baseGain * (harsh ? 2.5 : 1.8), now);
   masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.05);
   masterGain.connect(audioContext.destination);
 

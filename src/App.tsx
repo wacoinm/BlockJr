@@ -626,13 +626,19 @@ const App: React.FC = () => {
           onClick={toggleInteraction}
           className={`
             inline-flex items-center justify-center
-            w-12 h-16 rounded-t-full shadow-lg
+            w-12 h-16 shadow-lg
             cursor-pointer select-none
             transition-transform duration-200 hover:scale-105 active:scale-95
             bg-white dark:bg-slate-800
             text-gray-700 dark:text-slate-100
             hover:bg-gray-50 dark:hover:bg-slate-700
           `}
+          style={{
+            borderTopLeftRadius: '30%',
+            borderTopRightRadius: '30%',
+            borderBottomLeftRadius: '15%',
+            borderBottomRightRadius: '15%'
+          }}
           title={interactionMode === 'runner' ? 'Switch to delete mode' : 'Switch to run mode'}
         >
           <div className='flex flex-col gap-2 justify-center items-center'>

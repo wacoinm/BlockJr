@@ -1,5 +1,4 @@
-// src/components/EmergencyStopButton.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { StopCircle } from "lucide-react";
 import bluetoothService from "../utils/bluetoothService";
@@ -7,38 +6,38 @@ import bluetoothService from "../utils/bluetoothService";
 interface Props {
   className?: string;
   /**
-   * Optional hint from parent whether bluetooth is connected.
-   * If omitted the component will fall back to calling bluetoothService.isConnected().
+   * Parent-provided Bluetooth connection flag.
    */
   isConnected?: boolean;
 }
 
 const EmergencyStopButton: React.FC<Props> = ({ className = "", isConnected }) => {
   const [busy, setBusy] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  // watch prop to handle smooth entrance animation
+  useEffect(() => {
+    if (isConnected) {
+      const t = setTimeout(() => setVisible(true), 50);
+      return () => clearTimeout(t);
+    } else {
+      setVisible(false);
+    }
+  }, [isConnected]);
 
   const handleClick = async () => {
     if (busy) return;
     setBusy(true);
 
     try {
-      let connected = typeof isConnected === "boolean" ? isConnected : undefined;
-
-      if (connected === undefined && typeof bluetoothService.isConnected === "function") {
-        try {
-          connected = await bluetoothService.isConnected();
-        } catch (err) {
-          console.warn("isConnected check failed:", err);
-          connected = false;
-        }
-      }
-
-      if (!connected) {
+      // skip sending if disconnected
+      if (!isConnected) {
         toast.warn("دستگاه بلوتوث متصل نیست — ابتدا اتصال را برقرار کنید.");
         setBusy(false);
         return;
       }
 
-      // send the emergency command exactly as required
+      // send stop() command
       await bluetoothService.sendString("stop()");
       toast.success("فرمان توقف اضطراری ارسال شد.");
     } catch (err) {
@@ -49,23 +48,28 @@ const EmergencyStopButton: React.FC<Props> = ({ className = "", isConnected }) =
     }
   };
 
+  // hide fully when not connected
+  if (!visible) return null;
+
   return (
     <button
       aria-label="توقف اضطراری"
       title="توقف اضطراری"
       onClick={handleClick}
       disabled={busy}
-      className={`${className} inline-flex items-center justify-center select-none shadow-lg transition-transform duration-150 hover:scale-105 active:scale-95 focus:outline-none`}
+      className={`${className} inline-flex items-center justify-center select-none shadow-lg focus:outline-none`}
       style={{
-        // Match your FAB feel: compact, prominent, rounded, with heavy shadow.
         width: 48,
         height: 48,
-        borderRadius: 9999,
-        background: busy ? "linear-gradient(180deg,#ef9a9a,#c62828)" : "linear-gradient(180deg,#ef4444,#b91c1c)",
+        borderRadius: "50%",
         color: "white",
+        background: busy
+          ? "linear-gradient(180deg,#ef9a9a,#c62828)"
+          : "linear-gradient(180deg,#ef4444,#b91c1c)",
         boxShadow: "0 6px 18px rgba(0,0,0,0.18)",
         opacity: busy ? 0.8 : 1,
-        display: "inline-flex",
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        transition: "opacity 0.3s ease, transform 0.3s ease",
       }}
     >
       <StopCircle className="w-6 h-6" />

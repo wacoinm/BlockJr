@@ -49,6 +49,9 @@ import { advanceSessionStep, getSession } from './utils/sessionStorage';
 import TimelineTaskList, { TaskItem } from './components/TimelineTaskList';
 import { getTaskListForProject } from './utils/manifest';
 
+/* Emergency stop button (styled FAB) */
+import EmergencyStopButton from './components/EmergencyStopButton';
+
 export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
@@ -612,6 +615,22 @@ const App: React.FC = () => {
   return (
     <SoundContext.Provider value={playSnapSound}>
       <Header initialCollapsed={false} hasPrev={hasPrev} hasNext={hasNext} onPrev={goPrev} onNext={goNext} />
+
+      {/* Emergency Stop: positioned above the left mode selector FAB so it looks integrated */}
+      <div
+        style={{
+          position: 'fixed',
+          left: LEFT_TOGGLE_LEFT,
+          // place it above the mode FAB (approx offset = 88 px). Adjust if needed.
+          bottom: LEFT_TOGGLE_BOTTOM + 80,
+          zIndex: 80,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <EmergencyStopButton isConnected={isBluetoothConnected} />
+      </div>
 
       <div
         style={{

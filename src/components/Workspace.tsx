@@ -326,7 +326,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
       }
     }
 
-    // For any block not visited (orphaned, or part of cycles), fallback to stored x
+    // For any block not visited fallback to stored x
     for (const b of blocks) {
       if (!visited.has(b.id)) {
         map.set(b.id, b.x);
@@ -390,6 +390,10 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
             // Use computed displayX (never undefined because we default fallback to b.x)
             const displayLeft = displayXById.get(block.id) ?? block.x;
 
+            // determine which block types should receive in-block delay controls
+            const internalDelayTypes = new Set(['up','down','forward','backward','clockwise','countclockwise']);
+            const shouldHaveInBlockDelay = internalDelayTypes.has(block.type) || block.type === 'delay';
+
             return (
               <div
                 key={block.id}
@@ -419,7 +423,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
                   block={block}
                   onDragStart={(e) => onBlockDragStart?.(block, e)}
                   onGreenFlagClick={block.type === 'green-flag' ? () => onGreenFlagClick?.(block.id) : undefined}
-                  onDelayChange={block.type === 'delay' ? (value) => _onDelayChange(block.id, value) : undefined}
+                  onDelayChange={shouldHaveInBlockDelay ? (value) => _onDelayChange(block.id, value) : undefined}
                   onRemove={() => _onBlockRemove(block.id)}
                   style={{ width: 100, height: 100 }}
                 />

@@ -66,8 +66,9 @@ const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 1
     case 'down':
       return `down(${unitsToMs(delayUnits)})`;
     case 'delay': {
+      // Changed: emit sleep(...) instead of delay(...)
       const v = typeof block.value === 'number' ? block.value : 1;
-      return `delay(${v * unitMs})`;
+      return `sleep(${v * unitMs})`;
     }
     case 'forward':
       return `forward(${unitsToMs(delayUnits)})`;
@@ -106,7 +107,7 @@ const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 1
  * - Standalone delay blocks:
  *   - If the standalone delay occurs immediately after a speed block, it is ignored (no matter single or multiple).
  *   - If at the start (no previous block) AND there are 2+ consecutive delays, the whole run of delays is ignored.
- *   - Otherwise delays are encoded as delay(x) where x is block.value * unit
+ *   - Otherwise delays are encoded as sleep(x) where x is block.value * unit
  *
  * Single additional rule (ENFORCED):
  * - If a consuming move block (up/down/forward/backward/clockwise/countclockwise/lamp-on/lamp-off)
@@ -150,8 +151,6 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
     if (consumesDelay.has(curr.type) && isSpeed(next.type)) {
       // small toast error and abort
       toast.error('A move block cannot be immediately followed by a speed block.');
-      // also log details for debugging
-      // eslint-disable-next-line no-console
       console.error(
         `Validation error: move '${curr.type}' at index ${idx} is immediately followed by speed '${next.type}' at index ${idx + 1}.`
       );
@@ -166,8 +165,17 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
       continue;
     }
 
-    // 1) If this block consumes delay(s), sum all consecutive delays after it (in units) and apply the sum
+    // 1) If this block consumes delay(s)
     if (consumesDelay.has(currentBlock.type)) {
+      // If the action block itself has a numeric value, use it AS the delay and do NOT consume following delay blocks
+      if (typeof currentBlock.value === 'number') {
+        const explicitUnits = currentBlock.value;
+        commands.push(mapBlockToCommand(currentBlock, explicitUnits, unit));
+        i = i + 1; // only the action consumed
+        continue;
+      }
+
+      // Otherwise sum following delay blocks as before
       let sumDelayUnits = 0;
       let j = i + 1;
       while (j < orderedBlocks.length && orderedBlocks[j].type === 'delay') {
@@ -176,7 +184,6 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
         j++;
       }
 
-      // mapBlockToCommand will multiply units by `unit` (ms)
       commands.push(mapBlockToCommand(currentBlock, sumDelayUnits, unit));
       i = j; // skip action + consumed delays
       continue;
@@ -189,29 +196,25 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
       // count how many consecutive delays starting from i
       let k = i;
       let consecutiveCount = 0;
-      let totalConsecutiveDelayUnits = 0;
       while (k < orderedBlocks.length && orderedBlocks[k].type === 'delay') {
-        const d = typeof orderedBlocks[k].value === 'number' ? orderedBlocks[k].value! : 1;
-        totalConsecutiveDelayUnits += d;
         consecutiveCount++;
         k++;
       }
 
-      // Rule: if prev is speed => ignore all consecutive delays
+      // if previous is speed => ignore consecutive delays
       if (isSpeed(prevBlock?.type)) {
         i = k;
         continue;
       }
 
-      // Rule: if at start and 2+ consecutive delays => ignore them
+      // if at start and 2+ consecutive delays => ignore them
       if (prevBlock === undefined && consecutiveCount >= 2) {
         i = k;
         continue;
       }
 
-      // Otherwise, emit each delay as standalone (mapBlockToCommand handles multiplying by `unit`)
+      // otherwise emit each delay as standalone `sleep(...)`
       for (let p = i; p < k; p++) {
-        // For 'delay' type we simply call mapBlockToCommand which reads block.value and multiplies by `unit`
         commands.push(mapBlockToCommand(orderedBlocks[p]!, undefined, unit));
       }
       i = k;

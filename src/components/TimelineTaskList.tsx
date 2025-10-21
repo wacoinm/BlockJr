@@ -114,7 +114,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           </div>
           <button
             onClick={onClose}
-            className="flex-shrink-0 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex-shrink-0 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 ml-4"
           >
             <X className="w-5 h-5 text-slate-700 dark:text-slate-200" />
           </button>

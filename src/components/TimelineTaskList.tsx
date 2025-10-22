@@ -1,7 +1,7 @@
 // src/components/TimelineTaskList.tsx
 import React, { useEffect, useState, useRef } from "react";
 import { X, Play, CheckCircle, Lock, Circle } from "lucide-react";
-
+import ReactPlayer from "react-player";
 /*
   TimelineTaskList (Final Revision with built-in animations)
   - Prevents horizontal scroll.
@@ -85,9 +85,6 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
     );
   };
 
-  // CSS injected locally to provide the animations and prevent horizontal scroll.
-  // We use a container class `.timeline-expanded` when any item is open to animate icons out
-  // and let the selected card expand to full width.
   const expanded = openIndex !== null;
 
   return (
@@ -114,7 +111,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
         }}
       >
-        {/* Local CSS for the fancy animations (no external libs). */}
+        {/* Local CSS for animations and player wrapper */}
         <style>{`
           /* Prevent any horizontal overscroll caused by transforms */
           .timeline-container { overflow-x: hidden; }
@@ -147,8 +144,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
             pointer-events: none;
           }
 
-          /* the task card expands when timeline-expanded is active.
-             the open item gets a slight raise (z-index) to feel focused. */
+          /* the task card expands when timeline-expanded is active. */
           .task-card {
             transition: flex-basis 420ms cubic-bezier(.2,.9,.2,1), width 420ms cubic-bezier(.2,.9,.2,1), margin 320ms ease, box-shadow 320ms ease;
             will-change: flex-basis, width;
@@ -159,10 +155,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
             margin-left: 0 !important;
           }
 
-          /* make the opened card pop above neighbors */
-          .task-card.open {
-            z-index: 30;
-          }
+          .task-card.open { z-index: 30; }
 
           /* Smooth collapse content height when opening/closing */
           .collapse-body {
@@ -173,6 +166,34 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           @media (max-width: 640px) {
             .timeline-expanded .timeline-line { transform: translateX(96px); }
             .timeline-expanded .icon-col { transform: translateX(140%); }
+          }
+
+          /* simple 16:9 responsive player box using padding-bottom trick */
+          .player-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+            background: #000;
+          }
+          .player-wrapper .react-player {
+            position: absolute;
+            top: 0;
+            left: 0;
+          }
+
+          /* play overlay for fallback thumbnail */
+          .thumb-play-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+          }
+          .thumb-btn {
+            pointer-events: auto;
           }
         `}</style>
 
@@ -189,6 +210,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
           <button
             onClick={onClose}
             className="flex-shrink-0 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 ml-4"
+            aria-label="Close timeline"
           >
             <X className="w-5 h-5 text-slate-700 dark:text-slate-200" />
           </button>
@@ -210,11 +232,11 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
               {tasks.map((t, i) => {
                 const s = statuses[i] ?? "locked";
                 const open = openIndex === i;
+
                 return (
                   <div
-                    key={t.id}
+                    key={`${t.id}-${i}`}
                     className="relative flex items-start w-full overflow-x-hidden"
-                    // keep RTL friendliness
                     dir="rtl"
                   >
                     {/* icon column */}
@@ -285,26 +307,60 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
                             {t.description ?? "توضیحات این بخش"}
                           </div>
 
+                          {/* VIDEO: use react-player when task.type === 'video' */}
                           {t.type === "video" && (
                             <div className="rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-800 mb-3">
-                              <img
-                                src={t.mediaUrl ?? PLACEHOLDER(t.mediaText ?? "Video")}
-                                alt={t.title}
-                                className="w-full h-48 object-cover"
-                              />
-                              <div className="p-3">
-                                <a
-                                  href={t.mediaUrl ?? "#"}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-2 text-blue-700 dark:text-blue-300 text-[clamp(0.75rem,1.8vw,0.9rem)]"
-                                >
-                                  <Play className="w-4 h-4" /> تماشای ویدیو
-                                </a>
-                              </div>
+                              {/* When open, render the ReactPlayer iframe/player in a responsive 16:9 box.
+                                  When closed (but still expanded area due to quick animations), show a thumbnail + link. */}
+                              {open ? (
+                                <div className="p-3">
+                                  <div className="player-wrapper rounded-md overflow-hidden">
+                                    {/* react-player will size absolutely inside this wrapper */}
+                                    <ReactPlayer
+                                      className="react-player"
+                                      src={t.mediaUrl ?? ""}
+                                      controls
+                                      width="100%"
+                                      height="100%"
+                                    />
+                                  </div>
+
+                                  {/* small actions under the player */}
+                                  <div className="mt-3 flex items-center gap-3">
+                                    <a
+                                      href={t.mediaUrl ?? "#"}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-2 text-blue-700 dark:text-blue-300 text-[clamp(0.75rem,1.8vw,0.9rem)]"
+                                    >
+                                      <Play className="w-4 h-4" /> باز کردن ویدیو در سایت
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                // fallback thumbnail (collapsed but inside expanded area)
+                                <div className="relative w-full h-48 bg-slate-200 dark:bg-slate-900/40 rounded-md overflow-hidden">
+                                  <img
+                                    src={t.mediaUrl ? (t.mediaUrl + (/\.(jpg|jpeg|png|gif|webp)$/i.test(t.mediaUrl) ? "" : "") ) : PLACEHOLDER(t.mediaText ?? "Video")}
+                                    alt={t.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="thumb-play-overlay">
+                                    <button
+                                      onClick={() => toggleOpen(i)}
+                                      disabled={s === "locked"}
+                                      className="thumb-btn inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/70 px-3 py-1 rounded-md shadow-sm hover:scale-105 transition"
+                                    >
+                                      <Play className="w-4 h-4 text-blue-600" />
+                                      <span className="text-sm text-slate-700 dark:text-slate-100">تماشا</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
+                          {/* IMAGE */}
                           {t.type === "image" && (
                             <img
                               src={t.mediaUrl ?? PLACEHOLDER(t.mediaText ?? "Image")}

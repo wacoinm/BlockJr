@@ -1,4 +1,3 @@
-// src/pages/ProjectSelection/index.tsx
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import Header from "../../components/project-manager/Header";
@@ -9,7 +8,7 @@ import ProjectListNew from "../../components/project-selection/ProjectListNew";
 
 import { initSession } from "../../utils/sessionStorage";
 import { getSelectedPack } from "../../utils/packStorage";
-import { getAllProjects, getAllPacks, getPackKeywords } from "../../utils/manifest";
+import { getAllProjects, getAllPacks, getPackKeywords, getAllStories } from "../../utils/manifest";
 import { loadProjects } from "../../utils/projectStorage";
 
 /**
@@ -42,6 +41,28 @@ type Project = {
 
 const normalize = (s: string | undefined | null) => (String(s ?? "").trim().toLowerCase());
 
+/** small slugify helper to try filename-like candidates */
+function slugify(s?: string | null) {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF\-_]+/gi, "-")
+    .replace(/_{2,}/g, "-")
+    .replace(/\-+/g, "-")
+    .replace(/(^\-|\-$)/g, "");
+}
+
+/** candidateFromStoryModule helper reused from other components */
+function candidateFromStoryModule(storyModule?: string) {
+  if (!storyModule) return [];
+  let sm = storyModule;
+  if (sm.startsWith("src/")) sm = sm.slice(4);
+  if (sm.startsWith("/")) sm = sm.slice(1);
+  const base = `../../${sm}`;
+  const withoutIndex = base.replace(/\/index\.(ts|js)x?$/i, "");
+  return [base, withoutIndex];
+}
+
 const ProjectSelection: React.FC = () => {
   const { packId: paramPackId } = useParams<{ packId?: string }>();
   const [view, setView] = useState<"carousel" | "list">("carousel");
@@ -59,6 +80,7 @@ const ProjectSelection: React.FC = () => {
         const manifestProjects = (getAllProjects() || []) as Project[];
         const manifestPacks = (getAllPacks() || []) as any[];
         const persistedProjects = (await loadProjects().catch(() => [])) as Project[];
+        const manifestStories = (getAllStories() || []);
 
         // Merge projects: persisted overrides manifest
         const projectsMap = new Map<string, Project>();
@@ -75,8 +97,54 @@ const ProjectSelection: React.FC = () => {
           allProjects.map(async (p) => {
             let storyObj: any = null;
             try {
-              const mod: any = await import(`../../assets/stories/${p.id}`).catch(() => null);
-              if (mod) storyObj = mod[p.id] ?? mod.default ?? mod.elevator ?? mod;
+              // try a few candidates so localized ids still match a filename under assets/stories
+              const candidates = new Set<string>();
+              candidates.add(String(p.id));
+              if (p.name) candidates.add(slugify(p.name));
+              candidates.add(slugify(p.id));
+              const asciiId = String(p.id || "").replace(/[^\x00-\x7F]/g, "");
+              if (asciiId) candidates.add(slugify(asciiId));
+
+              // add manifest storyModule-derived candidates (if any)
+              for (const s of manifestStories) {
+                try {
+                  if (!s) continue;
+                  // if s.projectId matches this project id/name, prioritize its module
+                  if (String(s.projectId) === String(p.id) || slugify(String(s.projectId)) === slugify(p.id) || slugify(String(s.projectId)) === slugify(p.name)) {
+                    const arr = candidateFromStoryModule(s.storyModule);
+                    arr.forEach((c) => candidates.add(c.replace(/^src\//, "").replace(/^\/+/, "")));
+                  } else {
+                    // still add storyModule as a candidate in case filenames don't align exactly
+                    const arr = candidateFromStoryModule(s.storyModule);
+                    arr.forEach((c) => candidates.add(c.replace(/^src\//, "").replace(/^\/+/, "")));
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+
+              for (const cand of Array.from(candidates)) {
+                if (!cand) continue;
+                const tryPaths = [
+                  `../../assets/stories/${cand}`,
+                  `../../assets/stories/${cand}/index`,
+                  cand,
+                  `../../${cand}`,
+                ];
+                for (const pth of tryPaths) {
+                  try {
+                    // eslint-disable-next-line no-await-in-loop
+                    const mod: any = await import(pth).catch(() => null);
+                    if (mod) {
+                      storyObj = mod[p.id] ?? mod.default ?? mod[slugify(p.id)] ?? mod.elevator ?? mod;
+                      if (storyObj) break;
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }
+                if (storyObj) break;
+              }
             } catch {
               /* ignore */
             }

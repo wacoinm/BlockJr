@@ -1,4 +1,3 @@
-// src/components/project-selection/ProjectActionSheet.tsx
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Play } from "lucide-react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
@@ -7,6 +6,7 @@ import "react-circular-progressbar/dist/styles.css";
 import { useNavigate } from "react-router";
 import { saveProjectFile, readProjectFile, loadProjects, saveProjects } from "../../utils/projectStorage";
 import { initSession, getSession } from "../../utils/sessionStorage";
+import { getAllStories } from "../../utils/manifest";
 
 type Checkpoint = { id: string; title?: string; locked?: boolean; description?: string };
 type Project = {
@@ -57,6 +57,34 @@ function checkImageExists(url: string): Promise<boolean> {
   });
 }
 
+/** small slugify helper — keeps filenames safe and ascii-friendly */
+function slugify(s?: string | null) {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF\-_]+/gi, "-")
+    .replace(/_{2,}/g, "-")
+    .replace(/\-+/g, "-")
+    .replace(/(^\-|\-$)/g, "");
+}
+
+/** normalize a manifest storyModule path into a relative import path from this file */
+function candidateFromStoryModule(storyModule?: string) {
+  if (!storyModule) return null;
+  // if manifest gives "src/assets/stories/elevator/index.ts"
+  // produce "../../assets/stories/elevator" or "../../assets/stories/elevator/index.ts"
+  let sm = storyModule;
+  // strip leading 'src/' if present
+  if (sm.startsWith("src/")) sm = sm.slice(4);
+  // ensure no leading slash
+  if (sm.startsWith("/")) sm = sm.slice(1);
+  // return two candidate import paths:
+  const base = `../../${sm}`; // relative to src/components/project-selection
+  // also try trimming "index.ts" -> folder
+  const withoutIndex = base.replace(/\/index\.(ts|js)x?$/i, "");
+  return { base, withoutIndex };
+}
+
 const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   // derive checkpoints:
   const derivedCheckpointsBase = useMemo<Checkpoint[]>(() => {
@@ -82,6 +110,96 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     setDerivedCheckpoints(derivedCheckpointsBase);
   }, [derivedCheckpointsBase]);
 
+  // --- Fallback: try multiple import candidates + manifest storyModule if we don't have checkpoints yet ---
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if ((derivedCheckpointsBase ?? []).length > 0) return; // already have them
+        if (!project?.id) return;
+
+        // Prepare a set of string candidates to try importing from src/assets/stories/<candidate>
+        const candidates = new Set<string>();
+        candidates.add(String(project.id));
+        if (project.name) candidates.add(slugify(project.name));
+        candidates.add(slugify(project.id));
+
+        // ascii-only fallback (strip non-ascii)
+        const asciiId = String(project.id || "").replace(/[^\x00-\x7F]/g, "");
+        if (asciiId) candidates.add(slugify(asciiId));
+
+        // Also check manifest stories table (if it lists a storyModule for this project)
+        try {
+          const stories = getAllStories() || [];
+          for (const s of stories) {
+            if (!s) continue;
+            const pid = String(s.projectId || "");
+            const normalizedPid = slugify(pid);
+            if (normalizedPid && (normalizedPid === slugify(project.id) || normalizedPid === slugify(project.name))) {
+              // Story entry matches project id/name — add its module candidates
+              const candPaths = candidateFromStoryModule(s.storyModule);
+              if (candPaths) {
+                if (candPaths.base) candidates.add(candPaths.base.replace(/^src\//, "").replace(/^\/+/, ""));
+                if (candPaths.withoutIndex) candidates.add(candPaths.withoutIndex.replace(/^src\//, "").replace(/^\/+/, ""));
+              }
+            }
+            // Also add storyModule base as candidate for other fuzzy matches
+            if (s.storyModule) {
+              const candPaths = candidateFromStoryModule(s.storyModule);
+              if (candPaths) {
+                candidates.add(candPaths.base.replace(/^src\//, "").replace(/^\/+/, ""));
+                candidates.add(candPaths.withoutIndex.replace(/^src\//, "").replace(/^\/+/, ""));
+              }
+            }
+          }
+        } catch {
+          // ignore manifest read errors — we'll still try default candidates
+        }
+
+        // Try importing each candidate; note: import paths are relative to this file (src/components/project-selection)
+        for (const rawCand of Array.from(candidates)) {
+          const cand = String(rawCand).replace(/^\/+/, ""); // normalize
+          if (!cand) continue;
+          const tryPaths = [
+            `../../assets/stories/${cand}`,
+            `../../assets/stories/${cand}/index`,
+            cand, // cand may already be a path like ../../assets/...
+            `../../${cand}` // in case cand came from manifest like "assets/stories/..."
+          ];
+          for (const p of tryPaths) {
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const mod: any = await import(p).catch(() => null);
+              if (mod) {
+                // try to find the story object inside the module (various exports)
+                const storyObj = mod[project.id] ?? mod.default ?? mod[slugify(project.id)] ?? mod.elevator ?? mod;
+                if (storyObj && typeof storyObj === "object") {
+                  const keys = Object.keys(storyObj);
+                  if (keys.length > 0) {
+                    const cp = keys.map((k) => ({ id: k, title: k, locked: false })) as Checkpoint[];
+                    if (!mounted) return;
+                    setDerivedCheckpoints(cp);
+                    return;
+                  }
+                }
+              }
+            } catch {
+              // try next path
+            }
+          }
+        }
+      } catch (err) {
+        // ignore softly; we don't want to crash UI
+        // console.debug("ProjectActionSheet fallback import error", err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // intentionally run when base or project id changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id, derivedCheckpointsBase]);
+
   // overlay session progress/step for UI
   const [sessionProgress, setSessionProgress] = useState<number | undefined>(project.progress ?? 0);
   const [sessionStep, setSessionStep] = useState<number | null>(null);
@@ -97,7 +215,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
           setSessionProgress(typeof s.progress === "number" ? s.progress : project.progress ?? 0);
           setSessionStep(typeof s.step === "number" ? s.step : null);
 
-          const base = derivedCheckpointsBase.map((c, i) => {
+          const base = (derivedCheckpointsBase.length > 0 ? derivedCheckpointsBase : derivedCheckpoints).map((c, i) => {
             const step = s.step ?? 1;
             const isLocked = i + 1 > step;
             return { ...c, locked: !!isLocked };
@@ -115,7 +233,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     return () => {
       mounted = false;
     };
-  }, [project?.id, project.progress, derivedCheckpointsBase]);
+  }, [project?.id, project.progress, derivedCheckpointsBase]); // eslint-disable-line
 
   const checkpoints = derivedCheckpoints;
 
@@ -472,7 +590,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             <div className="text-md text-neutral-500 mt-1">{project.subtitle}</div>
           </div>
           {/* CHECKPOINT column: make this the only scrollable area */}
-          {/* <div
+          <div
             ref={scrollRef}
             className="flex-1 text-right w-full md:w-1/2"
             style={{
@@ -483,7 +601,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             <div className="my-3 text-right">
               <div className="text-sm font-medium mb-1">توضیحات مرحله</div>
               <div className="text-sm text-neutral-600 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-800 p-3 rounded-md">
-                {project.description || currentCheckpoint?.description || ""}
+                {project.subtitle || currentCheckpoint?.description || ""}
               </div>
             </div>
             
@@ -520,7 +638,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
                 })}
               </div>
             </div>
-          </div> */}
+          </div>
         </div>
 
         {/* footer buttons */}

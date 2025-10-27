@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Play, Lock } from "lucide-react";
 import { getSession } from "../../utils/sessionStorage";
-import { getAllProjects as getManifestProjects } from "../../utils/manifest";
+import { getAllProjects as getManifestProjects, getAllStories } from "../../utils/manifest";
 
 type Checkpoint = { id: string; title?: string; locked?: boolean };
 type Project = {
@@ -90,6 +90,28 @@ function normalizeImgsPath(raw?: string): string {
   return p;
 }
 
+/** small slugify helper so we can try slugified filenames in imports */
+function slugify(s?: string | null) {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF\-_]+/gi, "-")
+    .replace(/_{2,}/g, "-")
+    .replace(/\-+/g, "-")
+    .replace(/(^\-|\-$)/g, "");
+}
+
+/** Build candidate import paths from a manifest storyModule string */
+function candidateFromStoryModule(storyModule?: string) {
+  if (!storyModule) return [];
+  let sm = storyModule;
+  if (sm.startsWith("src/")) sm = sm.slice(4);
+  if (sm.startsWith("/")) sm = sm.slice(1);
+  const base = `../../${sm}`;
+  const withoutIndex = base.replace(/\/index\.(ts|js)x?$/i, "");
+  return [base, withoutIndex];
+}
+
 const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
   const projectCount = projects.length;
 
@@ -163,6 +185,15 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     }
   }, []);
 
+  const manifestStories = useMemo(() => {
+    try {
+      const s = getAllStories();
+      return Array.isArray(s) ? s : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   // Derived projects overlaying session data (progress & step) and trying to discover total chapters
   const [derivedProjects, setDerivedProjects] = useState<DerivedProject[]>(
     () =>
@@ -223,25 +254,57 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
           console.warn("EmblaIOSCarousel: getSession failed for", p.id, err);
         }
 
-        // If we don't have totalChapters, attempt to dynamically import a story module at ../../assets/stories/<id>
+        // If we don't have totalChapters, attempt to dynamically import a story module at several candidate locations
         if (dp.totalChapters == null) {
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            const mod: any = await import(`../../assets/stories/${p.id}`).catch(
-              () => null
-            );
-            if (mod) {
-              const storyObj =
-                mod[p.id] ?? mod.default ?? mod.elevator ?? mod;
-              if (storyObj && typeof storyObj === "object") {
-                const total = Object.keys(storyObj).length;
-                if (total > 0) dp.totalChapters = total;
+          const candidates = new Set<string>();
+          candidates.add(String(p.id));
+          if (p.name) candidates.add(slugify(p.name));
+          candidates.add(slugify(p.id));
+          const asciiId = String(p.id || "").replace(/[^\x00-\x7F]/g, "");
+          if (asciiId) candidates.add(slugify(asciiId));
+
+          // add manifest storyModule-derived candidates
+          const storyEntry = manifestStories.find((s) => String(s.projectId) === String(p.id) || slugify(String(s.projectId)) === slugify(p.id) || slugify(String(s.projectId)) === slugify(p.name));
+          if (storyEntry && storyEntry.storyModule) {
+            const fromStoryModule = candidateFromStoryModule(storyEntry.storyModule);
+            fromStoryModule.forEach((c) => candidates.add(c.replace(/^src\//, "").replace(/^\/+/, "")));
+          }
+          // additionally add storyModule values from the whole manifest (cover fuzzy cases)
+          for (const s of manifestStories) {
+            if (!s || !s.storyModule) continue;
+            const arr = candidateFromStoryModule(s.storyModule);
+            arr.forEach((c) => candidates.add(c.replace(/^src\//, "").replace(/^\/+/, "")));
+          }
+
+          for (const cand of Array.from(candidates)) {
+            if (!cand) continue;
+            const tryPaths = [
+              `../../assets/stories/${cand}`,
+              `../../assets/stories/${cand}/index`,
+              cand,
+              `../../${cand}`,
+            ];
+            let found = false;
+            for (const pth of tryPaths) {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                const mod: any = await import(pth).catch(() => null);
+                if (mod) {
+                  const storyObj = mod[p.id] ?? mod.default ?? mod[slugify(p.id)] ?? mod.elevator ?? mod;
+                  if (storyObj && typeof storyObj === "object") {
+                    const total = Object.keys(storyObj).length;
+                    if (total > 0) {
+                      dp.totalChapters = total;
+                      found = true;
+                      break;
+                    }
+                  }
+                }
+              } catch {
+                // ignore
               }
             }
-          } catch (err) {
-            // ignore - dynamic import failed or path not present
-            // eslint-disable-next-line no-console
-            console.debug("EmblaIOSCarousel: no story module for", p.id);
+            if (found) break;
           }
         }
 
@@ -255,7 +318,7 @@ const EmblaIOSCarousel: React.FC<Props> = ({ projects, onOpen }) => {
     return () => {
       mounted = false;
     };
-  }, [projects, manifestProjects]);
+  }, [projects, manifestProjects, manifestStories]);
 
   // ---------------------
   // Image loading & rotation per project

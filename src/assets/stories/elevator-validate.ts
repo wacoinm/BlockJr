@@ -28,7 +28,7 @@ export const elevatorValidationRules: Record<string, Array<Array<string>>> = {
   //  - regex tokens (slash-wrapped) allowing flexible matching
   "chapter-01": [
     // exact sequence: green-flag -> up -> delay -> down
-    ["green-flag", "up", "delay", "down"],
+    ["green-flag", "up", "down"],
     // allow "green flag" with or without hyphen and shorter sequence
     ["/^green[- ]?flag$/i", "down", "delay"],
     // alternative ordering or simplified sequence

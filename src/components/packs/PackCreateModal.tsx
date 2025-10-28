@@ -11,7 +11,7 @@ type Pack = {
 
 const DEFAULT_ITEMS = [
   "telecabin",
-  "elevator",
+  "car",
   "crane",
   "lift truck",
   "buildozer",

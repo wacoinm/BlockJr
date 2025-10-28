@@ -3,8 +3,8 @@ import React, { useEffect, useState } from "react";
 
 /** map item key -> emoji (برای اطمینان از اینکه در همه محیط‌ها نمایش دارد) */
 const ITEM_ICON: Record<string, string> = {
-  "تله کابین": "🚠",
-  "آسانسور": "🛗",
+  "منجنیق": "🏹",
+  "ماشین": "�",
   "جرثقیل": "🏗️",
   "lift truck": "🚚",
   buildozer: "🚜",

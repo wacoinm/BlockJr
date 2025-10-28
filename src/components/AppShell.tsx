@@ -12,6 +12,7 @@ import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import GamepadPng from "../assets/images/gamepad.png"; // <-- your PNG (you said you'll add this)
 import BatteryGauge from "./BatteryGauge";
+import type { TaskItem } from "../utils/manifest";
 
 export type FabItem = {
   key: string;
@@ -72,6 +73,8 @@ export type AppShellProps = {
   // replay handlers
   onReplayDialogue?: () => void;
   onReplayTasks?: () => void;
+  setShowTaskList?: (show: boolean) => void;
+  setActiveTaskList?: (tasks: TaskItem[] | null) => void;
 
   interactionMode?: "runner" | "deleter";
   blockPaletteBottom?: number;
@@ -185,6 +188,8 @@ export default function AppShell(props: AppShellProps) {
       <ReplayPalette
         onReplayTasks={props.onReplayTasks ?? (() => {})}
         blockPaletteBottom={blockPaletteBottom}
+        setShowTaskList={props.setShowTaskList ?? (() => {})}
+        setActiveTaskList={props.setActiveTaskList ?? (() => {})}
       />
 
       <BlockPalette

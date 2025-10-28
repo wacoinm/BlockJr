@@ -9,8 +9,8 @@ interface ProjectsState {
 }
 
 const initialState: ProjectsState = {
-  projects: ['elevator', 'bulldozer', 'lift truck'],
-  selectedProject: 'elevator',
+  projects: ['آسانسور', 'جرثقیل', 'تله کابین'],
+  selectedProject: 'آسانسور',
   selectVisible: false,
   selectOpen: false,
 };

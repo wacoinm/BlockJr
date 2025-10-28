@@ -1,18 +1,23 @@
 import React, { useCallback } from 'react';
 import { Play, ListChecks } from 'lucide-react';
 import { useDialogue } from 'dialogue-story';
-import { getTaskListForProject } from '../utils/manifest';
 import { useAppSelector } from '../store/hooks';
 import type { RootState } from '../store';
+import { getTaskListForProject } from '../utils/manifest';
+import type { TaskItem } from '../utils/manifest';
 
 type ReplayPaletteProps = {
   onReplayTasks: () => void;
   blockPaletteBottom?: number;
+  setShowTaskList: (show: boolean) => void;
+  setActiveTaskList: (tasks: TaskItem[] | null) => void;
 };
 
 export const ReplayPalette: React.FC<ReplayPaletteProps> = ({
   onReplayTasks,
-  blockPaletteBottom
+  blockPaletteBottom,
+  setShowTaskList,
+  setActiveTaskList
 }) => {
   const { dialogue } = useDialogue();
   const selectedProject = useAppSelector((s: RootState) => s.projects?.selectedProject);
@@ -53,7 +58,15 @@ export const ReplayPalette: React.FC<ReplayPaletteProps> = ({
       </button>
       
       <button
-        onClick={onReplayTasks}
+        onClick={() => {
+          if (!selectedProject || !currentChapter) return;
+          const taskList = getTaskListForProject(selectedProject, currentChapter);
+          if (taskList && taskList.tasks && taskList.tasks.length > 0) {
+            setActiveTaskList(taskList.tasks);
+            setShowTaskList(true);
+          }
+          onReplayTasks();
+        }}
         disabled={!selectedProject || !currentChapter}
         className="w-10 h-10 rounded-xl flex items-center justify-center
                    bg-slate-100 dark:bg-slate-700/50

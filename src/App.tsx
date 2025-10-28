@@ -274,7 +274,7 @@ const App: React.FC = () => {
     ITEM_STAGGER,
     BASE_DURATION,
     ITEM_DURATION,
-  } = useProjects('elevator');
+  } = useProjects('آسانسور');
 
   useEffect(() => {
     selectedProjectRef.current = selectedProject ?? null;
@@ -718,6 +718,8 @@ const App: React.FC = () => {
           interactionMode={interactionMode}
           blockPaletteBottom={blockPaletteBottom}
           setBlockPaletteBottom={setBlockPaletteBottom}
+          setShowTaskList={setShowTaskList}
+          setActiveTaskList={setActiveTaskList}
         />
 
         {/* Confetti overlay (appears when validator passes) */}

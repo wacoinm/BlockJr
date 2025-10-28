@@ -36,10 +36,10 @@ function speedFromDistance(distance: number) {
  * For a +90deg rotation (clockwise), the mapping of coordinates is:
  *   visual_x = original_y
  *   visual_y = -original_x
- *
+/**
  * So to recover "original" (logical) coordinates given the rotated event:
- *   logical_x = evt.y
- *   logical_y = -evt.x
+ *   logical_x = evt.x
+ *   logical_y = evt.y
  *
  * We'll apply that remapping for all joystick move handlers.
  */
@@ -50,8 +50,8 @@ function remapForRotation(evt: any) {
   if (typeof x !== "number" || typeof y !== "number") {
     return { x, y, distance, direction, ...rest };
   }
-  const logicalX = y;
-  const logicalY = -x;
+  const logicalX = x;
+  const logicalY = y;
   return { ...rest, x: logicalX, y: logicalY, distance, direction };
 }
 
@@ -60,10 +60,12 @@ function JoystickVisual({
   children,
   size = 180,
   active = false,
+  rotate = false,
 }: {
   children: React.ReactNode;
   size?: number;
   active?: boolean;
+  rotate?: boolean;
 }) {
   const s = Math.max(80, Math.min(320, size));
 
@@ -94,7 +96,7 @@ function JoystickVisual({
         .dir-left { left: 6%; top: 50%; transform: translate(0, -50%); }
         .dir-right { right: 6%; top: 50%; transform: translate(0, -50%); }
         .dark .dir-badge { background: rgba(18,22,28,0.76); color: #dbeafe; border: 1px solid rgba(255,255,255,0.03); box-shadow: 0 6px 14px rgba(0,0,0,0.6); }
-        .joy-holder { position: absolute; width: 58%; height: 58%; z-index: 9999; display:flex; align-items:center; justify-content:center; touch-action: none; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: auto; }
+        .joy-holder { position: absolute; width: 58%; height: 58%; z-index: 9999; display:flex; align-items:center; justify-content:center; touch-action: none; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(90deg); pointer-events: auto; }
         .joy-holder > * { width: 100% !important; height: 100% !important; display: block; touch-action: none; pointer-events: auto; background: rgba(0,0,0,0.001); }
         @media (max-width: 420px) { .joy-shaft { width:6px; } .dir-badge { width:24px; height:24px; font-size:12px; } }
       `}</style>
@@ -285,7 +287,7 @@ export default function GamepadPage() {
             We use viewport-based swapped sizes and overflow-hidden so no X-scroll appears. */}
         <div
           style={{
-            transform: "rotate(90deg)",
+            transform: "rotate(-90deg)", // Changed from 90deg to -90deg to reverse the rotation
             transformOrigin: "center center",
             width: "100vh",
             height: "100vw",
@@ -330,7 +332,7 @@ export default function GamepadPage() {
                       <Joystick
                         size={joystickSize}
                         stickSize={Math.round(joystickSize * 0.75)}
-                        controlPlaneShape={JoystickShape.AxisY}
+                        controlPlaneShape={JoystickShape.AxisX}
                         baseShape={JoystickShape.Circle}
                         stickShape={JoystickShape.Circle}
                         baseColor={nearTransparentBase}
@@ -376,7 +378,7 @@ export default function GamepadPage() {
                         <Joystick
                           size={joystickSize}
                           stickSize={Math.round(joystickSize * 0.35)}
-                          controlPlaneShape={JoystickShape.AxisY}
+                          controlPlaneShape={JoystickShape.AxisX}
                           baseShape={JoystickShape.Circle}
                           stickShape={JoystickShape.Circle}
                           baseColor={nearTransparentBase}

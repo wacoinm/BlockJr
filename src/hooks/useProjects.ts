@@ -1,7 +1,7 @@
 // src/hooks/useProjects.ts
 import { useCallback, useState } from 'react';
 
-export default function useProjects(initialProject: string = 'آسانسور') {
+export default function useProjects(initialProject: string = 'ماشین') {
   const [selectVisible, setSelectVisible] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>(initialProject);

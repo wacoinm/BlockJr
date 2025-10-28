@@ -4,9 +4,9 @@
   "packs": [
     {
       "id": "pack-tele-elev-crane",
-      "name": "پَک آسانسور و تله‌کابین",
-      "description": "تله‌کابین، آسانسور، جرثقیل",
-      "items": ["آسانسور", "جرثقیل", "تله کابین"],
+      "name": "پَک ماشین و منجنیق",
+      "description": "ماشین، جرثقیل، منجنیق",
+      "items": ["ماشین", "جرثقیل", "منجنیق"],
       "qrRaw": "ABCDEFGHIJKLMNOP",
       "qrBase64": "QUJDREVGR0hJSktMTU5PUA=="
     },
@@ -21,15 +21,15 @@
   ],
   "projects": [
     {
-      "id": "آسانسور",
-      "name": "آسانسور",
-      "subtitle": "پروژه نصب و راه‌اندازی آسانسور",
+      "id": "ماشین",
+      "name": "ماشین",
+      "subtitle": "پروژه نصب و راه‌اندازی ماشین",
       "category": "آموزشی",
       "description": "آن شب، زمستان انگار تصمیم گرفته بود همهٔ پنجره‌های جهان را منجمد کند. پشت شیشهٔ اتاق اندی، دانه‌های برف آرام آرام بر روی هم می‌نشستند. بخاریِ سالن خاموش شده بود، و اندی آن‌قدر خسته بود که با لباس مدرسه و جوراب‌های راه‌راهش،",
-      "imgsPath": "/scenes/elevator/chapters/",
-      "storyModule": "src/assets/stories/elevator/index.ts",
-      "storyDir": "src/assets/stories/elevator",
-      "validatorPath": "src/utils/validators/elevator.validator.ts",
+      "imgsPath": "/scenes/car/chapters/",
+      "storyModule": "src/assets/stories/car/index.ts",
+      "storyDir": "src/assets/stories/car",
+      "validatorPath": "src/utils/validators/car.validator.ts",
       "isLock": false,
       "notes": "Demo project used in ProjectSelection page."
     },
@@ -38,51 +38,51 @@
       "name": "جرثقیل",
       "subtitle": "پروژه جرثقیل سقفی",
       "category": "آموزشی",
-      "imgsPath": "public/scenes/elevator/chapters/",
-      "storyModule": "src/assets/stories/elevator/index.ts",
-      "storyDir": "src/assets/stories/elevator",
-      "validatorPath": "src/utils/validators/elevator.validator.ts",
+      "imgsPath": "public/scenes/car/chapters/",
+      "storyModule": "src/assets/stories/car/index.ts",
+      "storyDir": "src/assets/stories/car",
+      "validatorPath": "src/utils/validators/car.validator.ts",
       "isLock": true,
       "lockReason": "محتوا در دست ساخت است"
     },
     {
-      "id": "تله کابین",
-      "name": "تله کابین",
-      "subtitle": "پروژه احداث تله کابین",
+      "id": "منجنیق",
+      "name": "منجنیق",
+      "subtitle": "پروژه منجنیق",
       "category": "آموزشی",
-      "imgsPath": "public/scenes/elevator/chapters/",
-      "storyModule": "src/assets/stories/elevator/index.ts",
-      "storyDir": "src/assets/stories/elevator",
-      "validatorPath": "src/utils/validators/elevator.validator.ts",
-      "isLock": true
+      "description": "",
+      "imgsPath": "public/scenes/car/chapters/",
+      "storyModule": "src/assets/stories/car/index.ts",
+      "storyDir": "src/assets/stories/car",
+      "validatorPath": "src/utils/validators/car.validator.ts"
     }
   ],
   "stories": [
     {
-      "projectId": "elevator",
-      "storyPath": "src/assets/stories/elevator",
-      "storyModule": "src/assets/stories/elevator/index.ts",
-      "validatorPath": "src/utils/validators/elevator.validator.ts",
-      "notes": "Main elevator story module (exported as `elevator` in your code)."
+      "projectId": "car",
+      "storyPath": "src/assets/stories/car",
+      "storyModule": "src/assets/stories/car/index.ts",
+      "validatorPath": "src/utils/validators/car.validator.ts",
+      "notes": "Main car story module (exported as `car` in your code)."
     },
     {
       "projectId": "crane",
-      "storyPath": "src/assets/stories/elevator",
-      "storyModule": "src/assets/stories/elevator/index.ts",
-      "validatorPath": "src/utils/validators/elevator.validator.ts",
-      "notes": "Reuses elevator demo story for UI tests; replace with real story when available."
+      "storyPath": "src/assets/stories/car",
+      "storyModule": "src/assets/stories/car/index.ts",
+      "validatorPath": "src/utils/validators/car.validator.ts",
+      "notes": "Reuses car demo story for UI tests; replace with real story when available."
     },
     {
-      "projectId": "gondola",
-      "storyPath": "src/assets/stories/elevator",
-      "storyModule": "src/assets/stories/elevator/index.ts",
-      "validatorPath": "src/utils/validators/elevator.validator.ts",
-      "notes": "Gondola/télé-cabin story placeholder."
+      "projectId": "catapult",
+      "storyPath": "src/assets/stories/car",
+      "storyModule": "src/assets/stories/car/index.ts",
+      "validatorPath": "src/utils/validators/car.validator.ts",
+      "notes": "Catapult/منجنیق story placeholder."
     }
   ],
   "tasklists": [
     {
-      "projectId": "آسانسور",
+      "projectId": "ماشین",
       "chapterKey": "chapter-1",
       "tasks": [
         {
@@ -99,7 +99,7 @@
           "id": "elev-1-2",
           "title": "تماشای ویدیوی معرفی",
           "shortDescription": "ویدیوی ۳ دقیقه‌ای معرفی",
-          "description": "ویدیو کوتاه راهنمای نصب آسانسور را تماشا کنید.",
+          "description": "ویدیو کوتاه راهنمای نصب ماشین را تماشا کنید.",
           "type": "video",
           "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
           "mediaText": "ویدیو آموزشی",
@@ -136,7 +136,7 @@
       ]
     },
     {
-      "projectId": "آسانسور",
+      "projectId": "ماشین",
       "chapterKey": "chapter-2",
       "tasks": [
         {
@@ -154,11 +154,11 @@
   ],
   "packToProjectKeywords": {
     "pack-tele-elev-crane": [
-      "آسانسور",
-      "تله کابین",
+      "ماشین",
       "جرثقیل",
-      "elevator",
-      "gondola",
+      "منجنیق",
+      "car",
+      "catapult",
       "crane"
     ],
     "pack-lift-buildozer": [

@@ -1,5 +1,5 @@
-// src/assets/stories/elevator-validate.ts
-// Flexible elevator validator supporting exact tokens and regex patterns.
+// src/assets/stories/car-validate.ts
+// Flexible car validator supporting exact tokens and regex patterns.
 // Rules object is a plain JSON-like object you can edit.
 
 export type BlockLike = {
@@ -21,7 +21,7 @@ export type BlockLike = {
  * The validator will return true when any one rule-sequence appears
  * as a contiguous subsequence inside any chain (follow childId links).
  */
-export const elevatorValidationRules: Record<string, Array<Array<string>>> = {
+export const carValidationRules: Record<string, Array<Array<string>>> = {
   // example for chapter-01:
   // sequence examples:
   //  - exact match tokens
@@ -203,9 +203,9 @@ function sequenceMatches(tokens: string[], sequenceMatchers: ((t: string) => boo
  *
  * Returns true if any rule for the chapter is satisfied.
  */
-export function validateElevatorChapter(blocks: BlockLike[], chapterKey: string): boolean {
+export function validateCarChapter(blocks: BlockLike[], chapterKey: string): boolean {
   if (!Array.isArray(blocks)) return false;
-  const rules = elevatorValidationRules[chapterKey];
+  const rules = carValidationRules[chapterKey];
   if (!rules || rules.length === 0) return false;
 
   const chains = buildChains(blocks); // array of token arrays
@@ -223,4 +223,4 @@ export function validateElevatorChapter(blocks: BlockLike[], chapterKey: string)
   return false;
 }
 
-export default validateElevatorChapter;
+export default validateCarChapter;

@@ -4,8 +4,8 @@ import { useDialogue, DialogueMessage } from "dialogue-story";
 // messages array so we can attach `characterInfo` helper field without
 // causing strict type errors (cast to `any` when calling dialogue).
 
-// <-- NEW: load elevator story (adjust path if your file lives elsewhere)
-import { elevator } from "../assets/stories/elevator";
+// <-- Load car story (adjust path if your file lives elsewhere)
+import { car } from "../assets/stories/car";
 
 const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { dialogue } = useDialogue();
@@ -50,15 +50,15 @@ const SampleDialogue: React.FC<React.PropsWithChildren> = ({ children }) => {
   };
 
   const start = async () => {
-    // --- CHANGED: load rawMessages from elevator story's first chapter ---
-    // Find the first top-level chapter key in the elevator object
-    const chapterKeys = Object.keys(elevator);
+    // --- Load rawMessages from car story's first chapter ---
+    // Find the first top-level chapter key in the car object
+    const chapterKeys = Object.keys(car);
     if (chapterKeys.length === 0) {
-      console.warn("elevator story has no chapters");
+      console.warn("car story has no chapters");
       return;
     }
     const firstChapterKey = chapterKeys[0];
-    const firstChapter = elevator[firstChapterKey];
+    const firstChapter = car[firstChapterKey as keyof typeof car];
 
     // defensive check: ensure it's an array of messages
     const rawMessages: DialogueMessage[] = Array.isArray(firstChapter) ? (firstChapter as DialogueMessage[]) : [];

@@ -13,11 +13,11 @@ type Project = {
   id: string;
   name: string;
   subtitle?: string;
-  // imgsPath should be a public path (served from /), e.g. "/scenes/elevator/chapters/"
+  // imgsPath should be a public path (served from /), e.g. "/scenes/car/chapters/"
   imgsPath?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
-  project?: any; // elevator object etc
+  project?: any; // car object etc
 };
 
 type Props = {
@@ -71,8 +71,8 @@ function slugify(s?: string | null) {
 /** normalize a manifest storyModule path into a relative import path from this file */
 function candidateFromStoryModule(storyModule?: string) {
   if (!storyModule) return null;
-  // if manifest gives "src/assets/stories/elevator/index.ts"
-  // produce "../../assets/stories/elevator" or "../../assets/stories/elevator/index.ts"
+  // if manifest gives "src/assets/stories/car/index.ts"
+  // produce "../../assets/stories/car" or "../../assets/stories/car/index.ts"
   let sm = storyModule;
   // strip leading 'src/' if present
   if (sm.startsWith("src/")) sm = sm.slice(4);
@@ -395,16 +395,27 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
       const base = project.imgsPath.replace(/\/?$/, "/");
       const discovered: string[] = [];
 
+      // Try to find images for each checkpoint
       for (const cp of checkpoints) {
-        const cand = `${base}${cp.id}.png`;
-        // eslint-disable-next-line no-await-in-loop
-        if (await checkImageExists(cand)) {
-          discovered.push(cand);
-        } else {
-          const maybeNum = `${base}ch${cp.id}.png`;
+        const patterns = [
+          `${base}${cp.id}.png`,                     // direct ID
+          `${base}ch${cp.id}.png`,                   // with 'ch' prefix
+          `${base}chapter-${cp.id}.png`,             // full 'chapter-' prefix
+          `${base}${cp.id.replace('chapter-', '')}.png` // remove 'chapter-' prefix
+        ];
+        
+        // Extract numeric part if it exists
+        const numericMatch = cp.id.match(/\d+/);
+        if (numericMatch) {
+          patterns.push(`${base}${numericMatch[0]}.png`);
+        }
+
+        // Try each pattern
+        for (const pattern of patterns) {
           // eslint-disable-next-line no-await-in-loop
-          if (await checkImageExists(maybeNum)) {
-            discovered.push(maybeNum);
+          if (await checkImageExists(pattern)) {
+            discovered.push(pattern);
+            break; // Found one image for this checkpoint, move to next
           }
         }
       }
@@ -469,31 +480,26 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     (async () => {
       const base = project.imgsPath ? project.imgsPath.replace(/\/?$/, "/") : null;
       if (base) {
-        const candidate1 = `${base}${current}.png`;
-        if (await checkImageExists(candidate1)) {
-          setIsFading(true);
-          setTimeout(() => {
-            setCurrentImage(candidate1);
-            setIsFading(false);
-          }, 160);
-          return;
-        }
-        const candidate2 = `${base}ch${current}.png`;
-        if (await checkImageExists(candidate2)) {
-          setIsFading(true);
-          setTimeout(() => {
-            setCurrentImage(candidate2);
-            setIsFading(false);
-          }, 160);
-          return;
-        }
+        // Try different image naming patterns
+        const patterns = [
+          `${base}${current}.png`,                     // direct chapter ID
+          `${base}ch${current}.png`,                   // with 'ch' prefix
+          `${base}chapter-${current}.png`,             // full 'chapter-' prefix
+          `${base}${current.replace('chapter-', '')}.png` // remove 'chapter-' prefix
+        ];
+
+        // Extract numeric part if it exists
         const numericMatch = current.match(/\d+/);
         if (numericMatch) {
-          const candidate3 = `${base}${numericMatch[0]}.png`;
-          if (await checkImageExists(candidate3)) {
+          patterns.push(`${base}${numericMatch[0]}.png`);
+        }
+
+        // Try each pattern
+        for (const pattern of patterns) {
+          if (await checkImageExists(pattern)) {
             setIsFading(true);
             setTimeout(() => {
-              setCurrentImage(candidate3);
+              setCurrentImage(pattern);
               setIsFading(false);
             }, 160);
             return;
@@ -553,12 +559,27 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
                 className="w-full h-full"
                 style={{ position: "relative" }}
               >
-                <img
-                  src={currentImage ?? "https://placehold.co/800x600?text=project"}
-                  alt={project.name}
-                  className="w-full h-full object-cover transition-opacity duration-300"
-                  style={{ opacity: isFading ? 0 : 1, position: "absolute", inset: 0 }}
-                />
+                {/* Fallback placeholder always visible behind the actual image */}
+                <div 
+                  className="w-full h-full absolute inset-0 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center"
+                >
+                  <div className="text-neutral-400 dark:text-neutral-500">No Image</div>
+                </div>
+                
+                {/* Actual image with fade effect */}
+                {currentImage && (
+                  <img
+                    key={currentImage} // Force remount on image change
+                    src={currentImage}
+                    alt={project.name}
+                    className="w-full h-full object-cover transition-opacity duration-300"
+                    style={{ opacity: isFading ? 0 : 1, position: "absolute", inset: 0 }}
+                    onError={(e) => {
+                      console.warn('Image failed to load:', currentImage);
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
               </div>
 
               <button

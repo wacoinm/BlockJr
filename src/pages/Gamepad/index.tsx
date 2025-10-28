@@ -206,7 +206,7 @@ export default function GamepadPage() {
     }
   }, [isFastMode]);
 
-  const onElevatorMove = useCallback((evt: any) => {
+  const onCarMove = useCallback((evt: any) => {
     if (!evt) return;
     const e = remapForRotation(evt);
     const { y, distance } = e;
@@ -214,14 +214,14 @@ export default function GamepadPage() {
     if (Math.abs(y) < 0.05) return;
     const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0.0);
     if (y < 0) {
-      lastDirRef.current["elevator"] = "up";
-      sendCmd(`up(${effectiveSpeed})`, "elevator");
+      lastDirRef.current["car"] = "up";
+      sendCmd(`up(${effectiveSpeed})`, "car");
     } else {
-      lastDirRef.current["elevator"] = "down";
-      sendCmd(`down(${effectiveSpeed})`, "elevator");
+      lastDirRef.current["car"] = "down";
+      sendCmd(`down(${effectiveSpeed})`, "car");
     }
   }, [sendCmd, calculateEffectiveSpeed]);
-  const onElevatorStop = useCallback(() => sendZeroForKey("elevator"), [sendZeroForKey]);
+  const onCarStop = useCallback(() => sendZeroForKey("car"), [sendZeroForKey]);
 
   const onTeleMove = useCallback((evt: any) => {
     if (!evt) return;
@@ -276,7 +276,7 @@ export default function GamepadPage() {
     if (Math.abs(y) < 0.05) return;
     const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
     if (y < 0) {
-      lastDirRef.current["crane-elevator"] = "up";
+      lastDirRef.current["crane-car"] = "up";
       sendCmd(`up(${effectiveSpeed})`, "crane-elevator");
     } else {
       lastDirRef.current["crane-elevator"] = "down";
@@ -349,7 +349,7 @@ export default function GamepadPage() {
             </header>
 
             <div className="flex flex-col gap-6 mt-[6vw] items-center">
-              {projectId === "آسانسور" && (
+              {projectId === "ماشین" && (
                 <>
                   <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
                   <div className="w-full flex justify-center my-8">
@@ -363,8 +363,8 @@ export default function GamepadPage() {
                         baseColor={nearTransparentBase}
                         stickColor={nearTransparentStick}
                         minDistance={0}
-                        move={onElevatorMove}
-                        stop={onElevatorStop}
+                        move={onCarMove}
+                        stop={onCarStop}
                         start={() => {}}
                         throttle={30}
                         stickImage={stickShape}
@@ -421,7 +421,7 @@ export default function GamepadPage() {
                 </>
               )}
 
-              {projectId === "تله کابین" && (
+              {projectId === "منجنیق" && (
                 <>
                   <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">جوی‌استیک: فقط محور X (چپ/راست)</div>
                   <div className="w-full flex justify-center my-8">
@@ -445,7 +445,7 @@ export default function GamepadPage() {
                 </>
               )}
 
-              {projectId !== "آسانسور" && projectId !== "جرثقیل" && projectId !== "تله کابین" && (
+              {projectId !== "ماشین" && projectId !== "جرثقیل" && projectId !== "منجنیق" && (
                 <>
                   <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">پروژه‌ی مشخص‌شده پشتیبانی نمی‌شود. یک جوی‌استیک عمومی نمایش داده شده است.</div>
                   <JoystickVisual size={joystickSize} active={false}>

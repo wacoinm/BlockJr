@@ -136,7 +136,7 @@ const ProjectSelection: React.FC = () => {
                     // eslint-disable-next-line no-await-in-loop
                     const mod: any = await import(pth).catch(() => null);
                     if (mod) {
-                      storyObj = mod[p.id] ?? mod.default ?? mod[slugify(p.id)] ?? mod.elevator ?? mod;
+                                            storyObj = mod[p.id] ?? mod.default ?? mod[slugify(p.id)] ?? mod.car ?? mod;
                       if (storyObj) break;
                     }
                   } catch {

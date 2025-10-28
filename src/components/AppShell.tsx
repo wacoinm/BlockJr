@@ -5,12 +5,14 @@ import { BluetoothConnector } from "./BluetoothConnector";
 import WorkspaceControls from "./WorkspaceControls";
 import { Workspace } from "./Workspace";
 import { BlockPalette } from "./BlockPalette";
+import { ReplayPalette } from "./ReplayPalette";
 import { useAppSelector } from "../store/hooks";
 import type { RootState } from "../store";
 import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import GamepadPng from "../assets/images/gamepad.png"; // <-- your PNG (you said you'll add this)
 import BatteryGauge from "./BatteryGauge";
+import type { TaskItem } from "../utils/manifest";
 
 export type FabItem = {
   key: string;
@@ -67,6 +69,12 @@ export type AppShellProps = {
   bluetoothOpen?: boolean;
   setBluetoothOpen?: (open: boolean) => void;
   onBluetoothConnectionChange?: (connected: boolean) => void;
+
+  // replay handlers
+  onReplayDialogue?: () => void;
+  onReplayTasks?: () => void;
+  setShowTaskList?: (show: boolean) => void;
+  setActiveTaskList?: (tasks: TaskItem[] | null) => void;
 
   interactionMode?: "runner" | "deleter";
   blockPaletteBottom?: number;
@@ -175,6 +183,13 @@ export default function AppShell(props: AppShellProps) {
         onPan={onPan}
         onZoom={onZoom}
         interactionMode={interactionMode}
+      />
+
+      <ReplayPalette
+        onReplayTasks={props.onReplayTasks ?? (() => {})}
+        blockPaletteBottom={blockPaletteBottom}
+        setShowTaskList={props.setShowTaskList ?? (() => {})}
+        setActiveTaskList={props.setActiveTaskList ?? (() => {})}
       />
 
       <BlockPalette

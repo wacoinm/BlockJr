@@ -321,7 +321,6 @@ export default function GamepadPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            overflow: "hidden",
             touchAction: "none",
           }}
         >
@@ -339,9 +338,9 @@ export default function GamepadPage() {
                 <SpeedControl isFast={isFastMode} onChange={setIsFastMode} />
               </div>
 
-              <div className="text-end">
+              <div className="text-end mx-12">
                 <h1 className="text-xl font-semibold">{projectId}</h1>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
+                <p className="text-sm text-nowrap text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
               </div>
 
               <button onClick={() => navigate(-1)} className="px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800">

@@ -184,7 +184,7 @@ const App: React.FC = () => {
 
       // run elevator validator if this project is elevator
       try {
-        if (projectId === 'elevator' && currentDialogueChapter) {
+        if (projectId === 'آسانسور' && currentDialogueChapter) {
           const ok = validateElevatorChapter(snapshot ?? blocksRef.current, currentDialogueChapter);
           if (ok && !showNextButton) {
             setShowConfetti(true);

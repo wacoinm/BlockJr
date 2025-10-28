@@ -8,263 +8,99 @@ import { Lightbulb, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-rea
 import stickShape from "../../../public/shapeStick.svg";
 
 /**
- * Gamepad page:
- * - /gamepad/:id
- * - Supports three projects with different joystick setup:
- *   - آسانسور  -> single joystick (Y axis only) + light button
- *   - جرثقیل   -> two joysticks (left = full plane for move, right = Y axis only for up/down) + light
- *   - تله کابین -> single joystick (X axis only) + light
- *
- * Uses react-joystick-component. Sends bluetooth commands via bluetoothService.sendString(...)
- *
- * Commands sent: up(n), down(n), forward(n), backward(n), turnright(n), turnleft(n), lampon(), lampoff(), stop()
- *
- * Note: This file constrains joysticks using `controlPlaneShape` (JoystickShape.AxisX / AxisY).
+ * Gamepad page (rotated presentation wrapper).
+ * - Outer layout preserved (no layout shift on resize)
+ * - rot-inner is rotated visually
+ * - joystick event coordinates are remapped to account for rotation
+ * - horizontal scrolling disabled while rotated
  */
 
 const RATE_MS = 40;
 const STRONG_PUSH_THRESHOLD = 0.75;
 
+/* ---------- helpers ---------- */
 function clamp01(v: number) {
   if (isNaN(v)) return 0;
   return Math.max(0, Math.min(1, v));
 }
-
 function speedFromDistance(distance: number) {
   return Math.round(clamp01(distance) * 100);
 }
 
+/**
+ * We rotate the inner content by +90deg (clockwise).
+ * Pointer events from the joystick come in the rotated element's coordinate system,
+ * but the logical X/Y we want to send to the device must be remapped so directions
+ * match the visual orientation.
+ *
+ * For a +90deg rotation (clockwise), the mapping of coordinates is:
+ *   visual_x = original_y
+ *   visual_y = -original_x
+/**
+ * So to recover "original" (logical) coordinates given the rotated event:
+ *   logical_x = evt.x
+ *   logical_y = evt.y
+ *
+ * We'll apply that remapping for all joystick move handlers.
+ */
+function remapForRotation(evt: any) {
+  if (!evt) return evt;
+  const { x, y, distance, direction, ...rest } = evt;
+  // If x/y are missing, just return original (some events may only have distance/direction)
+  if (typeof x !== "number" || typeof y !== "number") {
+    return { x, y, distance, direction, ...rest };
+  }
+  const logicalX = x;
+  const logicalY = y;
+  return { ...rest, x: logicalX, y: logicalY, distance, direction };
+}
+
 /* ----------------- VISUAL WRAPPER (fixed to allow pointer events) ----------------- */
-/*
-  Important implementation notes (from the library docs/types):
-  - the Joystick component registers pointer events on its base element (baseRef),
-    so the library's base must be able to receive pointer events.
-  - we therefore make all decorative layers pointer-events: none and ensure the
-    .joy-holder (where the <Joystick /> lives) is on top and pointer-events: auto.
-  - we also set baseShape/stickShape and explicit baseColor/stickColor on <Joystick />
-    so the library draws normally while our visuals appear underneath/around it.
-*/
 function JoystickVisual({
   children,
   size = 180,
   active = false,
+  rotate = false,
 }: {
   children: React.ReactNode;
   size?: number;
   active?: boolean;
+  rotate?: boolean;
 }) {
   const s = Math.max(80, Math.min(320, size));
 
   return (
     <div style={{ width: s, height: s }} className="joy-wrap" aria-hidden={false}>
       <style>{`
-        /* Base container */
-        .joy-wrap {
-          position: relative;
-          border-radius: 18px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 8px;
-          user-select: none;
-          -webkit-tap-highlight-color: transparent;
-          transition: filter 220ms ease, box-shadow 220ms ease;
-        }
-
-        /* Decorative layers: MUST NOT intercept pointer events */
-        .joy-decor,
-        .joy-base,
-        .joy-radials,
-        .joy-center,
-        .joy-shaft,
-        .joy-glow,
-        .dir-badge {
-          pointer-events: none;
-        }
-
-        /* Outer decorative card (light) */
-        .joy-decor {
-          position: absolute;
-          inset: 0;
-          border-radius: 14px;
-          z-index: 0;
-          background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,249,255,0.95));
-          box-shadow:
-            0 10px 24px rgba(12, 24, 48, 0.06),
-            inset 0 2px 6px rgba(255,255,255,0.6);
-        }
-
-        /* Outer decorative card (dark) */
-        .dark .joy-decor {
-          background: linear-gradient(180deg, rgba(10,14,24,0.7), rgba(20,26,34,0.75));
-          box-shadow:
-            0 12px 28px rgba(2,6,12,0.6),
-            inset 0 2px 6px rgba(255,255,255,0.02);
-        }
-
-        .joy-base {
-          position: absolute;
-          inset: 10%;
-          border-radius: 999px;
-          z-index: 1;
-          background: radial-gradient(circle at center, rgba(255,255,255,0.92), rgba(240,246,255,0.9));
-          box-shadow: inset 0 6px 18px rgba(12,20,40,0.04);
-          overflow: hidden;
-        }
-        .joy-base::before {
-          content: "";
-          position: absolute;
-          inset: 6%;
-          border-radius: 999px;
-          background:
-            radial-gradient(circle, rgba(10,20,40,0.02) 0.5px, transparent 0.5px),
-            repeating-radial-gradient(circle at center, rgba(10,14,30,0.02) 0 6px, transparent 6px 12px);
-          opacity: 0.45;
-          mix-blend-mode: multiply;
-        }
-
-        /* base in dark mode */
-        .dark .joy-base {
-          background: radial-gradient(circle at center, rgba(30,36,44,0.8), rgba(10,14,20,0.7));
-          box-shadow: inset 0 6px 18px rgba(0,0,0,0.6);
-        }
-        .dark .joy-base::before {
-          background:
-            radial-gradient(circle, rgba(255,255,255,0.01) 0.5px, transparent 0.5px),
-            repeating-radial-gradient(circle at center, rgba(255,255,255,0.01) 0 6px, transparent 6px 12px);
-          opacity: 0.18;
-          mix-blend-mode: overlay;
-        }
-
-        .joy-radials {
-          position: absolute;
-          inset: 8%;
-          border-radius: 999px;
-          z-index: 2;
-        }
-        .joy-radials::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          border-radius: 999px;
-          background: conic-gradient(from 0deg, rgba(12,20,40,0.03) 0.5deg, transparent 1deg);
-          opacity: 0.25;
-          transform: rotate(8deg);
-        }
-        .dark .joy-radials::before {
-          background: conic-gradient(from 0deg, rgba(255,255,255,0.02) 0.5deg, transparent 1deg);
-          opacity: 0.06;
-        }
-
-        .joy-center {
-          position: absolute;
-          width: 52%;
-          height: 52%;
-          border-radius: 999px;
-          z-index: 3;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,250,255,0.96));
-          box-shadow: inset 0 6px 14px rgba(0,0,0,0.04);
-        }
-        .dark .joy-center {
-          background: linear-gradient(180deg, rgba(40,48,58,0.9), rgba(18,22,28,0.9));
-          box-shadow: inset 0 6px 14px rgba(0,0,0,0.6);
-        }
-
-        .joy-shaft {
-          position: absolute;
-          width: 8px;
-          height: 50%;
-          background: linear-gradient(180deg, #cfd8e3, #98a6bd);
-          border-radius: 6px;
-          z-index: 4;
-          bottom: 50%;
-          transform-origin: 50% 100%;
-          box-shadow: 0 8px 18px rgba(8,12,20,0.08);
-          transition: transform 120ms linear;
-        }
-        .dark .joy-shaft {
-          background: linear-gradient(180deg, rgba(130,144,160,0.12), rgba(90,100,120,0.12));
-          box-shadow: 0 8px 18px rgba(0,0,0,0.6);
-        }
-
-        .joy-glow {
-          position: absolute;
-          inset: 6%;
-          border-radius: 999px;
-          z-index: 2;
-          box-shadow: 0 22px 56px rgba(43, 108, 255, 0.08);
-          opacity: 0;
-          transition: opacity 160ms ease;
-        }
+        .joy-wrap { position: relative; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 8px; user-select: none; -webkit-tap-highlight-color: transparent; transition: filter 220ms ease, box-shadow 220ms ease; }
+        .joy-decor, .joy-base, .joy-radials, .joy-center, .joy-shaft, .joy-glow, .dir-badge { pointer-events: none; }
+        .joy-decor { position: absolute; inset: 0; border-radius: 14px; z-index: 0; background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,249,255,0.95)); box-shadow: 0 10px 24px rgba(12, 24, 48, 0.06), inset 0 2px 6px rgba(255,255,255,0.6); }
+        .dark .joy-decor { background: linear-gradient(180deg, rgba(10,14,24,0.7), rgba(20,26,34,0.75)); box-shadow: 0 12px 28px rgba(2,6,12,0.6), inset 0 2px 6px rgba(255,255,255,0.02); }
+        .joy-base { position: absolute; inset: 10%; border-radius: 999px; z-index: 1; background: radial-gradient(circle at center, rgba(255,255,255,0.92), rgba(240,246,255,0.9)); box-shadow: inset 0 6px 18px rgba(12,20,40,0.04); overflow: hidden; }
+        .joy-base::before { content: ""; position: absolute; inset: 6%; border-radius: 999px; background: radial-gradient(circle, rgba(10,20,40,0.02) 0.5px, transparent 0.5px), repeating-radial-gradient(circle at center, rgba(10,14,30,0.02) 0 6px, transparent 6px 12px); opacity: 0.45; mix-blend-mode: multiply; }
+        .dark .joy-base { background: radial-gradient(circle at center, rgba(30,36,44,0.8), rgba(10,14,20,0.7)); box-shadow: inset 0 6px 18px rgba(0,0,0,0.6); }
+        .dark .joy-base::before { background: radial-gradient(circle, rgba(255,255,255,0.01) 0.5px, transparent 0.5px), repeating-radial-gradient(circle at center, rgba(255,255,255,0.01) 0 6px, transparent 6px 12px); opacity: 0.18; mix-blend-mode: overlay; }
+        .joy-radials { position: absolute; inset: 8%; border-radius: 999px; z-index: 2; }
+        .joy-radials::before { content: ""; position: absolute; inset: 0; border-radius: 999px; background: conic-gradient(from 0deg, rgba(12,20,40,0.03) 0.5deg, transparent 1deg); opacity: 0.25; transform: rotate(8deg); }
+        .dark .joy-radials::before { background: conic-gradient(from 0deg, rgba(255,255,255,0.02) 0.5deg, transparent 1deg); opacity: 0.06; }
+        .joy-center { position: absolute; width: 52%; height: 52%; border-radius: 999px; z-index: 3; display:flex; align-items:center; justify-content:center; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,250,255,0.96)); box-shadow: inset 0 6px 14px rgba(0,0,0,0.04); }
+        .dark .joy-center { background: linear-gradient(180deg, rgba(40,48,58,0.9), rgba(18,22,28,0.9)); box-shadow: inset 0 6px 14px rgba(0,0,0,0.6); }
+        .joy-shaft { position: absolute; width: 8px; height: 50%; background: linear-gradient(180deg, #cfd8e3, #98a6bd); border-radius: 6px; z-index: 4; bottom: 50%; transform-origin: 50% 100%; box-shadow: 0 8px 18px rgba(8,12,20,0.08); transition: transform 120ms linear; }
+        .dark .joy-shaft { background: linear-gradient(180deg, rgba(130,144,160,0.12), rgba(90,100,120,0.12)); box-shadow: 0 8px 18px rgba(0,0,0,0.6); }
+        .joy-glow { position: absolute; inset: 6%; border-radius: 999px; z-index: 2; box-shadow: 0 22px 56px rgba(43, 108, 255, 0.08); opacity: 0; transition: opacity 160ms ease; }
         .joy-glow.on { opacity: 1; }
-
-        /* stronger glow in dark mode */
-        .dark .joy-glow {
-          box-shadow: 0 30px 80px rgba(60,140,255,0.16), 0 10px 24px rgba(20,30,70,0.12);
-        }
-
-        .dir-badge {
-          position: absolute;
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          background: rgba(255,255,255,0.9);
-          box-shadow: 0 6px 14px rgba(6,12,24,0.08);
-          z-index: 8;
-          color: #123248;
-          border: 1px solid rgba(18,50,72,0.06);
-        }
+        .dark .joy-glow { box-shadow: 0 30px 80px rgba(60,140,255,0.16), 0 10px 24px rgba(20,30,70,0.12); }
+        .dir-badge { position: absolute; width: 28px; height: 28px; border-radius: 8px; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.9); box-shadow: 0 6px 14px rgba(6,12,24,0.08); z-index: 8; color: #123248; border: 1px solid rgba(18,50,72,0.06); }
         .dir-up { top: 6%; left: 50%; transform: translate(-50%, 0); }
         .dir-down { bottom: 6%; left: 50%; transform: translate(-50%, 0); }
         .dir-left { left: 6%; top: 50%; transform: translate(0, -50%); }
         .dir-right { right: 6%; top: 50%; transform: translate(0, -50%); }
-
-        .dark .dir-badge {
-          background: rgba(18,22,28,0.76);
-          color: #dbeafe;
-          border: 1px solid rgba(255,255,255,0.03);
-          box-shadow: 0 6px 14px rgba(0,0,0,0.6);
-        }
-
-        /* CRITICAL: the holder must be above decorative layers and accept pointer events */
-        .joy-holder {
-          position: absolute;
-          width: 58%;
-          height: 58%;
-          z-index: 9999; /* ensure it's above decorative layers */
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          touch-action: none; /* important to prevent page scroll during drag */
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          pointer-events: auto; /* allow joystick to receive events */
-        }
-
-        /* ensure the actual Joystick child fills the holder (library expects base within) */
-        .joy-holder > * {
-          width: 100% !important;
-          height: 100% !important;
-          display: block;
-          touch-action: none;
-          pointer-events: auto;          /* ensure the child can receive events */
-          background: rgba(0,0,0,0.001); /* tiny invisible background to guarantee hit detection */
-        }
-
-        @media (max-width: 420px) {
-          .joy-shaft { width:6px; }
-          .dir-badge { width:24px; height:24px; font-size:12px; }
-        }
+        .dark .dir-badge { background: rgba(18,22,28,0.76); color: #dbeafe; border: 1px solid rgba(255,255,255,0.03); box-shadow: 0 6px 14px rgba(0,0,0,0.6); }
+        .joy-holder { position: absolute; width: 58%; height: 58%; z-index: 9999; display:flex; align-items:center; justify-content:center; touch-action: none; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(90deg); pointer-events: auto; }
+        .joy-holder > * { width: 100% !important; height: 100% !important; display: block; touch-action: none; pointer-events: auto; background: rgba(0,0,0,0.001); }
+        @media (max-width: 420px) { .joy-shaft { width:6px; } .dir-badge { width:24px; height:24px; font-size:12px; } }
       `}</style>
 
-      {/* decorative layers (underneath) */}
       <div className="joy-decor" />
       <div className="joy-base" />
       <div className={`joy-glow ${active ? "on" : ""}`} />
@@ -272,7 +108,6 @@ function JoystickVisual({
       <div className="joy-center" />
       <div className="joy-shaft" />
 
-      {/* direction icons (decorative, pointer-events: none) */}
       <div className="dir-badge dir-up" aria-hidden>
         <ArrowUp size={14} />
       </div>
@@ -286,16 +121,14 @@ function JoystickVisual({
         <ArrowRight size={14} />
       </div>
 
-      {/* JOYSTICK HOLDER: the actual <Joystick /> must be placed here and occupy the full area */}
       <div className="joy-holder">
-        {/* Put children directly so the Joystick's base element is at top z-index */}
         {children}
       </div>
     </div>
   );
 }
 
-/* ----------------- Rest of your page (unaltered logic) ----------------- */
+/* ----------------- Page component ----------------- */
 
 export default function GamepadPage() {
   const { id } = useParams<{ id: string }>();
@@ -342,9 +175,11 @@ export default function GamepadPage() {
     sendCmd(cmd, "light");
   }, [lightOn, sendCmd]);
 
+  /* ---------- MOVE HANDLERS use remapForRotation ---------- */
   const onElevatorMove = useCallback((evt: any) => {
     if (!evt) return;
-    const { y, distance } = evt;
+    const e = remapForRotation(evt);
+    const { y, distance } = e;
     if (y == null) return;
     if (Math.abs(y) < 0.05) return;
     const speed = speedFromDistance(distance ?? 0.0);
@@ -361,7 +196,8 @@ export default function GamepadPage() {
 
   const onTeleMove = useCallback((evt: any) => {
     if (!evt) return;
-    const { x, distance } = evt;
+    const e = remapForRotation(evt);
+    const { x, distance } = e;
     if (x == null) return;
     if (Math.abs(x) < 0.05) return;
     const speed = speedFromDistance(distance ?? 0);
@@ -378,7 +214,8 @@ export default function GamepadPage() {
 
   const onCraneMoveLeft = useCallback((evt: any) => {
     if (!evt) return;
-    const { x, y, distance } = evt;
+    const e = remapForRotation(evt);
+    const { x, y, distance } = e;
     if (x == null || y == null) return;
     if (Math.abs(x) > Math.abs(y)) {
       if (Math.abs(x) < 0.05) return;
@@ -408,7 +245,8 @@ export default function GamepadPage() {
 
   const onCraneMoveRight = useCallback((evt: any) => {
     if (!evt) return;
-    const { y, distance } = evt;
+    const e = remapForRotation(evt);
+    const { y, distance } = e;
     if (y == null) return;
     if (Math.abs(y) < 0.05) return;
     const speed = speedFromDistance(distance ?? 0);
@@ -434,179 +272,203 @@ export default function GamepadPage() {
 
   const projectId = id ?? "";
   const isMobile = typeof window !== "undefined" ? window.innerWidth <= 420 : true;
-  const joystickSize = isMobile ? 120 : 180;
+  const joystickSize = isMobile ? 120 : 140;
 
-  /** NOTE:
-   * Using a very small alpha instead of "transparent" helps hit-testing on some browsers.
-   * If you prefer, change these values later; the CSS background trick is the robust part.
-   */
   const nearTransparentBase = "rgba(0,0,0,0.01)";
   const nearTransparentStick = "rgba(255,255,255,0.92)";
 
+  /* ---------- RENDER ---------- */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-black transition-colors duration-500 p-4">
-      <div className="max-w-lg mx-auto">
-        <header className="flex items-center justify-between mb-4 flex-row-reverse">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleLight}
-              aria-pressed={lightOn}
-              className={`p-2 rounded-full transition-transform duration-300 shadow ${lightOn ? "scale-105" : ""} bg-white dark:bg-slate-800`}
-              title={lightOn ? "خاموش کردن چراغ" : "روشن کردن چراغ"}
-            >
-              <Lightbulb className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`} />
-            </button>
-          </div>
-
-          <div className="text-end">
-            <h1 className="text-xl font-semibold">{projectId}</h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
-          </div>
-
-          <button onClick={() => navigate(-1)} className="px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800">
-            بازگشت
-          </button>
-        </header>
-
-        <div className="flex flex-col gap-6 mt-[14vh] items-center">
-          {projectId === "آسانسور" && (
-            <>
-              <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
-              <div className="w-full flex justify-center my-8">
-                <JoystickVisual size={joystickSize} active={false}>
-                  <Joystick
-                    // Important: let the library draw its own base/stick (but colors set near-transparent so our visuals show)
-                    size={joystickSize}
-                    stickSize={Math.round(joystickSize * 0.75)}
-                    controlPlaneShape={JoystickShape.AxisY}
-                    baseShape={JoystickShape.Circle}
-                    stickShape={JoystickShape.Circle}
-                    baseColor={nearTransparentBase}
-                    stickColor={nearTransparentStick}
-                    minDistance={0}
-                    move={onElevatorMove}
-                    stop={onElevatorStop}
-                    start={() => {}}
-                    throttle={30}
-                    stickImage={stickShape}
-                  />
-                </JoystickVisual>
+    // Root takes the whole viewport and disables overflow to prevent scrollbars when rotated
+    <div className="min-h-screen min-w-screen w-screen h-screen p-4 flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-black transition-colors duration-500 overflow-hidden">
+      {/* Wrapper that preserves layout; content inside will be rotated */}
+      <div className="w-full h-full flex items-center justify-center" style={{ touchAction: "none" }}>
+        {/* rot-inner: this block is rotated +90deg (clockwise). 
+            We use viewport-based swapped sizes and overflow-hidden so no X-scroll appears. */}
+        <div
+          style={{
+            transform: "rotate(-90deg)", // Changed from 90deg to -90deg to reverse the rotation
+            transformOrigin: "center center",
+            width: "100vh",
+            height: "100vw",
+            maxWidth: "100%",
+            maxHeight: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            touchAction: "none",
+          }}
+        >
+          <div className="max-w-lg mx-auto">
+            <header className="flex items-center justify-between mb-4 flex-row-reverse">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleLight}
+                  aria-pressed={lightOn}
+                  className={`p-2 rounded-full transition-transform duration-300 shadow ${lightOn ? "scale-105" : ""} bg-white dark:bg-slate-800`}
+                  title={lightOn ? "خاموش کردن چراغ" : "روشن کردن چراغ"}
+                >
+                  <Lightbulb className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`} />
+                </button>
               </div>
-            </>
-          )}
 
-          {projectId === "جرثقیل" && (
-            <>
-              <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 flex flex-col items-center gap-2">
-                  <div className="text-sm my-8 text-center text-neutral-600 dark:text-neutral-300">حرکت: جلو/عقب/چپ/راست</div>
+              <div className="text-end">
+                <h1 className="text-xl font-semibold">{projectId}</h1>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
+              </div>
+
+              <button onClick={() => navigate(-1)} className="px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800">
+                بازگشت
+              </button>
+            </header>
+
+            <div className="flex flex-col gap-6 mt-[6vw] items-center">
+              {projectId === "آسانسور" && (
+                <>
+                  <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
+                  <div className="w-full flex justify-center my-8">
+                    <JoystickVisual size={joystickSize} active={false}>
+                      <Joystick
+                        size={joystickSize}
+                        stickSize={Math.round(joystickSize * 0.75)}
+                        controlPlaneShape={JoystickShape.AxisX}
+                        baseShape={JoystickShape.Circle}
+                        stickShape={JoystickShape.Circle}
+                        baseColor={nearTransparentBase}
+                        stickColor={nearTransparentStick}
+                        minDistance={0}
+                        move={onElevatorMove}
+                        stop={onElevatorStop}
+                        start={() => {}}
+                        throttle={30}
+                        stickImage={stickShape}
+                      />
+                    </JoystickVisual>
+                  </div>
+                </>
+              )}
+
+              {projectId === "جرثقیل" && (
+                <>
+                  {/* Always horizontal layout (do not switch to column on small widths) */}
+                  <div className="w-full flex flex-row gap-3 items-start justify-between">
+                    <div className="flex-1 flex flex-col items-center gap-2">
+                      <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">حرکت: جلو/عقب/چپ/راست</div>
+                      <JoystickVisual size={joystickSize} active={false}>
+                        <Joystick
+                          size={joystickSize}
+                          stickSize={Math.round(joystickSize * 0.65)}
+                          controlPlaneShape={JoystickShape.Plane}
+                          baseShape={JoystickShape.Circle}
+                          stickShape={JoystickShape.Circle}
+                          baseColor={nearTransparentBase}
+                          stickColor={nearTransparentStick}
+                          minDistance={0}
+                          move={onCraneMoveLeft}
+                          stop={onCraneMoveLeftStop}
+                          throttle={25}
+                          stickImage={stickShape}
+                        />
+                      </JoystickVisual>
+                    </div>
+
+                    <div className="flex-1 flex flex-col items-center gap-2">
+                      <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">بالا/پایین (محدود روی Y)</div>
+                      <JoystickVisual size={joystickSize} active={false}>
+                        <Joystick
+                          size={joystickSize}
+                          stickSize={Math.round(joystickSize * 0.65)}
+                          controlPlaneShape={JoystickShape.AxisX}
+                          baseShape={JoystickShape.Circle}
+                          stickShape={JoystickShape.Circle}
+                          baseColor={nearTransparentBase}
+                          stickColor={nearTransparentStick}
+                          minDistance={0}
+                          move={onCraneMoveRight}
+                          stop={onCraneMoveRightStop}
+                          throttle={25}
+                          stickImage={stickShape}
+                        />
+                      </JoystickVisual>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {projectId === "تله کابین" && (
+                <>
+                  <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">جوی‌استیک: فقط محور X (چپ/راست)</div>
+                  <div className="w-full flex justify-center my-8">
+                    <JoystickVisual size={joystickSize} active={false}>
+                      <Joystick
+                        size={joystickSize}
+                        stickSize={Math.round(joystickSize * 0.75)}
+                        controlPlaneShape={JoystickShape.AxisX}
+                        baseShape={JoystickShape.Circle}
+                        stickShape={JoystickShape.Circle}
+                        baseColor={nearTransparentBase}
+                        stickColor={nearTransparentStick}
+                        minDistance={0}
+                        move={onTeleMove}
+                        stop={onTeleStop}
+                        throttle={30}
+                        stickImage={stickShape}
+                      />
+                    </JoystickVisual>
+                  </div>
+                </>
+              )}
+
+              {projectId !== "آسانسور" && projectId !== "جرثقیل" && projectId !== "تله کابین" && (
+                <>
+                  <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">پروژه‌ی مشخص‌شده پشتیبانی نمی‌شود. یک جوی‌استیک عمومی نمایش داده شده است.</div>
                   <JoystickVisual size={joystickSize} active={false}>
                     <Joystick
                       size={joystickSize}
-                      stickSize={Math.round(joystickSize * 0.35)}
+                      stickSize={Math.round(joystickSize * 0.75)}
                       controlPlaneShape={JoystickShape.Plane}
                       baseShape={JoystickShape.Circle}
                       stickShape={JoystickShape.Circle}
                       baseColor={nearTransparentBase}
                       stickColor={nearTransparentStick}
                       minDistance={0}
-                      move={onCraneMoveLeft}
-                      stop={onCraneMoveLeftStop}
-                      throttle={25}
+                      stickImage={stickShape}
+                      move={(e) => {
+                        if (!e) return;
+                        const ev = remapForRotation(e);
+                        const { x, y, distance } = ev;
+                        if (Math.abs(y) > Math.abs(x)) {
+                          if (y < 0) {
+                            lastDirRef.current["fallback"] = "forward";
+                            sendCmd(`forward(${speedFromDistance(distance ?? 0)})`, "fallback");
+                          } else {
+                            lastDirRef.current["fallback"] = "backward";
+                            sendCmd(`backward(${speedFromDistance(distance ?? 0)})`, "fallback");
+                          }
+                        } else {
+                          if (x > 0) {
+                            lastDirRef.current["fallback"] = "turnright";
+                            sendCmd(`turnright(${speedFromDistance(distance ?? 0)})`, "fallback");
+                          } else {
+                            lastDirRef.current["fallback"] = "turnleft";
+                            sendCmd(`turnleft(${speedFromDistance(distance ?? 0)})`, "fallback");
+                          }
+                        }
+                      }}
+                      stop={() => sendZeroForKey("fallback")}
+                      throttle={60}
                     />
                   </JoystickVisual>
-                </div>
+                </>
+              )}
+            </div>
 
-                <div className="flex-1 flex flex-col items-center gap-2">
-                  <div className="text-sm my-8 text-center text-neutral-600 dark:text-neutral-300">بالا/پایین (محدود روی Y)</div>
-                  <JoystickVisual size={joystickSize} active={false}>
-                    <Joystick
-                      size={joystickSize}
-                      stickSize={Math.round(joystickSize * 0.35)}
-                      controlPlaneShape={JoystickShape.AxisY}
-                      baseShape={JoystickShape.Circle}
-                      stickShape={JoystickShape.Circle}
-                      baseColor={nearTransparentBase}
-                      stickColor={nearTransparentStick}
-                      minDistance={0}
-                      move={onCraneMoveRight}
-                      stop={onCraneMoveRightStop}
-                      throttle={25}
-                    />
-                  </JoystickVisual>
-                </div>
-              </div>
-            </>
-          )}
-
-          {projectId === "تله کابین" && (
-            <>
-              <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: فقط محور X (چپ/راست)</div>
-              <div className="w-full flex justify-center my-8">
-                <JoystickVisual size={joystickSize} active={false}>
-                  <Joystick
-                    size={joystickSize}
-                    stickSize={Math.round(joystickSize * 0.35)}
-                    controlPlaneShape={JoystickShape.AxisX}
-                    baseShape={JoystickShape.Circle}
-                    stickShape={JoystickShape.Circle}
-                    baseColor={nearTransparentBase}
-                    stickColor={nearTransparentStick}
-                    minDistance={0}
-                    move={onTeleMove}
-                    stop={onTeleStop}
-                    throttle={30}
-                  />
-                </JoystickVisual>
-              </div>
-            </>
-          )}
-
-          {projectId !== "آسانسور" && projectId !== "جرثقیل" && projectId !== "تله کابین" && (
-            <>
-              <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">پروژه‌ی مشخص‌شده پشتیبانی نمی‌شود. یک جوی‌استیک عمومی نمایش داده شده است.</div>
-              <JoystickVisual size={joystickSize} active={false}>
-                <Joystick
-                  size={joystickSize}
-                  stickSize={Math.round(joystickSize * 0.35)}
-                  controlPlaneShape={JoystickShape.Plane}
-                  baseShape={JoystickShape.Circle}
-                  stickShape={JoystickShape.Circle}
-                  baseColor={nearTransparentBase}
-                  stickColor={nearTransparentStick}
-                  minDistance={0}
-                  move={(e) => {
-                    if (!e) return;
-                    const { x, y, distance } = e;
-                    if (Math.abs(y) > Math.abs(x)) {
-                      if (y < 0) {
-                        lastDirRef.current["fallback"] = "forward";
-                        sendCmd(`forward(${speedFromDistance(distance ?? 0)})`, "fallback");
-                      } else {
-                        lastDirRef.current["fallback"] = "backward";
-                        sendCmd(`backward(${speedFromDistance(distance ?? 0)})`, "fallback");
-                      }
-                    } else {
-                      if (x > 0) {
-                        lastDirRef.current["fallback"] = "turnright";
-                        sendCmd(`turnright(${speedFromDistance(distance ?? 0)})`, "fallback");
-                      } else {
-                        lastDirRef.current["fallback"] = "turnleft";
-                        sendCmd(`turnleft(${speedFromDistance(distance ?? 0)})`, "fallback");
-                      }
-                    }
-                  }}
-                  stop={() => sendZeroForKey("fallback")}
-                  throttle={60}
-                />
-              </JoystickVisual>
-            </>
-          )}
+            <footer dir="rtl" className="mt-8 text-xs text-neutral-500 dark:text-neutral-400 text-center">
+              توجه: قبل از استفاده، از طریق بخش بلوتوث به دستگاه متصل شوید.
+            </footer>
+          </div>
         </div>
-
-        <footer dir="rtl" className="mt-8 text-xs text-neutral-500 dark:text-neutral-400 text-center">
-          توجه: قبل از استفاده، از طریق بخش بلوتوث به دستگاه متصل شوید.
-        </footer>
       </div>
     </div>
   );

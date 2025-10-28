@@ -3,8 +3,8 @@
  * Convert a project name (and optional category) into a pack id: slug + "(category)".pack
  * Keeps Unicode letters and numbers (so Persian names are preserved).
  * Example:
- *   name = "آسانسور تست", category = "تله کابین"
- *   => "آسانسور-تست(تله-کابین).pack"
+ *   name = "ماشین تست", category = "منجنیق"
+ *   => "ماشین-تست(منجنیق).pack"
  */
 export function toPackId(name: string, category?: string) {
   const clean = (s?: string) => {

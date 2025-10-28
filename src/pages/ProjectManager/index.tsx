@@ -22,7 +22,7 @@ export interface Project {
 
 const initialProjects: Project[] = []; // start empty
 
-const defaultCategories = ["آسانسور", "تله کابین", "پلکان برقی", "سایر"];
+const defaultCategories = ["ماشین", "منجنیق", "پلکان برقی", "سایر"];
 
 const ProjectManager: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(initialProjects);

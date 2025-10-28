@@ -43,8 +43,8 @@ import { useParams, useNavigate, useLocation } from 'react-router';
 
 import Confetti from 'react-confetti';
 import { useDialogue } from 'dialogue-story';
-import { elevator } from './assets/stories/elevator';
-import validateElevatorChapter from './assets/stories/elevator-validate';
+import { car } from './assets/stories/car';
+import validateCarChapter from './assets/stories/car-validate';
 import { advanceSessionStep, getSession } from './utils/sessionStorage';
 
 /* Timeline tasklist imports */
@@ -161,7 +161,7 @@ const App: React.FC = () => {
     return { clientX: 0, clientY: 0 };
   }, []);
 
-  // Dialogue + elevator validation UI state
+  // Dialogue + car validation UI state
   const { dialogue } = useDialogue();
   const location = useLocation();
   const [showConfetti, setShowConfetti] = useState(false);
@@ -185,10 +185,10 @@ const App: React.FC = () => {
         console.warn('autosave serialization failed', err);
       }
 
-      // run elevator validator if this project is elevator
+      // run car validator if this project is car
       try {
-        if (projectId === 'آسانسور' && currentDialogueChapter) {
-          const ok = validateElevatorChapter(snapshot ?? blocksRef.current, currentDialogueChapter);
+        if (projectId === 'ماشین' && currentDialogueChapter) {
+          const ok = validateCarChapter(snapshot ?? blocksRef.current, currentDialogueChapter);
           if (ok && !showNextButton) {
             setShowConfetti(true);
             setShowNextButton(true);
@@ -274,7 +274,7 @@ const App: React.FC = () => {
     ITEM_STAGGER,
     BASE_DURATION,
     ITEM_DURATION,
-  } = useProjects('آسانسور');
+  } = useProjects('ماشین');
 
   useEffect(() => {
     selectedProjectRef.current = selectedProject ?? null;
@@ -470,15 +470,15 @@ const App: React.FC = () => {
   const startDialogueForChapter = useCallback(
     async (chapterKey?: string | null) => {
       try {
-        const chapterKeys = Object.keys(elevator);
+        const chapterKeys = Object.keys(car);
         if (chapterKeys.length === 0) return;
 
         let key = chapterKey ?? chapterKeys[0];
-        if (!key || !elevator[key]) {
+        if (!key || !car[key]) {
           key = chapterKeys[0];
         }
 
-        const rawMessages: any[] = Array.isArray(elevator[key]) ? elevator[key] : [];
+        const rawMessages: any[] = Array.isArray(car[key]) ? car[key] : [];
         setCurrentDialogueChapter(key);
         const normalized = normalizeMessagesForSides(rawMessages);
         
@@ -490,7 +490,7 @@ const App: React.FC = () => {
 
         // After dialogue finishes, show tasklist popup if exists for selected project + chapter.
         try {
-          const projId = selectedProjectRef.current ?? selectedProject ?? 'آسانسور';
+          const projId = selectedProjectRef.current ?? selectedProject ?? 'ماشین';
           const chapterKeyForTasklist = key;
           const t = getTaskListForProject(projId, chapterKeyForTasklist);
           if (t && t.tasks && t.tasks.length > 0) {
@@ -521,7 +521,7 @@ const App: React.FC = () => {
   const handleNextChapter = useCallback(async () => {
     setShowNextButton(false);
 
-    const keys = Object.keys(elevator);
+    const keys = Object.keys(car);
     if (!keys || keys.length === 0) return;
 
     const currentKey = currentDialogueChapter ?? keys[0];
@@ -615,7 +615,7 @@ const App: React.FC = () => {
     },
   ];
 
-  const projects = ['آسانسور', 'جرثقیل', 'تله کابین'];
+  const projects = ['ماشین', 'جرثقیل', 'منجنیق'];
   const LEFT_TOGGLE_LEFT = 6;
   const LEFT_TOGGLE_BOTTOM = blockPaletteBottom;
   const toggleInteraction = () => setInteractionMode((prev) => (prev === 'runner' ? 'deleter' : 'runner'));

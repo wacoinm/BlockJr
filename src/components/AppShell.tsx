@@ -5,6 +5,7 @@ import { BluetoothConnector } from "./BluetoothConnector";
 import WorkspaceControls from "./WorkspaceControls";
 import { Workspace } from "./Workspace";
 import { BlockPalette } from "./BlockPalette";
+import { ReplayPalette } from "./ReplayPalette";
 import { useAppSelector } from "../store/hooks";
 import type { RootState } from "../store";
 import { useNavigate } from "react-router";
@@ -67,6 +68,10 @@ export type AppShellProps = {
   bluetoothOpen?: boolean;
   setBluetoothOpen?: (open: boolean) => void;
   onBluetoothConnectionChange?: (connected: boolean) => void;
+
+  // replay handlers
+  onReplayDialogue?: () => void;
+  onReplayTasks?: () => void;
 
   interactionMode?: "runner" | "deleter";
   blockPaletteBottom?: number;
@@ -175,6 +180,11 @@ export default function AppShell(props: AppShellProps) {
         onPan={onPan}
         onZoom={onZoom}
         interactionMode={interactionMode}
+      />
+
+      <ReplayPalette
+        onReplayTasks={props.onReplayTasks ?? (() => {})}
+        blockPaletteBottom={blockPaletteBottom}
       />
 
       <BlockPalette

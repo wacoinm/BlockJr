@@ -32,7 +32,9 @@ import {
 import { toast } from 'react-toastify';
 
 import { useAppSelector } from './store/hooks';
+import { useDispatch } from 'react-redux';
 import type { RootState } from './store';
+import { setCurrentChapter, setMessages } from './store/slices/storySlice';
 
 import { computeHorizStep, GAP_BETWEEN_BLOCKS } from './constants/spacing';
 
@@ -55,6 +57,7 @@ import EmergencyStopButton from './components/EmergencyStopButton';
 export const SoundContext = createContext<() => void>(() => {});
 
 const App: React.FC = () => {
+  const dispatch = useDispatch();
   // read UI values from redux; cast to any for properties that may not be typed
   const reduxInteractionMode = useAppSelector((s: RootState) => (s.ui ? (s.ui as any).interactionMode : undefined));
   const reduxBluetoothOpen = useAppSelector((s: RootState) => (s.ui ? (s.ui as any).bluetoothOpen : undefined));
@@ -478,6 +481,11 @@ const App: React.FC = () => {
         const rawMessages: any[] = Array.isArray(elevator[key]) ? elevator[key] : [];
         setCurrentDialogueChapter(key);
         const normalized = normalizeMessagesForSides(rawMessages);
+        
+        // Save to redux store
+        dispatch(setCurrentChapter(key));
+        dispatch(setMessages({ chapter: key, messages: normalized }));
+        
         await dialogue(normalized as any);
 
         // After dialogue finishes, show tasklist popup if exists for selected project + chapter.

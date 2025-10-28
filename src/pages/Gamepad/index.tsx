@@ -358,7 +358,7 @@ export default function GamepadPage() {
                       <JoystickVisual size={joystickSize} active={false}>
                         <Joystick
                           size={joystickSize}
-                          stickSize={Math.round(joystickSize * 0.35)}
+                          stickSize={Math.round(joystickSize * 0.65)}
                           controlPlaneShape={JoystickShape.Plane}
                           baseShape={JoystickShape.Circle}
                           stickShape={JoystickShape.Circle}
@@ -368,6 +368,7 @@ export default function GamepadPage() {
                           move={onCraneMoveLeft}
                           stop={onCraneMoveLeftStop}
                           throttle={25}
+                          stickImage={stickShape}
                         />
                       </JoystickVisual>
                     </div>
@@ -377,7 +378,7 @@ export default function GamepadPage() {
                       <JoystickVisual size={joystickSize} active={false}>
                         <Joystick
                           size={joystickSize}
-                          stickSize={Math.round(joystickSize * 0.35)}
+                          stickSize={Math.round(joystickSize * 0.65)}
                           controlPlaneShape={JoystickShape.AxisX}
                           baseShape={JoystickShape.Circle}
                           stickShape={JoystickShape.Circle}
@@ -387,6 +388,7 @@ export default function GamepadPage() {
                           move={onCraneMoveRight}
                           stop={onCraneMoveRightStop}
                           throttle={25}
+                          stickImage={stickShape}
                         />
                       </JoystickVisual>
                     </div>
@@ -401,7 +403,7 @@ export default function GamepadPage() {
                     <JoystickVisual size={joystickSize} active={false}>
                       <Joystick
                         size={joystickSize}
-                        stickSize={Math.round(joystickSize * 0.35)}
+                        stickSize={Math.round(joystickSize * 0.75)}
                         controlPlaneShape={JoystickShape.AxisX}
                         baseShape={JoystickShape.Circle}
                         stickShape={JoystickShape.Circle}
@@ -411,6 +413,7 @@ export default function GamepadPage() {
                         move={onTeleMove}
                         stop={onTeleStop}
                         throttle={30}
+                        stickImage={stickShape}
                       />
                     </JoystickVisual>
                   </div>
@@ -423,13 +426,14 @@ export default function GamepadPage() {
                   <JoystickVisual size={joystickSize} active={false}>
                     <Joystick
                       size={joystickSize}
-                      stickSize={Math.round(joystickSize * 0.35)}
+                      stickSize={Math.round(joystickSize * 0.75)}
                       controlPlaneShape={JoystickShape.Plane}
                       baseShape={JoystickShape.Circle}
                       stickShape={JoystickShape.Circle}
                       baseColor={nearTransparentBase}
                       stickColor={nearTransparentStick}
                       minDistance={0}
+                      stickImage={stickShape}
                       move={(e) => {
                         if (!e) return;
                         const ev = remapForRotation(e);

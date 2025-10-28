@@ -4,8 +4,28 @@ import { useParams, useNavigate } from "react-router";
 import { Joystick, JoystickShape } from "react-joystick-component";
 import bluetoothService from "../../utils/bluetoothService";
 import { toast } from "react-toastify";
-import { Lightbulb, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
+import { Lightbulb, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Rabbit, Turtle } from "lucide-react";
 import stickShape from "../../../public/shapeStick.svg";
+
+/**
+ * Speed Control Component with animation
+ */
+function SpeedControl({ isFast, onChange }: { isFast: boolean; onChange: (fast: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-full p-2 shadow-md transition-all duration-300">
+      <div className="relative w-16 h-8 rounded-full bg-slate-100 dark:bg-slate-700 cursor-pointer"
+           onClick={() => onChange(!isFast)}>
+        <div className={`absolute inset-y-1 w-7 bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-500 ease-in-out ${
+          isFast ? 'right-1' : 'left-1'
+        }`} />
+        <div className={`absolute inset-0 flex items-center justify-between px-1.5 transition-opacity duration-300`}>
+          <Turtle size={16} className={`text-slate-600 dark:text-slate-300 transition-opacity duration-300 ${isFast ? 'opacity-40' : 'opacity-100'}`} />
+          <Rabbit size={16} className={`text-slate-600 dark:text-slate-300 transition-opacity duration-300 ${isFast ? 'opacity-100' : 'opacity-40'}`} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Gamepad page (rotated presentation wrapper).
@@ -134,6 +154,7 @@ export default function GamepadPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [lightOn, setLightOn] = useState(false);
+  const [isFastMode, setIsFastMode] = useState(false);
 
   const lastSentMapRef = useRef<Record<string, number>>({});
   const lastDirRef = useRef<Record<string, string>>({});
@@ -176,14 +197,22 @@ export default function GamepadPage() {
   }, [lightOn, sendCmd]);
 
   /* ---------- MOVE HANDLERS use remapForRotation ---------- */
+  const calculateEffectiveSpeed = useCallback((distance: number) => {
+    const baseSpeed = speedFromDistance(distance);
+    if (isFastMode) {
+      return distance >= STRONG_PUSH_THRESHOLD ? Math.max(baseSpeed, 90) : Math.max(baseSpeed, 45);
+    } else {
+      return distance >= STRONG_PUSH_THRESHOLD ? Math.max(baseSpeed, 70) : Math.max(baseSpeed, 30);
+    }
+  }, [isFastMode]);
+
   const onElevatorMove = useCallback((evt: any) => {
     if (!evt) return;
     const e = remapForRotation(evt);
     const { y, distance } = e;
     if (y == null) return;
     if (Math.abs(y) < 0.05) return;
-    const speed = speedFromDistance(distance ?? 0.0);
-    const effectiveSpeed = distance >= STRONG_PUSH_THRESHOLD ? Math.max(speed, 80) : Math.max(speed, 35);
+    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0.0);
     if (y < 0) {
       lastDirRef.current["elevator"] = "up";
       sendCmd(`up(${effectiveSpeed})`, "elevator");
@@ -191,7 +220,7 @@ export default function GamepadPage() {
       lastDirRef.current["elevator"] = "down";
       sendCmd(`down(${effectiveSpeed})`, "elevator");
     }
-  }, [sendCmd]);
+  }, [sendCmd, calculateEffectiveSpeed]);
   const onElevatorStop = useCallback(() => sendZeroForKey("elevator"), [sendZeroForKey]);
 
   const onTeleMove = useCallback((evt: any) => {
@@ -200,8 +229,7 @@ export default function GamepadPage() {
     const { x, distance } = e;
     if (x == null) return;
     if (Math.abs(x) < 0.05) return;
-    const speed = speedFromDistance(distance ?? 0);
-    const effectiveSpeed = distance >= STRONG_PUSH_THRESHOLD ? Math.max(speed, 80) : Math.max(speed, 35);
+    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
     if (x > 0) {
       lastDirRef.current["tele"] = "forward";
       sendCmd(`forward(${effectiveSpeed})`, "tele");
@@ -209,7 +237,7 @@ export default function GamepadPage() {
       lastDirRef.current["tele"] = "backward";
       sendCmd(`backward(${effectiveSpeed})`, "tele");
     }
-  }, [sendCmd]);
+  }, [sendCmd, calculateEffectiveSpeed]);
   const onTeleStop = useCallback(() => sendZeroForKey("tele"), [sendZeroForKey]);
 
   const onCraneMoveLeft = useCallback((evt: any) => {
@@ -217,30 +245,27 @@ export default function GamepadPage() {
     const e = remapForRotation(evt);
     const { x, y, distance } = e;
     if (x == null || y == null) return;
+    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
     if (Math.abs(x) > Math.abs(y)) {
       if (Math.abs(x) < 0.05) return;
-      const speed = speedFromDistance(distance ?? 0);
-      const s = distance >= STRONG_PUSH_THRESHOLD ? Math.max(speed, 80) : Math.max(speed, 35);
       if (x > 0) {
         lastDirRef.current["crane-move"] = "turnright";
-        sendCmd(`turnright(${s})`, "crane-move");
+        sendCmd(`turnright(${effectiveSpeed})`, "crane-move");
       } else {
         lastDirRef.current["crane-move"] = "turnleft";
-        sendCmd(`turnleft(${s})`, "crane-move");
+        sendCmd(`turnleft(${effectiveSpeed})`, "crane-move");
       }
     } else {
       if (Math.abs(y) < 0.05) return;
-      const speed = speedFromDistance(distance ?? 0);
-      const s = distance >= STRONG_PUSH_THRESHOLD ? Math.max(speed, 80) : Math.max(speed, 35);
       if (y < 0) {
         lastDirRef.current["crane-move"] = "forward";
-        sendCmd(`forward(${s})`, "crane-move");
+        sendCmd(`forward(${effectiveSpeed})`, "crane-move");
       } else {
         lastDirRef.current["crane-move"] = "backward";
-        sendCmd(`backward(${s})`, "crane-move");
+        sendCmd(`backward(${effectiveSpeed})`, "crane-move");
       }
     }
-  }, [sendCmd]);
+  }, [sendCmd, calculateEffectiveSpeed]);
   const onCraneMoveLeftStop = useCallback(() => sendZeroForKey("crane-move"), [sendZeroForKey]);
 
   const onCraneMoveRight = useCallback((evt: any) => {
@@ -249,22 +274,22 @@ export default function GamepadPage() {
     const { y, distance } = e;
     if (y == null) return;
     if (Math.abs(y) < 0.05) return;
-    const speed = speedFromDistance(distance ?? 0);
-    const s = distance >= STRONG_PUSH_THRESHOLD ? Math.max(speed, 80) : Math.max(speed, 35);
+    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
     if (y < 0) {
       lastDirRef.current["crane-elevator"] = "up";
-      sendCmd(`up(${s})`, "crane-elevator");
+      sendCmd(`up(${effectiveSpeed})`, "crane-elevator");
     } else {
       lastDirRef.current["crane-elevator"] = "down";
-      sendCmd(`down(${s})`, "crane-elevator");
+      sendCmd(`down(${effectiveSpeed})`, "crane-elevator");
     }
-  }, [sendCmd]);
+  }, [sendCmd, calculateEffectiveSpeed]);
   const onCraneMoveRightStop = useCallback(() => sendZeroForKey("crane-elevator"), [sendZeroForKey]);
 
   useEffect(() => {
+    const currentDirMap = lastDirRef.current;
     return () => {
-      Object.keys(lastDirRef.current).forEach((k) => {
-        const dir = lastDirRef.current[k];
+      Object.keys(currentDirMap).forEach((k) => {
+        const dir = currentDirMap[k];
         if (dir) sendCmd(`${dir}(0)`, k);
       });
     };
@@ -311,6 +336,7 @@ export default function GamepadPage() {
                 >
                   <Lightbulb className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`} />
                 </button>
+                <SpeedControl isFast={isFastMode} onChange={setIsFastMode} />
               </div>
 
               <div className="text-end">
@@ -359,7 +385,7 @@ export default function GamepadPage() {
                         <Joystick
                           size={joystickSize}
                           stickSize={Math.round(joystickSize * 0.65)}
-                          controlPlaneShape={JoystickShape.Plane}
+                          controlPlaneShape={JoystickShape.Circle}
                           baseShape={JoystickShape.Circle}
                           stickShape={JoystickShape.Circle}
                           baseColor={nearTransparentBase}
@@ -427,7 +453,7 @@ export default function GamepadPage() {
                     <Joystick
                       size={joystickSize}
                       stickSize={Math.round(joystickSize * 0.75)}
-                      controlPlaneShape={JoystickShape.Plane}
+                      controlPlaneShape={JoystickShape.Circle}
                       baseShape={JoystickShape.Circle}
                       stickShape={JoystickShape.Circle}
                       baseColor={nearTransparentBase}

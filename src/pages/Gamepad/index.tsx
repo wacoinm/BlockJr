@@ -35,8 +35,24 @@ function SpeedControl({ isFast, onChange }: { isFast: boolean; onChange: (fast: 
  * - horizontal scrolling disabled while rotated
  */
 
-const RATE_MS = 40;
+const RATE_MS = 200; // Changed to 200ms as requested
 const STRONG_PUSH_THRESHOLD = 0.75;
+
+/* ---------- Command formats ---------- */
+const Commands = {
+  UP: 'up',
+  DOWN: 'down',
+  DELAY: 'delay',
+  GREEN_FLAG: 'green-flag',
+  FORWARD: 'forward',
+  BACKWARD: 'backward',
+  CLOCKWISE: 'clockwise',
+  COUNTERCLOCKWISE: 'countclockwise',
+  LAMP_ON: 'lamp-on',
+  LAMP_OFF: 'lamp-off',
+  SPEED_LOW: 'speed-low',
+  SPEED_HIGH: 'speed-high',
+} as const;
 
 /* ---------- helpers ---------- */
 function clamp01(v: number) {
@@ -70,8 +86,11 @@ function remapForRotation(evt: any) {
   if (typeof x !== "number" || typeof y !== "number") {
     return { x, y, distance, direction, ...rest };
   }
-  const logicalX = x;
-  const logicalY = y;
+  // For +90deg rotation:
+  // logical_x = -visual_y
+  // logical_y = visual_x
+  const logicalX = -y;  // Reverse y for x
+  const logicalY = x;   // Use x for y
   return { ...rest, x: logicalX, y: logicalY, distance, direction };
 }
 
@@ -163,20 +182,31 @@ export default function GamepadPage() {
     document.title = id ? `Gamepad — ${id}` : "Gamepad";
   }, [id]);
 
-  const sendCmd = useCallback(async (cmd: string, key: string = "global") => {
+  const buildCommand = useCallback((commands: string[]) => {
+    // Convert time to seconds and format commands
+    if (commands[0] === 'stop') return "stop()" 
+    else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)"
+    else if (commands[0] === Commands.SPEED_LOW) return "speed(50)"
+    const timeInSec = RATE_MS / 1000; // Convert to seconds
+    const formattedCmds = commands.map(cmd => `${cmd}(${timeInSec})`);
+    return formattedCmds.join('_');
+  }, []);
+
+  const sendCmd = useCallback(async (commands: string[], key: string = "global") => {
     const now = Date.now();
     const last = lastSentMapRef.current[key] ?? 0;
     if (now - last < RATE_MS) return;
     lastSentMapRef.current[key] = now;
 
     try {
+      const formattedCmd = buildCommand(commands);
       const connected = await bluetoothService.isConnected();
       if (!connected) {
         toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
         return;
       }
-      console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${cmd}`);
-      await bluetoothService.sendString(cmd);
+      // console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${formattedCmd}`);
+      await bluetoothService.sendString(formattedCmd);
     } catch (e) {
       console.error("Failed to send cmd", e);
       toast.error("خطا در ارسال فرمان بلوتوث.");
@@ -186,15 +216,20 @@ export default function GamepadPage() {
   const sendZeroForKey = useCallback((key: string) => {
     const dir = lastDirRef.current[key];
     if (!dir) return;
-    sendCmd(`${dir}(0)`, key);
+    sendCmd(dir, 0, key);
   }, [sendCmd]);
 
   const toggleLight = useCallback(() => {
     const next = !lightOn;
     setLightOn(next);
-    const cmd = next ? "lampon()" : "lampoff()";
-    sendCmd(cmd, "light");
+    const cmd = next ? Commands.LAMP_ON : Commands.LAMP_OFF;
+    sendCmd([cmd], "light"); // Send as array
   }, [lightOn, sendCmd]);
+
+  // Send speed command when speed mode changes
+  useEffect(() => {
+    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed"); // Send as array
+  }, [isFastMode, sendCmd]);
 
   /* ---------- MOVE HANDLERS use remapForRotation ---------- */
   const calculateEffectiveSpeed = useCallback((distance: number) => {
@@ -209,88 +244,146 @@ export default function GamepadPage() {
   const onCarMove = useCallback((evt: any) => {
     if (!evt) return;
     const e = remapForRotation(evt);
-    const { y, distance } = e;
+    const { x, y } = e;
     if (y == null) return;
-    if (Math.abs(y) < 0.05) return;
-    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0.0);
-    if (y < 0) {
-      lastDirRef.current["car"] = "up";
-      sendCmd(`up(${effectiveSpeed})`, "car");
-    } else {
-      lastDirRef.current["car"] = "down";
-      sendCmd(`down(${effectiveSpeed})`, "car");
+    if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
+      sendCmd(['stop'], "car");
+      return;
     }
-  }, [sendCmd, calculateEffectiveSpeed]);
+
+    // Determine commands based on joystick position
+    const commands: string[] = [];
+    
+    // Primary direction
+    if (Math.abs(y) > 0.05) {
+      if (y < 0) {
+        commands.push(Commands.UP);
+      } else {
+        commands.push(Commands.DOWN);
+      }
+    }
+
+    // Add secondary direction for diagonal movement
+    if (Math.abs(x) > 0.05) {
+      if (x < 0) {
+        commands.push(Commands.COUNTERCLOCKWISE);
+      } else {
+        commands.push(Commands.CLOCKWISE);
+      }
+    }
+
+    if (commands.length > 0) {
+      sendCmd(commands, "car");
+    }
+  }, [sendCmd]);
   const onCarStop = useCallback(() => sendZeroForKey("car"), [sendZeroForKey]);
 
-  const onTeleMove = useCallback((evt: any) => {
+  const onTeleMove = useCallback((evt: JoystickMoveEvent) => {
     if (!evt) return;
     const e = remapForRotation(evt);
-    const { x, distance } = e;
-    if (x == null) return;
-    if (Math.abs(x) < 0.05) return;
-    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
-    if (x > 0) {
-      lastDirRef.current["tele"] = "forward";
-      sendCmd(`forward(${effectiveSpeed})`, "tele");
-    } else {
-      lastDirRef.current["tele"] = "backward";
-      sendCmd(`backward(${effectiveSpeed})`, "tele");
-    }
-  }, [sendCmd, calculateEffectiveSpeed]);
-  const onTeleStop = useCallback(() => sendZeroForKey("tele"), [sendZeroForKey]);
-
-  const onCraneMoveLeft = useCallback((evt: any) => {
-    if (!evt) return;
-    const e = remapForRotation(evt);
-    const { x, y, distance } = e;
-    if (x == null || y == null) return;
-    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
-    if (Math.abs(x) > Math.abs(y)) {
-      if (Math.abs(x) < 0.05) return;
-      if (x > 0) {
-        lastDirRef.current["crane-move"] = "turnright";
-        sendCmd(`turnright(${effectiveSpeed})`, "crane-move");
-      } else {
-        lastDirRef.current["crane-move"] = "turnleft";
-        sendCmd(`turnleft(${effectiveSpeed})`, "crane-move");
-      }
-    } else {
-      if (Math.abs(y) < 0.05) return;
-      if (y < 0) {
-        lastDirRef.current["crane-move"] = "forward";
-        sendCmd(`forward(${effectiveSpeed})`, "crane-move");
-      } else {
-        lastDirRef.current["crane-move"] = "backward";
-        sendCmd(`backward(${effectiveSpeed})`, "crane-move");
-      }
-    }
-  }, [sendCmd, calculateEffectiveSpeed]);
-  const onCraneMoveLeftStop = useCallback(() => sendZeroForKey("crane-move"), [sendZeroForKey]);
-
-  const onCraneMoveRight = useCallback((evt: any) => {
-    if (!evt) return;
-    const e = remapForRotation(evt);
-    const { y, distance } = e;
+    const { x, y } = e;
     if (y == null) return;
-    if (Math.abs(y) < 0.05) return;
-    const effectiveSpeed = calculateEffectiveSpeed(distance ?? 0);
-    if (y < 0) {
-      lastDirRef.current["crane-car"] = "up";
-      sendCmd(`up(${effectiveSpeed})`, "crane-elevator");
-    } else {
-      lastDirRef.current["crane-elevator"] = "down";
-      sendCmd(`down(${effectiveSpeed})`, "crane-elevator");
+    if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
+      sendCmd(['stop'], "tele");
+      return;
     }
-  }, [sendCmd, calculateEffectiveSpeed]);
-  const onCraneMoveRightStop = useCallback(() => sendZeroForKey("crane-elevator"), [sendZeroForKey]);
+
+    // Determine commands based on joystick position
+    const commands: string[] = [];
+    
+    // Primary direction
+    if (Math.abs(y) > 0.05) {
+      if (y < 0) {
+        commands.push(Commands.FORWARD);
+      } else {
+        commands.push(Commands.BACKWARD);
+      }
+    }
+
+    // Add secondary direction for diagonal movement
+    if (Math.abs(x) > 0.05) {
+      if (x < 0) {
+        commands.push(Commands.COUNTERCLOCKWISE);
+      } else {
+        commands.push(Commands.CLOCKWISE);
+      }
+    }
+
+    if (commands.length > 0) {
+      sendCmd(commands, "tele");
+    }
+  }, [sendCmd]);
+  const onTeleStop = useCallback(() => sendCmd(['stop'], "tele"), [sendCmd]);
+
+  const onCraneMoveLeft = useCallback((evt: IJoystickUpdateEvent) => {
+    if (!evt) return;
+    const e = remapForRotation(evt);
+    const { x, y } = e;
+    if (x == null || y == null) return;
+
+    if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) {
+      sendCmd(['stop'], "crane-move");
+      return;
+    }
+
+    const commands: string[] = [];
+    
+    if (Math.abs(x) > Math.abs(y)) {
+      if (x > 0) {
+        commands.push(Commands.CLOCKWISE);
+      } else if (x < 0) {
+        commands.push(Commands.COUNTERCLOCKWISE);
+      }
+    } else {
+      if (y < 0) {
+        commands.push(Commands.FORWARD);
+      } else if (y > 0) {
+        commands.push(Commands.BACKWARD);
+      }
+    }
+
+    if (commands.length > 0) {
+      sendCmd(commands, "crane-move");
+    }
+  }, [sendCmd]);
+  const onCraneMoveLeftStop = useCallback(() => sendCmd(['stop'], "crane-move"), [sendCmd]);
+
+  interface IJoystickUpdateEvent {
+    x: number | null;
+    y: number | null;
+    distance: number | null;
+    angle?: number | null;
+  }
+
+  const onCraneMoveRight = useCallback((evt: IJoystickUpdateEvent) => {
+    if (!evt) return;
+    const e = remapForRotation(evt);
+    const { y } = e;
+    if (y == null) return;
+    if (Math.abs(y) < 0.05) {
+      sendCmd(['stop'], "crane-elevator");
+      return;
+    }
+
+    const commands: string[] = [];
+    
+    if (y < 0) {
+      commands.push(Commands.UP);
+    } else if (y > 0) {
+      commands.push(Commands.DOWN);
+    }
+
+    if (commands.length > 0) {
+      sendCmd(commands, "crane-elevator");
+    }
+  }, [sendCmd]);
+  const onCraneMoveRightStop = useCallback(() => sendCmd(['stop'], "crane-elevator"), [sendCmd]);
 
   useEffect(() => {
-    const currentDirMap = lastDirRef.current;
     return () => {
-      Object.keys(currentDirMap).forEach((k) => {
-        const dir = currentDirMap[k];
-        if (dir) sendCmd(`${dir}(0)`, k);
+      // Send stop command to all controllers on unmount
+      ["car", "tele", "crane-move", "crane-elevator", "fallback"].forEach((controller) => {
+        sendCmd(['stop'], controller);
       });
     };
   }, [sendCmd]);
@@ -463,25 +556,33 @@ export default function GamepadPage() {
                         if (!e) return;
                         const ev = remapForRotation(e);
                         const { x, y, distance } = ev;
+                        
+                        if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
+                          sendCmd(['stop'], "fallback");
+                          return;
+                        }
+
+                        const commands: string[] = [];
+                        
                         if (Math.abs(y) > Math.abs(x)) {
                           if (y < 0) {
-                            lastDirRef.current["fallback"] = "forward";
-                            sendCmd(`forward(${speedFromDistance(distance ?? 0)})`, "fallback");
+                            commands.push(`forward(${speedFromDistance(distance ?? 0)})`);
                           } else {
-                            lastDirRef.current["fallback"] = "backward";
-                            sendCmd(`backward(${speedFromDistance(distance ?? 0)})`, "fallback");
+                            commands.push(`backward(${speedFromDistance(distance ?? 0)})`);
                           }
                         } else {
                           if (x > 0) {
-                            lastDirRef.current["fallback"] = "turnright";
-                            sendCmd(`turnright(${speedFromDistance(distance ?? 0)})`, "fallback");
+                            commands.push(`turnright(${speedFromDistance(distance ?? 0)})`);
                           } else {
-                            lastDirRef.current["fallback"] = "turnleft";
-                            sendCmd(`turnleft(${speedFromDistance(distance ?? 0)})`, "fallback");
+                            commands.push(`turnleft(${speedFromDistance(distance ?? 0)})`);
                           }
                         }
+
+                        if (commands.length > 0) {
+                          sendCmd(commands, "fallback");
+                        }
                       }}
-                      stop={() => sendZeroForKey("fallback")}
+                      stop={() => sendCmd(['stop'], "fallback")}
                       throttle={60}
                     />
                   </JoystickVisual>

@@ -178,6 +178,10 @@ export default function GamepadPage() {
   const lastSentMapRef = useRef<Record<string, number>>({});
   const lastDirRef = useRef<Record<string, string>>({});
 
+  // new refs for autosend behavior
+  const lastEventRef = useRef<Record<string, any>>({});
+  const autoSendTimerRef = useRef<Record<string, number | null>>({});
+
   useEffect(() => {
     document.title = id ? `Gamepad — ${id}` : "Gamepad";
   }, [id]);
@@ -202,24 +206,119 @@ export default function GamepadPage() {
 
     try {
       const formattedCmd = buildCommand(commands);
-      const connected = await bluetoothService.isConnected();
-      if (!connected) {
-        toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
-        return;
-      }
-      // console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${formattedCmd}`);
-      await bluetoothService.sendString(formattedCmd);
+      // const connected = await bluetoothService.isConnected();
+      // if (!connected) {
+      //   toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
+      //   return;
+      // }
+      console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${formattedCmd}`);
+      // await bluetoothService.sendString(formattedCmd);
     } catch (e) {
       console.error("Failed to send cmd", e);
       toast.error("خطا در ارسال فرمان بلوتوث.");
     }
+  }, [buildCommand]);
+
+  // Send speed command when speed mode changes
+  useEffect(() => {
+    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed"); // Send as array
+  }, [isFastMode, sendCmd]);
+
+  /* ---------- Autosend helpers ---------- */
+
+  // returns array of command strings or empty array
+  const commandsFromEvent = useCallback((controllerKey: string, evt: any): string[] => {
+    if (!evt) return [];
+    const e = remapForRotation(evt);
+    const { x, y, distance } = e;
+
+    // fallback: if almost centered -> stop
+    if ((Math.abs(x ?? 0) < 0.05) && (Math.abs(y ?? 0) < 0.05)) {
+      return ['stop'];
+    }
+
+    // per-controller logic similar to your existing handlers
+    switch (controllerKey) {
+      case "car": {
+        const cmds: string[] = [];
+        if (Math.abs(y) > 0.05) cmds.push(y < 0 ? Commands.UP : Commands.DOWN);
+        if (Math.abs(x) > 0.05) cmds.push(x < 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
+        return cmds;
+      }
+      case "tele": {
+        const cmds: string[] = [];
+        if (Math.abs(y) > 0.05) cmds.push(y < 0 ? Commands.FORWARD : Commands.BACKWARD);
+        if (Math.abs(x) > 0.05) cmds.push(x < 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
+        return cmds;
+      }
+      case "crane-move": {
+        const cmds: string[] = [];
+        if (x == null || y == null) return [];
+        if (Math.abs(x) > Math.abs(y)) {
+          if (x > 0) cmds.push(Commands.CLOCKWISE);
+          else if (x < 0) cmds.push(Commands.COUNTERCLOCKWISE);
+        } else {
+          if (y < 0) cmds.push(Commands.FORWARD);
+          else if (y > 0) cmds.push(Commands.BACKWARD);
+        }
+        return cmds;
+      }
+      case "crane-elevator": {
+        const cmds: string[] = [];
+        if (y == null) return [];
+        if (Math.abs(y) < 0.05) return ['stop'];
+        if (y < 0) cmds.push(Commands.UP);
+        else cmds.push(Commands.DOWN);
+        return cmds;
+      }
+      case "fallback": {
+        const cmds: string[] = [];
+        if ((Math.abs(x ?? 0) < 0.05) && (Math.abs(y ?? 0) < 0.05)) return ['stop'];
+        if (Math.abs(y) > Math.abs(x)) {
+          if (y < 0) cmds.push(`forward(${speedFromDistance(distance ?? 0)})`);
+          else cmds.push(`backward(${speedFromDistance(distance ?? 0)})`);
+        } else {
+          if (x > 0) cmds.push(`turnright(${speedFromDistance(distance ?? 0)})`);
+          else cmds.push(`turnleft(${speedFromDistance(distance ?? 0)})`);
+        }
+        return cmds;
+      }
+      default:
+        return [];
+    }
   }, []);
 
-  const sendZeroForKey = useCallback((key: string) => {
-    const dir = lastDirRef.current[key];
-    if (!dir) return;
-    sendCmd(dir, 0, key);
-  }, [sendCmd]);
+  const startAutoSend = useCallback((key: string) => {
+    if (autoSendTimerRef.current[key]) return; // already running
+    // use window.setInterval so we can clear with window.clearInterval
+    const id = window.setInterval(() => {
+      const lastEvt = lastEventRef.current[key];
+      if (!lastEvt) {
+        // nothing to send — keep timer running until explicit stop for reliability
+        return;
+      }
+      const cmds = commandsFromEvent(key, lastEvt);
+      if (cmds.length > 0) {
+        sendCmd(cmds, key);
+      }
+    }, RATE_MS);
+    autoSendTimerRef.current[key] = id;
+  }, [commandsFromEvent, sendCmd]);
+
+  const stopAutoSend = useCallback((key: string) => {
+    const id = autoSendTimerRef.current[key];
+    if (id) {
+      window.clearInterval(id);
+      autoSendTimerRef.current[key] = null;
+    }
+    lastEventRef.current[key] = null;
+  }, []);
+
+  // helper to immediately stop controller and stop autosend
+  const sendStopAndClear = useCallback((key: string) => {
+    sendCmd(['stop'], key);
+    stopAutoSend(key);
+  }, [sendCmd, stopAutoSend]);
 
   const toggleLight = useCallback(() => {
     const next = !lightOn;
@@ -228,12 +327,8 @@ export default function GamepadPage() {
     sendCmd([cmd], "light"); // Send as array
   }, [lightOn, sendCmd]);
 
-  // Send speed command when speed mode changes
-  useEffect(() => {
-    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed"); // Send as array
-  }, [isFastMode, sendCmd]);
+  /* ---------- MOVE HANDLERS use remapForRotation + autosend ---------- */
 
-  /* ---------- MOVE HANDLERS use remapForRotation ---------- */
   const calculateEffectiveSpeed = useCallback((distance: number) => {
     const baseSpeed = speedFromDistance(distance);
     if (isFastMode) {
@@ -243,113 +338,36 @@ export default function GamepadPage() {
     }
   }, [isFastMode]);
 
+  // CAR handlers
   const onCarMove = useCallback((evt: any) => {
     if (!evt) return;
-    const e = remapForRotation(evt);
-    const { x, y } = e;
-    if (y == null) return;
-    if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
-      sendCmd(['stop'], "car");
-      return;
-    }
+    lastEventRef.current["car"] = evt;
+    startAutoSend("car");
 
-    // Determine commands based on joystick position
-    const commands: string[] = [];
-    
-    // Primary direction
-    if (Math.abs(y) > 0.05) {
-      if (y < 0) {
-        commands.push(Commands.UP);
-      } else {
-        commands.push(Commands.DOWN);
-      }
+    const cmds = commandsFromEvent("car", evt);
+    if (cmds.length > 0) {
+      sendCmd(cmds, "car");
     }
+  }, [startAutoSend, sendCmd, commandsFromEvent]);
 
-    // Add secondary direction for diagonal movement
-    if (Math.abs(x) > 0.05) {
-      if (x < 0) {
-        commands.push(Commands.COUNTERCLOCKWISE);
-      } else {
-        commands.push(Commands.CLOCKWISE);
-      }
-    }
+  const onCarStop = useCallback(() => {
+    sendStopAndClear("car");
+  }, [sendStopAndClear]);
 
-    if (commands.length > 0) {
-      sendCmd(commands, "car");
-    }
-  }, [sendCmd]);
-  const onCarStop = useCallback(() => sendZeroForKey("car"), [sendZeroForKey]);
-
-  const onTeleMove = useCallback((evt: JoystickMoveEvent) => {
+  // TELE handlers
+  const onTeleMove = useCallback((evt: any) => {
     if (!evt) return;
-    const e = remapForRotation(evt);
-    const { x, y } = e;
-    if (y == null) return;
-    if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
-      sendCmd(['stop'], "tele");
-      return;
-    }
+    lastEventRef.current["tele"] = evt;
+    startAutoSend("tele");
+    const cmds = commandsFromEvent("tele", evt);
+    if (cmds.length > 0) sendCmd(cmds, "tele");
+  }, [startAutoSend, sendCmd, commandsFromEvent]);
 
-    // Determine commands based on joystick position
-    const commands: string[] = [];
-    
-    // Primary direction
-    if (Math.abs(y) > 0.05) {
-      if (y < 0) {
-        commands.push(Commands.FORWARD);
-      } else {
-        commands.push(Commands.BACKWARD);
-      }
-    }
+  const onTeleStop = useCallback(() => {
+    sendStopAndClear("tele");
+  }, [sendStopAndClear]);
 
-    // Add secondary direction for diagonal movement
-    if (Math.abs(x) > 0.05) {
-      if (x < 0) {
-        commands.push(Commands.COUNTERCLOCKWISE);
-      } else {
-        commands.push(Commands.CLOCKWISE);
-      }
-    }
-
-    if (commands.length > 0) {
-      sendCmd(commands, "tele");
-    }
-  }, [sendCmd]);
-  const onTeleStop = useCallback(() => sendCmd(['stop'], "tele"), [sendCmd]);
-
-  const onCraneMoveLeft = useCallback((evt: IJoystickUpdateEvent) => {
-    if (!evt) return;
-    const e = remapForRotation(evt);
-    const { x, y } = e;
-    if (x == null || y == null) return;
-
-    if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) {
-      sendCmd(['stop'], "crane-move");
-      return;
-    }
-
-    const commands: string[] = [];
-    
-    if (Math.abs(x) > Math.abs(y)) {
-      if (x > 0) {
-        commands.push(Commands.CLOCKWISE);
-      } else if (x < 0) {
-        commands.push(Commands.COUNTERCLOCKWISE);
-      }
-    } else {
-      if (y < 0) {
-        commands.push(Commands.FORWARD);
-      } else if (y > 0) {
-        commands.push(Commands.BACKWARD);
-      }
-    }
-
-    if (commands.length > 0) {
-      sendCmd(commands, "crane-move");
-    }
-  }, [sendCmd]);
-  const onCraneMoveLeftStop = useCallback(() => sendCmd(['stop'], "crane-move"), [sendCmd]);
-
+  // CRANE LEFT (movement)
   interface IJoystickUpdateEvent {
     x: number | null;
     y: number | null;
@@ -357,32 +375,38 @@ export default function GamepadPage() {
     angle?: number | null;
   }
 
+  const onCraneMoveLeft = useCallback((evt: IJoystickUpdateEvent) => {
+    if (!evt) return;
+    lastEventRef.current["crane-move"] = evt;
+    startAutoSend("crane-move");
+    const cmds = commandsFromEvent("crane-move", evt);
+    if (cmds.length > 0) sendCmd(cmds, "crane-move");
+  }, [startAutoSend, sendCmd, commandsFromEvent]);
+
+  const onCraneMoveLeftStop = useCallback(() => {
+    sendStopAndClear("crane-move");
+  }, [sendStopAndClear]);
+
+  // CRANE RIGHT (elevator)
   const onCraneMoveRight = useCallback((evt: IJoystickUpdateEvent) => {
     if (!evt) return;
-    const e = remapForRotation(evt);
-    const { y } = e;
-    if (y == null) return;
-    if (Math.abs(y) < 0.05) {
-      sendCmd(['stop'], "crane-elevator");
-      return;
-    }
+    lastEventRef.current["crane-elevator"] = evt;
+    startAutoSend("crane-elevator");
+    const cmds = commandsFromEvent("crane-elevator", evt);
+    if (cmds.length > 0) sendCmd(cmds, "crane-elevator");
+  }, [startAutoSend, sendCmd, commandsFromEvent]);
 
-    const commands: string[] = [];
-    
-    if (y < 0) {
-      commands.push(Commands.UP);
-    } else if (y > 0) {
-      commands.push(Commands.DOWN);
-    }
-
-    if (commands.length > 0) {
-      sendCmd(commands, "crane-elevator");
-    }
-  }, [sendCmd]);
-  const onCraneMoveRightStop = useCallback(() => sendCmd(['stop'], "crane-elevator"), [sendCmd]);
+  const onCraneMoveRightStop = useCallback(() => {
+    sendStopAndClear("crane-elevator");
+  }, [sendStopAndClear]);
 
   useEffect(() => {
     return () => {
+      // stop all timers
+      Object.keys(autoSendTimerRef.current).forEach(k => {
+        const id = autoSendTimerRef.current[k];
+        if (id) window.clearInterval(id);
+      });
       // Send stop command to all controllers on unmount
       ["car", "tele", "crane-move", "crane-elevator", "fallback"].forEach((controller) => {
         sendCmd(['stop'], controller);
@@ -556,6 +580,10 @@ export default function GamepadPage() {
                       stickImage={stickShape}
                       move={(e) => {
                         if (!e) return;
+                        // store last event and start autosend for fallback
+                        lastEventRef.current["fallback"] = e;
+                        startAutoSend("fallback");
+
                         const ev = remapForRotation(e);
                         const { x, y, distance } = ev;
                         
@@ -584,7 +612,10 @@ export default function GamepadPage() {
                           sendCmd(commands, "fallback");
                         }
                       }}
-                      stop={() => sendCmd(['stop'], "fallback")}
+                      stop={() => {
+                        sendCmd(['stop'], "fallback");
+                        stopAutoSend("fallback");
+                      }}
                       throttle={60}
                     />
                   </JoystickVisual>

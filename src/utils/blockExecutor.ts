@@ -58,7 +58,11 @@ const buildExecutionOrder = (blocks: Block[]): Block[] => {
  */
 const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 100): string => {
   // Helper to compute ms from units (units may be undefined)
-  const unitsToMs = (u?: number) => (typeof u === 'number' ? u * unitMs : 0);
+  const unitsToMs = (u) => {
+  if (typeof u !== 'number') return '0.00';
+    return (u * unitMs).toFixed(2);
+  };
+
 
   switch (block.type) {
     case 'up':

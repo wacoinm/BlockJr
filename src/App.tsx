@@ -8,7 +8,8 @@ import React, {
   useRef,
 } from 'react';
 import { useSnapSound } from './utils/soundEffects';
-import { executeBlocks } from './utils/blockExecutor';
+import { executeBlocks, buildCommandQueue } from './utils/blockExecutor';
+import bluetoothService from './utils/bluetoothService';
 import { Block } from './types/Block';
 import Header from './components/Header';
 import { SplashScreen } from '@capacitor/splash-screen';
@@ -392,18 +393,186 @@ const App: React.FC = () => {
     // keep deps explicit
   }, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
 
-  const handleGreenFlagClick = useCallback(
-    async (blockId: string) => {
-      if (!isBluetoothConnected) {
-        toast.info('You must connect to a device');
+  // ---------- NEW: execution UI state ----------
+  const [isExecuting, setIsExecuting] = useState(false);
+  // set of block ids currently muted (grayscaled). We store as Set for quick lookup.
+  const [mutedBlockIds, setMutedBlockIds] = useState<Set<string>>(new Set());
+  // ref to current execution queue (array of { id, cmd })
+  const executingQueueRef = useRef<{ id: string; cmd: string }[] | null>(null);
+  const executingAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
+
+  // helper to wait for a device "OK" response (resolves when OK received)
+  const waitForOK = useCallback((timeoutMs = 8000) => {
+    return new Promise<void>(async (resolve, reject) => {
+      let settled = false;
+      let timer: number | null = null;
+      try {
+        const unsub = await bluetoothService.onOK(() => {
+          if (settled) return;
+          settled = true;
+          if (timer) window.clearTimeout(timer);
+          resolve();
+          // unsub will be called below
+        });
+
+        // Timeout
+        timer = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try {
+            if (typeof unsub === 'function') unsub();
+          } catch {}
+          reject(new Error('OK timeout'));
+        }, timeoutMs);
+
+        // once we resolve/reject above we must cleanup by calling unsub if available
+        // but unsub is a function returned from onOK; we will call it in both send/timeout branches
+        // Because of scoping, we cannot call unsub here when OK arrives (the callback above will finish first)
+        // So to be safe, call unsub inside both branches where possible. For simplicity we will schedule a microtask:
+        (async () => {
+          // wait for promise settle then cleanup
+          try {
+            // wait a bit (the callback will resolve the outer promise)
+            // cleanup will be done by outer code that calls unsub after resolution if needed
+          } catch {}
+        })();
+
+      } catch (err) {
+        reject(err);
       }
-      const flag = blocksMap.get(blockId);
-      if (flag && flag.childId) {
-        const executionChain = getChain(flag.childId);
-        executeBlocks(executionChain, unitValue);
+    });
+  }, []);
+
+  // MAIN execution routine: execute chain step-by-step, waiting OK between sends
+  const executeChain = useCallback(
+    async (flagBlockId: string) => {
+      if (isExecuting) {
+        toast.info('فرایند قبل در حال اجراست...');
+        return;
+      }
+
+      const flag = blocksMap.get(flagBlockId);
+      if (!flag) return;
+      if (!flag.childId) return;
+
+      const chain = getChain(flag.childId);
+      if (!chain || chain.length === 0) return;
+
+      // Build the queue from the chain: each entry maps to the block id that produced the command
+      const queue = buildCommandQueue(chain, unitValue);
+      if (!queue || queue.length === 0) {
+        toast.info('هیچ فرمانی برای اجرا وجود ندارد.');
+        return;
+      }
+
+      // map of blockId -> how many commands belong to that block.
+      // but our buildCommandQueue uses one entry per emitted command and sets id to the block that originated it.
+      // initial muted set: all unique ids in the queue
+      const initialMuted = new Set<string>(queue.map((q) => q.id));
+      setMutedBlockIds(new Set(initialMuted));
+      executingQueueRef.current = queue;
+      executingAbortRef.current = { aborted: false };
+      setIsExecuting(true);
+
+      try {
+        // ensure we are connected
+        const connected = await bluetoothService.isConnected();
+        if (!connected) {
+          toast.info('You must connect to a device');
+          setIsExecuting(false);
+          setMutedBlockIds(new Set());
+          executingQueueRef.current = null;
+          return;
+        }
+
+        // Iterate queue: send and wait for OK for each cmd
+        for (let idx = 0; idx < queue.length; idx++) {
+          const item = queue[idx];
+          if (!item) continue;
+          if (executingAbortRef.current.aborted) {
+            throw new Error('aborted');
+          }
+
+          // send the command
+          try {
+            console.debug('[App] sending:', item.cmd);
+            await bluetoothService.sendString(item.cmd);
+          } catch (sendErr) {
+            console.error('Failed to send command:', sendErr);
+            toast.error('خطا هنگام ارسال فرمان بلوتوث.');
+            throw sendErr;
+          }
+
+          // Wait for OK (with timeout). We listen with a dedicated subscriber for OK and resolve when OK received.
+          try {
+            await new Promise<void>(async (resolve, reject) => {
+              let timeoutId: number | null = null;
+              let unsub: (() => void) | null = null;
+              try {
+                unsub = await bluetoothService.onOK(() => {
+                  if (timeoutId) window.clearTimeout(timeoutId);
+                  resolve();
+                });
+              } catch (err) {
+                console.warn('onOK subscribe failed', err);
+                reject(err);
+                return;
+              }
+
+              // Timeout fallback (8s)
+              timeoutId = window.setTimeout(() => {
+                try {
+                  if (unsub) unsub();
+                } catch {}
+                reject(new Error('OK timeout'));
+              }, 8000);
+            });
+          } catch (okErr) {
+            console.error('OK wait failed:', okErr);
+            toast.error('پاسخ OK از دستگاه دریافت نشد. اجرای زنجیره متوقف شد.');
+            throw okErr;
+          }
+
+          // On OK -> remove this block id from muted set (restore UI)
+          setMutedBlockIds((prev) => {
+            const next = new Set<string>(prev);
+            next.delete(item.id);
+            return next;
+          });
+        }
+
+        // finished successfully
+        toast.success('زنجیره اجرا شد.');
+      } catch (e) {
+        console.warn('Execution aborted/failed', e);
+      } finally {
+        // cleanup
+        setIsExecuting(false);
+        setMutedBlockIds(new Set());
+        executingQueueRef.current = null;
+        executingAbortRef.current = { aborted: false };
       }
     },
-    [blocksMap, getChain, isBluetoothConnected, unitValue],
+    [isExecuting, blocksMap, getChain, unitValue],
+  );
+
+  // cancel running execution (if any)
+  const cancelExecution = useCallback(() => {
+    if (!isExecuting) return;
+    executingAbortRef.current.aborted = true;
+    setIsExecuting(false);
+    setMutedBlockIds(new Set());
+    executingQueueRef.current = null;
+    toast.info('Execution cancelled.');
+  }, [isExecuting]);
+
+  // ---------- previously existing handlers (now re-used) ----------
+  const handleGreenFlagClick = useCallback(
+    async (blockId: string) => {
+      // new flow: call executeChain (which will guard re-entry)
+      await executeChain(blockId);
+    },
+    [executeChain],
   );
 
   const handleDelayChange = useCallback(
@@ -720,6 +889,8 @@ const App: React.FC = () => {
           setBlockPaletteBottom={setBlockPaletteBottom}
           setShowTaskList={setShowTaskList}
           setActiveTaskList={setActiveTaskList}
+          // NEW: muted block ids so the workspace can render grayscale/disable UI
+          mutedBlockIds={mutedBlockIds}
         />
 
         {/* Confetti overlay (appears when validator passes) */}

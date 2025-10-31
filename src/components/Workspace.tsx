@@ -29,6 +29,9 @@ interface WorkspaceProps {
 
   // NEW: interaction mode. 'runner' means normal (default). 'deleter' means clicking a component removes it.
   interactionMode?: 'runner' | 'deleter';
+
+  // NEW: muted block ids (when executing a chain) — workspace will render these as grayscale & non-interactive
+  mutedBlockIds?: Set<string>;
 }
 
 export const Workspace: React.FC<WorkspaceProps> = (props) => {
@@ -82,6 +85,7 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
     pinchSensitivity = 0.5,
     pinchMaxStep = 1.12,
     interactionMode: interactionModeProp,
+    mutedBlockIds: mutedBlockIdsProp,
   } = props;
 
   const blocks = blocksProp ?? reduxBlocks ?? [];
@@ -89,6 +93,9 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
   const panY = typeof panYProp === 'number' ? panYProp : reduxPan.y ?? 0;
   const zoom = typeof zoomProp === 'number' ? zoomProp : reduxZoom ?? 1;
   const interactionMode = interactionModeProp ?? reduxInteractionMode ?? 'runner';
+
+  // ensure we can treat mutedBlockIds as a Set (fallback empty set)
+  const mutedBlockIds = mutedBlockIdsProp ?? new Set<string>();
 
   // local fallback handlers that dispatch to store when parent didn't pass handlers
   const onDelayChangeDefault = (blockId: string, value: number) => {
@@ -394,6 +401,9 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
             const internalDelayTypes = new Set(['up','down','forward','backward','clockwise','countclockwise']);
             const shouldHaveInBlockDelay = internalDelayTypes.has(block.type) || block.type === 'delay';
 
+            // muted state for this block (when executing)
+            const isMuted = mutedBlockIds.has(block.id);
+
             return (
               <div
                 key={block.id}
@@ -405,6 +415,13 @@ export const Workspace: React.FC<WorkspaceProps> = (props) => {
                   zIndex: isCurrentlyDragged ? 200 : 100,
                   pointerEvents: 'auto',
                   touchAction: 'none',
+                  // apply grayscale filter and disable interactions if muted
+                  filter: isMuted ? 'grayscale(1) contrast(0.85) opacity(0.65)' : undefined,
+                  WebkitFilter: isMuted ? 'grayscale(1) contrast(0.85) opacity(0.65)' : undefined,
+                  // When muted, block should not be clickable/draggable
+                  // However, keep pointer-event handling for the wrapper so we can still capture pointer events
+                  // on background; the internal block will be non-interactive via BlockComponent's own internals.
+                  pointerEvents: isMuted ? 'none' : 'auto',
                 }}
                 onPointerDownCapture={(e: React.PointerEvent) => {
                   // If deleter mode — remove immediately and prevent drag start

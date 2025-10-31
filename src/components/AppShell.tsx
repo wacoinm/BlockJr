@@ -11,7 +11,6 @@ import type { RootState } from "../store";
 import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import GamepadPng from "../assets/images/gamepad.png"; // <-- your PNG (you said you'll add this)
-import BatteryGauge from "./BatteryGauge";
 import type { TaskItem } from "../utils/manifest";
 
 export type FabItem = {

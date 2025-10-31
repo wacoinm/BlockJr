@@ -8,4 +8,22 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/assets/stories/')) {
+            return 'stories';
+          }
+        }
+      }
+    }
+  },
+  resolve: {
+    alias: {
+      '@': '/src'
+    },
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
+  }
 });

@@ -1,3 +1,4 @@
+// src/components/project-selection/ProjectActionSheet.tsx
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Play } from "lucide-react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
@@ -13,11 +14,10 @@ type Project = {
   id: string;
   name: string;
   subtitle?: string;
-  // imgsPath should be a public path (served from /), e.g. "/scenes/car/chapters/"
   imgsPath?: string;
   progress?: number;
   checkpoints?: Checkpoint[];
-  project?: any; // car object etc
+  project?: any;
 };
 
 type Props = {
@@ -45,9 +45,7 @@ function checkImageExists(url: string): Promise<boolean> {
     };
     img.onload = onLoad;
     img.onerror = onErr;
-    // avoid accidental relative resolution issues by using the url as-is
     img.src = url;
-    // safety timeout
     setTimeout(() => {
       if (!done) {
         done = true;
@@ -71,64 +69,90 @@ function slugify(s?: string | null) {
 /** normalize a manifest storyModule path into a relative import path from this file */
 function candidateFromStoryModule(storyModule?: string) {
   if (!storyModule) return null;
-  // if manifest gives "src/assets/stories/car/index.ts"
-  // produce "../../assets/stories/car" or "../../assets/stories/car/index.ts"
   let sm = storyModule;
-  // strip leading 'src/' if present
   if (sm.startsWith("src/")) sm = sm.slice(4);
-  // ensure no leading slash
   if (sm.startsWith("/")) sm = sm.slice(1);
-  // return two candidate import paths:
-  const base = `../../${sm}`; // relative to src/components/project-selection
-  // also try trimming "index.ts" -> folder
+  const base = `../../${sm}`;
   const withoutIndex = base.replace(/\/index\.(ts|js)x?$/i, "");
   return { base, withoutIndex };
 }
 
 const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
-  // derive checkpoints:
+  // derive checkpoints base (source, unlocked)
   const derivedCheckpointsBase = useMemo<Checkpoint[]>(() => {
     if (Array.isArray(project.checkpoints) && project.checkpoints.length > 0) {
-      return project.checkpoints;
+      return project.checkpoints.map((c) => ({ ...c, locked: !!c.locked }));
     }
     if (project.project && typeof project.project === "object") {
       const keys = Object.keys(project.project);
-      return keys.map((k) => ({
-        id: k,
-        title: k,
-        locked: false,
-        description: undefined,
-      }));
+      return keys.map((k) => ({ id: k, title: k, locked: false }));
     }
     return [];
   }, [project]);
 
-  // session-aware checkpoints (we'll overlay locked/current based on session.step)
-  const [derivedCheckpoints, setDerivedCheckpoints] = useState<Checkpoint[]>(derivedCheckpointsBase);
+  // sourceCheckpointsRef holds the canonical source (unlocked) list — import fallback/manifest will overwrite this
+  const sourceCheckpointsRef = useRef<Checkpoint[]>(derivedCheckpointsBase);
+  // sessionStepRef holds the latest numeric step used for locking
+  const sessionStepRef = useRef<number | null>(null);
 
+  // derivedCheckpoints is what we render (locked applied)
+  const [derivedCheckpoints, setDerivedCheckpoints] = useState<Checkpoint[]>(() => {
+    return derivedCheckpointsBase.map((c) => ({ ...c }));
+  });
+
+  // when base changes, update source ref and recompute derived
   useEffect(() => {
-    setDerivedCheckpoints(derivedCheckpointsBase);
+    sourceCheckpointsRef.current = derivedCheckpointsBase.slice();
+    // recompute using current sessionStepRef (or fallback 1)
+    const stepNow = sessionStepRef.current ?? 1;
+    recomputeDerivedCheckpoints(stepNow);
   }, [derivedCheckpointsBase]);
 
-  // --- Fallback: try multiple import candidates + manifest storyModule if we don't have checkpoints yet ---
+  // ---------- helpers to coerce/parse numbers and apply locks ----------
+  const toFiniteInt = (v: any, fallback: number) => {
+    if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t === "") return fallback;
+      const n = Number(t);
+      if (Number.isFinite(n)) return Math.trunc(n);
+      try {
+        const parsed = JSON.parse(t);
+        if (typeof parsed === "number" && Number.isFinite(parsed)) return Math.trunc(parsed);
+      } catch {}
+      return fallback;
+    }
+    return fallback;
+  };
+
+  const recomputeDerivedCheckpoints = (stepNum: number) => {
+    // stepNum expected 1-based. clamp and apply
+    const src = sourceCheckpointsRef.current ?? [];
+    let s = typeof stepNum === "number" && Number.isFinite(stepNum) ? Math.trunc(stepNum) : 1;
+    if (s <= 0) s = 1;
+    if (src.length > 0) {
+      s = Math.min(Math.max(1, s), src.length);
+    }
+    const out = src.map((c, i) => ({ ...c, locked: (i + 1) > s }));
+    setDerivedCheckpoints(out);
+  };
+
+  // ---------- fallback: try multiple import candidates + manifest storyModule if we don't have checkpoints yet ----------
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        if ((derivedCheckpointsBase ?? []).length > 0) return; // already have them
+        // if base already has checkpoints, we still may want to keep them; but if it's empty try import
+        if ((derivedCheckpointsBase ?? []).length > 0) return;
         if (!project?.id) return;
 
-        // Prepare a set of string candidates to try importing from src/assets/stories/<candidate>
         const candidates = new Set<string>();
         candidates.add(String(project.id));
         if (project.name) candidates.add(slugify(project.name));
         candidates.add(slugify(project.id));
-
-        // ascii-only fallback (strip non-ascii)
         const asciiId = String(project.id || "").replace(/[^\x00-\x7F]/g, "");
         if (asciiId) candidates.add(slugify(asciiId));
 
-        // Also check manifest stories table (if it lists a storyModule for this project)
         try {
           const stories = getAllStories() || [];
           for (const s of stories) {
@@ -136,14 +160,12 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             const pid = String(s.projectId || "");
             const normalizedPid = slugify(pid);
             if (normalizedPid && (normalizedPid === slugify(project.id) || normalizedPid === slugify(project.name))) {
-              // Story entry matches project id/name — add its module candidates
               const candPaths = candidateFromStoryModule(s.storyModule);
               if (candPaths) {
                 if (candPaths.base) candidates.add(candPaths.base.replace(/^src\//, "").replace(/^\/+/, ""));
                 if (candPaths.withoutIndex) candidates.add(candPaths.withoutIndex.replace(/^src\//, "").replace(/^\/+/, ""));
               }
             }
-            // Also add storyModule base as candidate for other fuzzy matches
             if (s.storyModule) {
               const candPaths = candidateFromStoryModule(s.storyModule);
               if (candPaths) {
@@ -153,54 +175,80 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             }
           }
         } catch {
-          // ignore manifest read errors — we'll still try default candidates
+          // ignore manifest read errors
         }
 
-        // Try importing each candidate; note: import paths are relative to this file (src/components/project-selection)
         for (const rawCand of Array.from(candidates)) {
-          const cand = String(rawCand).replace(/^\/+/, ""); // normalize
+          const cand = String(rawCand).replace(/^\/+/, "");
           if (!cand) continue;
-          const tryPaths = [
-            `../../assets/stories/${cand}`,
-            `../../assets/stories/${cand}/index`,
-            cand, // cand may already be a path like ../../assets/...
-            `../../${cand}` // in case cand came from manifest like "assets/stories/..."
-          ];
-          for (const p of tryPaths) {
+
+          type StoryKey = 'car' | 'ماشین' | 'elevator' | 'tele-elev-crane';
+          interface StoryModule { car?: Record<string, unknown>; [key: string]: Record<string, unknown> | undefined; }
+          const importMap: Record<StoryKey, () => Promise<StoryModule>> = {
+            'car': () => import('../../assets/stories/car.ts'),
+            'ماشین': () => import('../../assets/stories/car.ts'),
+            'elevator': () => import('../../assets/stories/car.ts'),
+            'tele-elev-crane': () => import('../../assets/stories/car.ts')
+          };
+
+          if (importMap[cand as StoryKey]) {
             try {
-              // eslint-disable-next-line no-await-in-loop
-              const mod: any = await import(p).catch(() => null);
+              const mod = await importMap[cand as StoryKey]();
               if (mod) {
-                // try to find the story object inside the module (various exports)
-                const storyObj = mod[project.id] ?? mod.default ?? mod[slugify(project.id)] ?? mod.elevator ?? mod;
+                const storyObj = mod[project.id] ?? mod.default ?? mod[slugify(project.id)] ?? mod.car ?? mod;
                 if (storyObj && typeof storyObj === "object") {
                   const keys = Object.keys(storyObj);
                   if (keys.length > 0) {
                     const cp = keys.map((k) => ({ id: k, title: k, locked: false })) as Checkpoint[];
                     if (!mounted) return;
-                    setDerivedCheckpoints(cp);
+                    // update canonical source AND recompute locks immediately
+                    sourceCheckpointsRef.current = cp;
+                    const stepNow = sessionStepRef.current ?? 1;
+                    recomputeDerivedCheckpoints(stepNow);
                     return;
                   }
                 }
               }
             } catch {
-              // try next path
+              // continue
+            }
+          }
+
+          const tryPaths = [
+            `../../assets/stories/${cand}.ts`,
+            `../../assets/stories/car.ts`
+          ];
+          for (const p of tryPaths) {
+            try {
+              const mod = await import(/* @vite-ignore */ p).catch(() => null);
+              if (mod) {
+                const storyObj = mod[project.id] ?? mod.default ?? mod[slugify(project.id)] ?? mod;
+                if (storyObj && typeof storyObj === "object") {
+                  const keys = Object.keys(storyObj);
+                  if (keys.length > 0) {
+                    const cp = keys.map((k) => ({ id: k, title: k, locked: false })) as Checkpoint[];
+                    if (!mounted) return;
+                    sourceCheckpointsRef.current = cp;
+                    const stepNow = sessionStepRef.current ?? 1;
+                    recomputeDerivedCheckpoints(stepNow);
+                    return;
+                  }
+                }
+              }
+            } catch {
+              // continue
             }
           }
         }
-      } catch (err) {
-        // ignore softly; we don't want to crash UI
-        // console.debug("ProjectActionSheet fallback import error", err);
+      } catch {
+        // ignore
       }
     })();
-    return () => {
-      mounted = false;
-    };
-    // intentionally run when base or project id changes
+    return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id, derivedCheckpointsBase]);
 
-  // overlay session progress/step for UI
+  // overlay session progress/step for UI (robust) — centralized: when session read, update sessionStepRef and recompute from sourceCheckpointsRef
   const [sessionProgress, setSessionProgress] = useState<number | undefined>(project.progress ?? 0);
   const [sessionStep, setSessionStep] = useState<number | null>(null);
 
@@ -209,40 +257,84 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     (async () => {
       try {
         if (!project?.id) return;
-        const s = await getSession(project.id);
-        if (!mounted) return;
-        if (s) {
-          setSessionProgress(typeof s.progress === "number" ? s.progress : project.progress ?? 0);
-          setSessionStep(typeof s.step === "number" ? s.step : null);
-
-          const base = (derivedCheckpointsBase.length > 0 ? derivedCheckpointsBase : derivedCheckpoints).map((c, i) => {
-            const step = s.step ?? 1;
-            const isLocked = i + 1 > step;
-            return { ...c, locked: !!isLocked };
-          });
-          setDerivedCheckpoints(base);
-        } else {
-          setSessionProgress(project.progress ?? 0);
-          setSessionStep(null);
-          setDerivedCheckpoints(derivedCheckpointsBase);
+        let s: any = null;
+        try {
+          s = await getSession(project.id);
+        } catch (err) {
+          // getSession may throw in prod — we'll fallback to scanning localStorage if needed
+          s = null;
         }
+
+        // fallback: try to read a likely localStorage key if getSession returned nothing
+        if (!s && typeof window !== "undefined" && window.localStorage) {
+          const keysToTry = [
+            `bj_session_${project.id}`,
+            `session_${project.id}`,
+            `bj_projects/${project.id}/session`,
+            `bj_projects/${project.id}`,
+            `session-${project.id}`,
+            `session:${project.id}`
+          ];
+          for (const k of keysToTry) {
+            try {
+              const v = window.localStorage.getItem(k);
+              if (!v) continue;
+              try {
+                s = JSON.parse(v);
+              } catch {
+                s = v; // raw
+              }
+              if (s) break;
+            } catch { /* ignore */ }
+          }
+        }
+
+        // now coerce numbers safely
+        const defaultStep = 1;
+        const parsedStep = s && (s.step ?? s.currentStep ?? s.index) !== undefined ? toFiniteInt(s.step ?? s.currentStep ?? s.index, defaultStep) : undefined;
+        const parsedProgress = s && (s.progress ?? s.percent) !== undefined ? toFiniteInt(s.progress ?? s.percent, project.progress ?? 0) : undefined;
+
+        // determine final stepNum (1-based), clamp later
+        const stepNumRaw = parsedStep ?? defaultStep;
+        // clamp to sensible range (1..N)
+        let stepNum = typeof stepNumRaw === "number" && Number.isFinite(stepNumRaw) ? Math.trunc(stepNumRaw) : defaultStep;
+        if (stepNum <= 0) stepNum = 1;
+        const srcLen = sourceCheckpointsRef.current.length;
+        if (srcLen > 0) {
+          stepNum = Math.min(Math.max(1, stepNum), srcLen);
+        }
+
+        if (!mounted) return;
+        sessionStepRef.current = stepNum;
+        setSessionStep(stepNum);
+        setSessionProgress(parsedProgress ?? project.progress ?? 0);
+
+        // recompute derived checkpoints from canonical source using the computed stepNum
+        recomputeDerivedCheckpoints(stepNum);
       } catch (err) {
         console.warn("ProjectActionSheet: failed to read session", err);
+        // fallback: keep defaults
+        sessionStepRef.current = 1;
+        setSessionStep(null);
+        setSessionProgress(project.progress ?? 0);
+        recomputeDerivedCheckpoints(1);
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, [project?.id, project.progress, derivedCheckpointsBase]); // eslint-disable-line
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id, project.progress]);
 
+  // checkpoints used for rendering
   const checkpoints = derivedCheckpoints;
 
+  // current selected checkpoint — pick last unlocked (most recent) or first
   const [current, setCurrent] = useState<string | null>(null);
-
   useEffect(() => {
-    setCurrent([...checkpoints].reverse().find(c => !c.locked)?.id ?? checkpoints[0]?.id ?? null);
-  }, [project, checkpoints]); // eslint-disable-line
+    const lastUnlocked = [...checkpoints].reverse().find((c) => !c.locked);
+    setCurrent(lastUnlocked?.id ?? checkpoints[0]?.id ?? null);
+  }, [checkpoints, project]); // eslint-disable-line
 
+  // rest of UI state & touch handlers (unchanged)
   const [isVisible, setIsVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -368,7 +460,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
   };
 
   // -------------------------
-  // IMAGE logic for action sheet (improved)
+  // IMAGE logic for action sheet (unchanged)
   // -------------------------
   const [imageCandidates, setImageCandidates] = useState<string[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -398,24 +490,22 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
       // Try to find images for each checkpoint
       for (const cp of checkpoints) {
         const patterns = [
-          `${base}${cp.id}.png`,                     // direct ID
-          `${base}ch${cp.id}.png`,                   // with 'ch' prefix
-          `${base}chapter-${cp.id}.png`,             // full 'chapter-' prefix
-          `${base}${cp.id.replace('chapter-', '')}.png` // remove 'chapter-' prefix
+          `${base}${cp.id}.png`,
+          `${base}ch${cp.id}.png`,
+          `${base}chapter-${cp.id}.png`,
+          `${base}${cp.id.replace('chapter-', '')}.png`
         ];
-        
-        // Extract numeric part if it exists
+
         const numericMatch = cp.id.match(/\d+/);
         if (numericMatch) {
           patterns.push(`${base}${numericMatch[0]}.png`);
         }
 
-        // Try each pattern
         for (const pattern of patterns) {
           // eslint-disable-next-line no-await-in-loop
           if (await checkImageExists(pattern)) {
             discovered.push(pattern);
-            break; // Found one image for this checkpoint, move to next
+            break;
           }
         }
       }
@@ -466,7 +556,6 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
       } else {
         setCurrentImage(uniq[0] ?? null);
       }
-
     })();
 
     return () => {
@@ -480,21 +569,18 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
     (async () => {
       const base = project.imgsPath ? project.imgsPath.replace(/\/?$/, "/") : null;
       if (base) {
-        // Try different image naming patterns
         const patterns = [
-          `${base}${current}.png`,                     // direct chapter ID
-          `${base}ch${current}.png`,                   // with 'ch' prefix
-          `${base}chapter-${current}.png`,             // full 'chapter-' prefix
-          `${base}${current.replace('chapter-', '')}.png` // remove 'chapter-' prefix
+          `${base}${current}.png`,
+          `${base}ch${current}.png`,
+          `${base}chapter-${current}.png`,
+          `${base}${current.replace('chapter-', '')}.png`
         ];
 
-        // Extract numeric part if it exists
         const numericMatch = current.match(/\d+/);
         if (numericMatch) {
           patterns.push(`${base}${numericMatch[0]}.png`);
         }
 
-        // Try each pattern
         for (const pattern of patterns) {
           if (await checkImageExists(pattern)) {
             setIsFading(true);
@@ -551,7 +637,6 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
         <div className="flex flex-col md:flex-row gap-4" style={{ flex: 1, minHeight: 0 }}>
           {/* IMAGE + DESCRIPTION column */}
           <div className="w-full md:w-1/2 flex-shrink-0 flex flex-col" style={{ minHeight: 0 }}>
-            {/* CHANGED: use an aspect-ratio container so image is visible on mobile and desktop equally */}
             <div
               className="relative rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 aspect-[11/9] md:aspect-[16/9]"
             >
@@ -559,17 +644,15 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
                 className="w-full h-full"
                 style={{ position: "relative" }}
               >
-                {/* Fallback placeholder always visible behind the actual image */}
                 <div 
                   className="w-full h-full absolute inset-0 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center"
                 >
                   <div className="text-neutral-400 dark:text-neutral-500">No Image</div>
                 </div>
                 
-                {/* Actual image with fade effect */}
                 {currentImage && (
                   <img
-                    key={currentImage} // Force remount on image change
+                    key={currentImage}
                     src={currentImage}
                     alt={project.name}
                     className="w-full h-full object-cover transition-opacity duration-300"
@@ -630,7 +713,7 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
             <div className="mt-3">
               <div className="text-sm font-medium mb-2">مراحل (Checkpoint)</div>
               <div className="space-y-2 px-0">
-                {checkpoints.map((c, idx) => {
+                {checkpoints.map((c) => {
                   const isCurrent = c.id === current;
                   return (
                     <button

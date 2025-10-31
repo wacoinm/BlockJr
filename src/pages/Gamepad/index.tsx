@@ -5,7 +5,7 @@ import { Joystick, JoystickShape } from "react-joystick-component";
 import bluetoothService from "../../utils/bluetoothService";
 import { toast } from "react-toastify";
 import { Lightbulb, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Rabbit, Turtle } from "lucide-react";
-import stickShape from "../../../public/shapeStick.svg";
+import stickShape from "/shapeStick.svg";
 
 /**
  * Speed Control Component with animation
@@ -206,13 +206,13 @@ export default function GamepadPage() {
 
     try {
       const formattedCmd = buildCommand(commands);
-      // const connected = await bluetoothService.isConnected();
-      // if (!connected) {
-      //   toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
-      //   return;
-      // }
-      console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${formattedCmd}`);
-      // await bluetoothService.sendString(formattedCmd);
+      const connected = await bluetoothService.isConnected();
+      if (!connected) {
+        toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
+        return;
+      }
+      // console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${formattedCmd}`);
+      await bluetoothService.sendString(formattedCmd);
     } catch (e) {
       console.error("Failed to send cmd", e);
       toast.error("خطا در ارسال فرمان بلوتوث.");

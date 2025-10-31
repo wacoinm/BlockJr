@@ -82,7 +82,6 @@ function speedFromDistance(distance: number) {
 function remapForRotation(evt: any) {
   if (!evt) return evt;
   const { x, y, distance, direction, ...rest } = evt;
-  // If x/y are missing, just return original (some events may only have distance/direction)
   if (typeof x !== "number" || typeof y !== "number") {
     return { x, y, distance, direction, ...rest };
   }
@@ -182,6 +181,11 @@ export default function GamepadPage() {
   const lastEventRef = useRef<Record<string, any>>({});
   const autoSendTimerRef = useRef<Record<string, number | null>>({});
 
+  // pending ack map: when true for a key, we will not issue further autosends for that key
+  const pendingAckRef = useRef<Record<string, boolean>>({});
+  // pending ack timeout handlers (to avoid permanent deadlocks)
+  const pendingAckTimeoutRef = useRef<Record<string, number | null>>({});
+
   useEffect(() => {
     document.title = id ? `Gamepad — ${id}` : "Gamepad";
   }, [id]);
@@ -198,7 +202,8 @@ export default function GamepadPage() {
     return formattedCmds.join('_');
   }, []);
 
-  const sendCmd = useCallback(async (commands: string[], key: string = "global") => {
+  // sendCmd optionally waits for ACK by setting pendingAck[key] true
+  const sendCmd = useCallback(async (commands: string[], key: string = "global", { waitForAck = true } = {}) => {
     const now = Date.now();
     const last = lastSentMapRef.current[key] ?? 0;
     if (now - last < RATE_MS) return;
@@ -211,18 +216,66 @@ export default function GamepadPage() {
         toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
         return;
       }
-      // console.log(`[BT SEND] ${new Date().toISOString()} key=${key} cmd=${formattedCmd}`);
+      // write to device
       await bluetoothService.sendString(formattedCmd);
+
+      // if we want to wait for OK, set pending ack and a safety timeout
+      if (waitForAck) {
+        pendingAckRef.current[key] = true;
+        // clear previous timeout if any
+        const prev = pendingAckTimeoutRef.current[key];
+        if (prev) {
+          window.clearTimeout(prev);
+          pendingAckTimeoutRef.current[key] = null;
+        }
+        // safety fallback: if no OK received in 2000 ms, clear pending ack to avoid permanent lock
+        const tid = window.setTimeout(() => {
+          pendingAckRef.current[key] = false;
+          pendingAckTimeoutRef.current[key] = null;
+          console.warn(`[Gamepad] pending ACK timeout for key=${key}`);
+        }, 2000);
+        pendingAckTimeoutRef.current[key] = tid;
+      }
+
     } catch (e) {
       console.error("Failed to send cmd", e);
       toast.error("خطا در ارسال فرمان بلوتوث.");
+      // clear pending ack if send failed
+      pendingAckRef.current[key] = false;
+      const prev = pendingAckTimeoutRef.current[key];
+      if (prev) {
+        window.clearTimeout(prev);
+        pendingAckTimeoutRef.current[key] = null;
+      }
     }
   }, [buildCommand]);
 
   // Send speed command when speed mode changes
   useEffect(() => {
-    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed"); // Send as array
-  }, [isFastMode, sendCmd]);
+    // speed commands should wait for OK as well
+      sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed", { waitForAck: true });
+    }, [isFastMode, sendCmd]);
+
+    /* ---------- Data listener for ACK ("OK") ---------- */
+
+    useEffect(() => {
+    let unsub: (() => void) | null = null;
+
+    bluetoothService.onOK(() => {
+      Object.keys(pendingAckRef.current).forEach((key) => {
+        pendingAckRef.current[key] = false;
+        const timeout = pendingAckTimeoutRef.current[key];
+        if (timeout) {
+          clearTimeout(timeout);
+          pendingAckTimeoutRef.current[key] = null;
+        }
+      });
+    }).then((u) => (unsub = u));
+
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, []);
 
   /* ---------- Autosend helpers ---------- */
 
@@ -297,9 +350,17 @@ export default function GamepadPage() {
         // nothing to send — keep timer running until explicit stop for reliability
         return;
       }
+
+      // If waiting for ack for this key, skip sending new command
+      if (pendingAckRef.current[key]) {
+        // console.debug(`[Gamepad] waiting for OK for key=${key}; skipping send`);
+        return;
+      }
+
       const cmds = commandsFromEvent(key, lastEvt);
       if (cmds.length > 0) {
-        sendCmd(cmds, key);
+        // autosend should wait for OK to enforce serial feedback loop
+        sendCmd(cmds, key, { waitForAck: true });
       }
     }, RATE_MS);
     autoSendTimerRef.current[key] = id;
@@ -312,11 +373,20 @@ export default function GamepadPage() {
       autoSendTimerRef.current[key] = null;
     }
     lastEventRef.current[key] = null;
+
+    // clear pending ack and timeout for this key as well
+    pendingAckRef.current[key] = false;
+    const prev = pendingAckTimeoutRef.current[key];
+    if (prev) {
+      window.clearTimeout(prev);
+      pendingAckTimeoutRef.current[key] = null;
+    }
   }, []);
 
   // helper to immediately stop controller and stop autosend
   const sendStopAndClear = useCallback((key: string) => {
-    sendCmd(['stop'], key);
+    // send stop but do NOT wait for ack here (stop should be immediate)
+    sendCmd(['stop'], key, { waitForAck: false });
     stopAutoSend(key);
   }, [sendCmd, stopAutoSend]);
 
@@ -324,7 +394,8 @@ export default function GamepadPage() {
     const next = !lightOn;
     setLightOn(next);
     const cmd = next ? Commands.LAMP_ON : Commands.LAMP_OFF;
-    sendCmd([cmd], "light"); // Send as array
+    // lights also wait for OK
+    sendCmd([cmd], "light", { waitForAck: true });
   }, [lightOn, sendCmd]);
 
   /* ---------- MOVE HANDLERS use remapForRotation + autosend ---------- */
@@ -345,8 +416,9 @@ export default function GamepadPage() {
     startAutoSend("car");
 
     const cmds = commandsFromEvent("car", evt);
-    if (cmds.length > 0) {
-      sendCmd(cmds, "car");
+    if (cmds.length > 0 && !pendingAckRef.current["car"]) {
+      // allow immediate send on move if not waiting for ack
+      sendCmd(cmds, "car", { waitForAck: true });
     }
   }, [startAutoSend, sendCmd, commandsFromEvent]);
 
@@ -360,7 +432,7 @@ export default function GamepadPage() {
     lastEventRef.current["tele"] = evt;
     startAutoSend("tele");
     const cmds = commandsFromEvent("tele", evt);
-    if (cmds.length > 0) sendCmd(cmds, "tele");
+    if (cmds.length > 0 && !pendingAckRef.current["tele"]) sendCmd(cmds, "tele", { waitForAck: true });
   }, [startAutoSend, sendCmd, commandsFromEvent]);
 
   const onTeleStop = useCallback(() => {
@@ -380,7 +452,7 @@ export default function GamepadPage() {
     lastEventRef.current["crane-move"] = evt;
     startAutoSend("crane-move");
     const cmds = commandsFromEvent("crane-move", evt);
-    if (cmds.length > 0) sendCmd(cmds, "crane-move");
+    if (cmds.length > 0 && !pendingAckRef.current["crane-move"]) sendCmd(cmds, "crane-move", { waitForAck: true });
   }, [startAutoSend, sendCmd, commandsFromEvent]);
 
   const onCraneMoveLeftStop = useCallback(() => {
@@ -393,7 +465,7 @@ export default function GamepadPage() {
     lastEventRef.current["crane-elevator"] = evt;
     startAutoSend("crane-elevator");
     const cmds = commandsFromEvent("crane-elevator", evt);
-    if (cmds.length > 0) sendCmd(cmds, "crane-elevator");
+    if (cmds.length > 0 && !pendingAckRef.current["crane-elevator"]) sendCmd(cmds, "crane-elevator", { waitForAck: true });
   }, [startAutoSend, sendCmd, commandsFromEvent]);
 
   const onCraneMoveRightStop = useCallback(() => {
@@ -407,9 +479,9 @@ export default function GamepadPage() {
         const id = autoSendTimerRef.current[k];
         if (id) window.clearInterval(id);
       });
-      // Send stop command to all controllers on unmount
+      // Send stop command to all controllers on unmount (do not wait for ack)
       ["car", "tele", "crane-move", "crane-elevator", "fallback"].forEach((controller) => {
-        sendCmd(['stop'], controller);
+        sendCmd(['stop'], controller, { waitForAck: false });
       });
     };
   }, [sendCmd]);
@@ -588,7 +660,7 @@ export default function GamepadPage() {
                         const { x, y, distance } = ev;
                         
                         if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
-                          sendCmd(['stop'], "fallback");
+                          sendCmd(['stop'], "fallback", { waitForAck: false });
                           return;
                         }
 
@@ -608,12 +680,12 @@ export default function GamepadPage() {
                           }
                         }
 
-                        if (commands.length > 0) {
-                          sendCmd(commands, "fallback");
+                        if (commands.length > 0 && !pendingAckRef.current["fallback"]) {
+                          sendCmd(commands, "fallback", { waitForAck: true });
                         }
                       }}
                       stop={() => {
-                        sendCmd(['stop'], "fallback");
+                        sendCmd(['stop'], "fallback", { waitForAck: false });
                         stopAutoSend("fallback");
                       }}
                       throttle={60}

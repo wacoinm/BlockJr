@@ -1,4 +1,4 @@
-// ./utils/blockExecutor.ts
+// src/utils/blockExecutor.ts
 import bluetoothService from './bluetoothService';
 import { Block } from '../types/Block';
 import { toast } from 'react-toastify'; // show small toast messages for errors
@@ -56,13 +56,13 @@ const buildExecutionOrder = (blocks: Block[]): Block[] => {
  * For action types that accept a delay parameter we multiply delayUnits * unitMs to produce a milli-second value.
  * For 'delay' block we multiply the block.value by unitMs.
  */
-const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 100): string => {
+export const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 100): string => {
   // Helper to compute ms from units (units may be undefined)
-  const unitsToMs = (u) => {
-  if (typeof u !== 'number') return '0.00';
+  const unitsToMs = (u: any) => {
+    if (typeof u !== 'number') return '0.00';
+    // keep two decimal places for compatibility with device protocol if needed
     return (u * unitMs).toFixed(2);
   };
-
 
   switch (block.type) {
     case 'up':
@@ -72,6 +72,7 @@ const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 1
     case 'delay': {
       // Changed: emit sleep(...) instead of delay(...)
       const v = typeof block.value === 'number' ? block.value : 1;
+      // sleep expects milliseconds total (unitMs * v)
       return `sleep(${v * unitMs})`;
     }
     case 'forward':
@@ -101,37 +102,21 @@ const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: number = 1
 };
 
 /**
- * Main executor — accepts an array of Block objects and sends the encoded command string via bluetoothService when connected.
+ * Build a command queue (array) mapping blocks -> command string(s).
  *
- * Rules implemented:
- * - The following types WILL consume a following delay block(s) as their parameter:
- *   up, down, forward, backward, clockwise, countclockwise, lamp-on, lamp-off
- *   If multiple consecutive delay blocks follow, their values are summed and applied to the action (in units, then multiplied by `unit`).
- * - speed-low and speed-high are fixed and DO NOT consume a following delay (delay remains standalone).
- * - Standalone delay blocks:
- *   - If the standalone delay occurs immediately after a speed block, it is ignored (no matter single or multiple).
- *   - If at the start (no previous block) AND there are 2+ consecutive delays, the whole run of delays is ignored.
- *   - Otherwise delays are encoded as sleep(x) where x is block.value * unit
+ * Each entry in the returned array is { id: string, cmd: string } where `id` is the originating block's id
+ * (for delay-consuming actions the action block is the id; for standalone delay the delay block is the id).
  *
- * Single additional rule (ENFORCED):
- * - If a consuming move block (up/down/forward/backward/clockwise/countclockwise/lamp-on/lamp-off)
- *   is immediately followed by a speed block (speed-low or speed-high) — with no intervening blocks —
- *   show a small toast error and abort execution.
+ * This mirrors the encoding rules in the older executeBlocks() but returns individual commands rather than a joined string.
  *
- * New: accepts optional `unit` parameter (milliseconds per unit). For:
- * - 100m => pass 100
- * - 10m  => pass 10
- * - 1s   => pass 1000
+ * unit: multiplier in ms (100, 10, 1000, etc.)
  */
-export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
-  if (!blocks || blocks.length === 0) {
-    console.log('Execution chain is empty.');
-    return;
-  }
+export const buildCommandQueue = (blocks: Block[], unit: number = 100): { id: string; cmd: string }[] => {
+  if (!blocks || blocks.length === 0) return [];
 
   const orderedBlocks = buildExecutionOrder(blocks);
 
-  const commands: string[] = [];
+  const queue: { id: string; cmd: string }[] = [];
   let i = 0;
 
   // set of types that consume the following delay(s) as a parameter (in units)
@@ -153,12 +138,11 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
     const curr = orderedBlocks[idx];
     const next = orderedBlocks[idx + 1];
     if (consumesDelay.has(curr.type) && isSpeed(next.type)) {
-      // small toast error and abort
       toast.error('A move block cannot be immediately followed by a speed block.');
       console.error(
         `Validation error: move '${curr.type}' at index ${idx} is immediately followed by speed '${next.type}' at index ${idx + 1}.`
       );
-      return;
+      return [];
     }
   }
 
@@ -174,7 +158,7 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
       // If the action block itself has a numeric value, use it AS the delay and do NOT consume following delay blocks
       if (typeof currentBlock.value === 'number') {
         const explicitUnits = currentBlock.value;
-        commands.push(mapBlockToCommand(currentBlock, explicitUnits, unit));
+        queue.push({ id: currentBlock.id, cmd: mapBlockToCommand(currentBlock, explicitUnits, unit) });
         i = i + 1; // only the action consumed
         continue;
       }
@@ -188,7 +172,7 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
         j++;
       }
 
-      commands.push(mapBlockToCommand(currentBlock, sumDelayUnits, unit));
+      queue.push({ id: currentBlock.id, cmd: mapBlockToCommand(currentBlock, sumDelayUnits, unit) });
       i = j; // skip action + consumed delays
       continue;
     }
@@ -217,22 +201,34 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
         continue;
       }
 
-      // otherwise emit each delay as standalone `sleep(...)`
+      // otherwise emit each delay as standalone `sleep(...)` mapped to that delay block
       for (let p = i; p < k; p++) {
-        commands.push(mapBlockToCommand(orderedBlocks[p]!, undefined, unit));
+        queue.push({ id: orderedBlocks[p]!.id, cmd: mapBlockToCommand(orderedBlocks[p]!, undefined, unit) });
       }
       i = k;
       continue;
     }
 
     // 3) Other blocks (including speed) — just map directly (no delay parameter)
-    commands.push(mapBlockToCommand(currentBlock, undefined, unit));
+    queue.push({ id: currentBlock.id, cmd: mapBlockToCommand(currentBlock, undefined, unit) });
     i += 1;
   }
 
-  const finalCommand = commands.join('_');
-  console.log('Executing command:', finalCommand);
+  return queue;
+};
 
+/**
+ * Backwards-compatible helper — keeps the previous behavior of sending a joined command.
+ * (We keep it for other parts of the app that may still call executeBlocks()).
+ */
+export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
+  const queue = buildCommandQueue(blocks, unit);
+  if (!queue || queue.length === 0) {
+    console.log('Execution chain is empty or invalid.');
+    return;
+  }
+  const finalCommand = queue.map((q) => q.cmd).join('_');
+  console.log('Executing command (joined):', finalCommand);
   try {
     const connected = await bluetoothService.isConnected();
     if (connected) {
@@ -242,7 +238,6 @@ export const executeBlocks = async (blocks: Block[], unit: number = 100) => {
       console.log('Not connected to Bluetooth device — command not sent.');
     }
   } catch (e) {
-    console.log(finalCommand);
     console.error('Failed to send command over Bluetooth:', e);
   }
 };

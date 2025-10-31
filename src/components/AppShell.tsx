@@ -10,7 +10,7 @@ import { useAppSelector } from "../store/hooks";
 import type { RootState } from "../store";
 import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
-import GamepadPng from "../assets/images/gamepad.png"; // <-- your PNG (you said you'll add this)
+import GamepadPng from "../assets/images/gamepad.png";
 import type { TaskItem } from "../utils/manifest";
 
 export type FabItem = {
@@ -78,6 +78,9 @@ export type AppShellProps = {
   interactionMode?: "runner" | "deleter";
   blockPaletteBottom?: number;
   setBlockPaletteBottom?: (n: number) => void;
+
+  // ✅ NEW: list of blocks to grayscale during execution
+  mutedBlockIds?: Set<string>;
 };
 
 export default function AppShell(props: AppShellProps) {
@@ -114,6 +117,7 @@ export default function AppShell(props: AppShellProps) {
     theme,
     blockPaletteBottom,
     setBlockPaletteBottom,
+    mutedBlockIds, // <-- ✅ NEW
   } = props;
 
   const menuOpen = typeof props.menuOpen === "boolean" ? props.menuOpen : reduxMenuOpen ?? false;
@@ -127,7 +131,7 @@ export default function AppShell(props: AppShellProps) {
   const onBluetoothConnectionChange = props.onBluetoothConnectionChange ?? (() => {});
   const interactionMode = typeof props.interactionMode !== "undefined" ? props.interactionMode : reduxInteractionMode ?? "runner";
 
-  // Handler to open gamepad page for the currently selected project
+  // Handler to open gamepad page
   const openGamepadForProject = (id?: string | null) => {
     const pid = id ?? selectedProject;
     if (!pid) {
@@ -182,6 +186,7 @@ export default function AppShell(props: AppShellProps) {
         onPan={onPan}
         onZoom={onZoom}
         interactionMode={interactionMode}
+        mutedBlockIds={mutedBlockIds}
       />
 
       <ReplayPalette
@@ -198,20 +203,20 @@ export default function AppShell(props: AppShellProps) {
         setBlockPaletteBottom={setBlockPaletteBottom}
       />
 
-      {/* Left-top helper UI (zoom + battery + gamepad button) */}
-      <div style={{ position: 'absolute', left: 8, top: 200, zIndex: 80 }}>
-          <button
-            type="button"
-            onClick={() => openGamepadForProject(selectedProject)}
-            className={
-              "mt-2 w-12 h-12 rounded-full flex items-center justify-center shadow-inner transition-transform active:scale-95 " +
-              "bg-white/90 dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
-            }
-            title="Gamepad"
-            aria-label="Open gamepad"
-          >
-            <img src={GamepadPng} alt="gamepad" className="w-7 h-7" />
-          </button>
+      {/* Gamepad button */}
+      <div style={{ position: "absolute", left: 8, top: 200, zIndex: 80 }}>
+        <button
+          type="button"
+          onClick={() => openGamepadForProject(selectedProject)}
+          className={
+            "mt-2 w-12 h-12 rounded-full flex items-center justify-center shadow-inner transition-transform active:scale-95 " +
+            "bg-white/90 dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
+          }
+          title="Gamepad"
+          aria-label="Open gamepad"
+        >
+          <img src={GamepadPng} alt="gamepad" className="w-7 h-7" />
+        </button>
       </div>
     </>
   );

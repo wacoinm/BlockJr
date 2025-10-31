@@ -454,6 +454,22 @@ export async function stopEnabledListener(): Promise<void> {
   console.debug('[bluetoothService] enabled listener removed');
 }
 
+/** 
+ * onOK(callback)
+ * subscribes only to "OK" responses from the device.
+ * auto-unsubscribes in cleanup.
+ */
+async function onOK(callback: () => void): Promise<() => void> {
+  const unsub = await startDataListener((msg) => {
+    const s = msg.trim().toLowerCase();
+    if (s === "ok" || s.includes("ok")) {
+      callback();
+    }
+  });
+  return unsub;
+}
+
+
 /* ---------- default export (compat) ---------- */
 
 export default {
@@ -469,4 +485,5 @@ export default {
   stopDisconnectListener,
   startEnabledListener,
   stopEnabledListener,
+  onOK
 };

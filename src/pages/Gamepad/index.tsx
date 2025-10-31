@@ -188,7 +188,7 @@ export default function GamepadPage() {
 
   const buildCommand = useCallback((commands: string[]) => {
     // Convert time to seconds and format commands
-    if (commands[0] === 'stop') return "stop()" 
+    if (commands[0] === 'stop') return "stop" 
     else if (commands[0] === Commands.LAMP_ON) return "lampon()"
     else if (commands[0] === Commands.LAMP_OFF) return "lampoff()"
     else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)"

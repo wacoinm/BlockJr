@@ -38,7 +38,7 @@ const EmergencyStopButton: React.FC<Props> = ({ className = "", isConnected }) =
       }
 
       // send stop() command
-      await bluetoothService.sendString("stop()");
+      await bluetoothService.sendString("stop");
       toast.success("فرمان توقف اضطراری ارسال شد.");
     } catch (err) {
       console.error("EmergencyStopButton send failed:", err);

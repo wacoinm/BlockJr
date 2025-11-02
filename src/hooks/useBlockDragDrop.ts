@@ -183,6 +183,24 @@ export function useBlockDragDrop({
           ...(typeof (block as any).width === 'undefined' ? { width: BLOCK_WIDTH } : {}),
         } as Block & { width?: number };
 
+        if (typeof (newBlock as any).value === 'undefined') {
+          const numericTypes = new Set([
+            'delay',
+            'up',
+            'down',
+            'left',
+            'right',
+            'forward',
+            'backward',
+            'move',
+            'turn',
+            'rotate',
+          ]);
+          if (numericTypes.has((block as any).type)) {
+            (newBlock as any).value = 1;
+          }
+        }
+
         setBlocks((prev) => {
           const next = [...prev, newBlock];
           blocksRef.current = next;

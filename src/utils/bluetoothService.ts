@@ -3,10 +3,13 @@ import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { toast } from 'react-toastify';
 
+const TAG = 'BTDBG';
+const now = () => new Date().toISOString();
+
 const isNative = Capacitor.getPlatform() !== 'web';
 let connectedDeviceId: string | null = null;
 
-/* small types */
+/* types */
 type PluginListenerHandle = { remove?: () => Promise<void> } | null;
 interface DeviceItem { id: string; name?: string; }
 type PluginShape = {
@@ -34,24 +37,37 @@ let enabledListener: PluginListenerHandle = null;
 
 let initialized = false;
 
-/* simple helper: try add listener by names */
+/* helpers for logging */
+function logDebug(...args: any[]) { try { console.debug(TAG, now(), ...args); } catch {} }
+function logInfo(...args: any[])  { try { console.info(TAG, now(), ...args); } catch {} }
+function logWarn(...args: any[])  { try { console.warn(TAG, now(), ...args); } catch {} }
+function logError(...args: any[]) { try { console.error(TAG, now(), ...args); } catch {} }
+
+/* try adding listener with many possible names and log attempts */
 const tryAddListener = async (names: string[], handler: (ev: unknown) => void): Promise<PluginListenerHandle> => {
+  logDebug('tryAddListener names=', names, 'plugin.addListener=', typeof plugin?.addListener);
   if (!plugin || typeof plugin.addListener !== 'function') {
-    // plugin missing (web or not installed) => fake handle
+    logWarn('plugin.addListener not available (web or plugin missing)');
     return { remove: async () => {} };
   }
   for (const n of names) {
     try {
+      logDebug('attempt addListener', n);
       const h = await plugin.addListener(n, handler);
+      logInfo('addListener succeeded', n, 'handle=', !!h);
       return h || { remove: async () => {} };
     } catch (e) {
-      console.warn('[bluetoothService] addListener(', n, ') failed', e);
+      logWarn('addListener failed for', n, e);
     }
   }
+  logWarn('no addListener names succeeded from', names);
   return null;
 };
 
-/* small decoders -> produce a string for subscribers */
+/* decoders + base64 helper */
+function toHex(u8: Uint8Array) {
+  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
+}
 function decodeArrayLikeToString(v: any): string {
   try {
     if (typeof v === 'string') return v;
@@ -61,110 +77,153 @@ function decodeArrayLikeToString(v: any): string {
     try { return JSON.stringify(v); } catch { return String(v); }
   }
 }
-
 function decodeBase64ToString(s: string): string {
   try {
-    // atob available on mobile webviews
     if (typeof atob === 'function') {
-      // decodeURIComponent(escape(...)) to handle utf8
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      return decodeURIComponent(escape(atob(s)));
+      const bin = atob(s);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
     }
-    // fallback (node)
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // fallback node Buffer
     // @ts-ignore
-    return Buffer.from(s, 'base64').toString('utf8');
-  } catch {
+    if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64').toString('utf8');
+    return s;
+  } catch (e) {
     return s;
   }
 }
 
-function extractDataString(ev: unknown): string {
-  if (!ev && ev !== 0) return '';
-  if (typeof ev === 'string') return ev;
-  if (typeof ev === 'object' && ev !== null) {
-    const obj = ev as any;
-    if (typeof obj.data === 'string') return obj.data;
-    if (typeof obj.value === 'string') return obj.value;
-    if (typeof obj.read === 'string') return obj.read;
-    if (typeof obj.message === 'string') return obj.message;
-    // base64 field (some plugins return this)
-    if (typeof obj.base64 === 'string') return decodeBase64ToString(obj.base64);
-    // array-like payloads in common fields
-    if (obj.value && (obj.value.buffer || Array.isArray(obj.value) || ArrayBuffer.isView(obj.value))) return decodeArrayLikeToString(obj.value);
-    if (obj.data && (obj.data.buffer || Array.isArray(obj.data) || ArrayBuffer.isView(obj.data))) return decodeArrayLikeToString(obj.data);
-    if (Array.isArray(obj.bytes)) return decodeArrayLikeToString(obj.bytes);
-    if (obj.buffer && (obj.buffer instanceof ArrayBuffer || obj.buffer.constructor?.name === 'ArrayBuffer')) return decodeArrayLikeToString(new Uint8Array(obj.buffer));
-    // sometimes top-level has buffer
-    if ((ev as any).buffer && ((ev as any).buffer instanceof ArrayBuffer)) return decodeArrayLikeToString(new Uint8Array((ev as any).buffer));
-    try { return JSON.stringify(obj); } catch { return String(obj); }
+/* comprehensive extractor that also logs raw forms */
+function extractDataStringWithDiagnostics(ev: unknown): { asString: string; diagnostics: any } {
+  const diag: any = { rawType: typeof ev, raw: ev };
+  if (ev == null) {
+    diag.note = 'null/undefined';
+    return { asString: '', diagnostics: diag };
   }
-  return String(ev);
+  if (typeof ev === 'string') {
+    diag.form = 'string';
+    diag.length = (ev as string).length;
+    return { asString: ev as string, diagnostics: diag };
+  }
+  if (typeof ev === 'object') {
+    const obj: any = ev;
+    if (typeof obj.data === 'string') { diag.field='data(string)'; diag.value = obj.data; return { asString: obj.data, diagnostics: diag }; }
+    if (typeof obj.value === 'string') { diag.field='value(string)'; diag.value = obj.value; return { asString: obj.value, diagnostics: diag }; }
+    if (typeof obj.read === 'string') { diag.field='read(string)'; diag.value = obj.read; return { asString: obj.read, diagnostics: diag }; }
+    if (typeof obj.message === 'string') { diag.field='message(string)'; diag.value = obj.message; return { asString: obj.message, diagnostics: diag }; }
+    if (typeof obj.base64 === 'string') { diag.field='base64'; diag.decoded = decodeBase64ToString(obj.base64); return { asString: diag.decoded, diagnostics: diag }; }
+    // array-like
+    if (obj.value && (obj.value.buffer || Array.isArray(obj.value) || ArrayBuffer.isView(obj.value))) {
+      diag.field = 'value(array-like)';
+      const s = decodeArrayLikeToString(obj.value);
+      diag.hex = toHex(obj.value instanceof Uint8Array ? obj.value : new Uint8Array(obj.value));
+      return { asString: s, diagnostics: diag };
+    }
+    if (obj.data && (obj.data.buffer || Array.isArray(obj.data) || ArrayBuffer.isView(obj.data))) {
+      diag.field = 'data(array-like)';
+      const s = decodeArrayLikeToString(obj.data);
+      diag.hex = toHex(obj.data instanceof Uint8Array ? obj.data : new Uint8Array(obj.data));
+      return { asString: s, diagnostics: diag };
+    }
+    if (Array.isArray(obj.bytes)) {
+      diag.field = 'bytes[array]';
+      const s = decodeArrayLikeToString(obj.bytes);
+      diag.hex = toHex(new Uint8Array(obj.bytes));
+      return { asString: s, diagnostics: diag };
+    }
+    if (obj.buffer && (obj.buffer instanceof ArrayBuffer || obj.buffer.constructor?.name === 'ArrayBuffer')) {
+      diag.field='buffer';
+      const u8 = new Uint8Array(obj.buffer);
+      diag.hex = toHex(u8);
+      return { asString: decodeArrayLikeToString(u8), diagnostics: diag };
+    }
+    // top-level buffer
+    if ((ev as any).buffer && ((ev as any).buffer instanceof ArrayBuffer)) {
+      const u8 = new Uint8Array((ev as any).buffer);
+      diag.field = 'top-buffer';
+      diag.hex = toHex(u8);
+      return { asString: decodeArrayLikeToString(u8), diagnostics: diag };
+    }
+    // fallback
+    try { diag.fallback = JSON.stringify(obj); return { asString: diag.fallback, diagnostics: diag }; } catch { diag.fallback = String(obj); return { asString: diag.fallback, diagnostics: diag }; }
+  }
+  return { asString: String(ev), diagnostics: { note: 'coerced' } };
 }
 
-/* core: when platform emits data, forward raw string (NO trim) to subscribers */
+/* platform handler: logs everything and forwards raw string to subscribers (no trim) */
 function platformDataHandler(ev: unknown) {
   try {
-    const s = extractDataString(ev);
-    if (!s && s !== '0') return;
-    // forward raw string exactly as decoded (no trimming)
+    const { asString, diagnostics } = extractDataStringWithDiagnostics(ev);
+    logInfo('platformDataHandler event', { diagnostics });
+    // produce a base64 of the raw if possible
+    try {
+      if (diagnostics.hex) logDebug('payload hex:', diagnostics.hex);
+    } catch {}
+    // forward EXACT decoded string (do NOT trim here)
     for (const sub of Array.from(dataSubscribers)) {
-      try { sub(s); } catch (err) { console.warn('[bluetoothService] data subscriber threw', err); }
+      try { sub(asString); } catch (err) { logWarn('subscriber threw', err); }
     }
   } catch (err) {
-    console.warn('[bluetoothService] platformDataHandler error', err);
+    logError('platformDataHandler failed', err);
   }
 }
 
-/* start notifications if plugin supports it */
+/* startNotifications helper */
 async function _startNotificationsIfAvailable(delimiter = '\n') {
-  if (!isNative || !plugin) return;
+  if (!isNative || !plugin) { logWarn('_startNotifications skipped (not native or plugin missing)'); return; }
   if (typeof plugin.startNotifications === 'function') {
     try {
-      // try with delimiter first (many implementations accept it)
+      logInfo('calling startNotifications with delimiter', delimiter);
       await plugin.startNotifications({ delimiter });
-      console.debug('[bluetoothService] startNotifications called with delimiter', delimiter);
+      logInfo('startNotifications ok (with delimiter)');
     } catch (e) {
+      logWarn('startNotifications with delimiter failed, trying no-arg', e);
       try {
-        // fallback: call without args
         await (plugin as any).startNotifications();
-        console.debug('[bluetoothService] startNotifications called without args');
+        logInfo('startNotifications ok (no-arg)');
       } catch (e2) {
-        console.debug('[bluetoothService] startNotifications failed', e2);
+        logError('startNotifications failed both ways', e2);
       }
     }
+  } else {
+    logDebug('plugin.startNotifications not available');
   }
 }
 
 /* ---------- public API ---------- */
 
 export async function initialize(): Promise<void> {
+  logDebug('initialize called, isNative=', isNative);
   if (!isNative) return;
-  if (initialized) return;
+  if (initialized) { logDebug('already initialized'); return; }
   initialized = true;
   try {
     if (plugin && typeof plugin.isEnabled === 'function') {
       const res = await plugin.isEnabled({});
+      logDebug('plugin.isEnabled returned', res);
       const enabled = (res && typeof res === 'object' && 'enabled' in (res as Record<string, unknown>))
         ? Boolean((res as Record<string, unknown>).enabled)
         : Boolean(res);
       if (!enabled && typeof plugin.enable === 'function') {
+        logInfo('bluetooth not enabled, calling plugin.enable()');
         await plugin.enable();
       }
-      console.debug('[bluetoothService] initialized, enabled:', enabled);
+      logInfo('initialized, enabled:', enabled);
     }
   } catch (err) {
-    console.warn('[bluetoothService] initialize failed', err);
+    logWarn('initialize failed', err);
     throw err;
   }
 }
 
 export async function scanForDevices(): Promise<DeviceItem[]> {
+  logDebug('scanForDevices');
   if (!isNative) return [];
   try {
-    if (!plugin.scan) return [];
+    if (!plugin.scan) { logWarn('plugin.scan not available'); return []; }
     const raw = await plugin.scan({});
+    logDebug('scan raw result', raw);
     const devicesRaw = (raw && typeof raw === 'object' && 'devices' in (raw as Record<string, unknown>))
       ? (raw as Record<string, unknown>).devices
       : raw;
@@ -177,56 +236,60 @@ export async function scanForDevices(): Promise<DeviceItem[]> {
       return { id, name };
     });
   } catch (err) {
-    console.error('[bluetoothService] scanForDevices failed', err);
+    logError('scanForDevices failed', err);
     throw err;
   }
 }
 
 export async function connect(deviceId: string): Promise<boolean> {
+  logInfo('connect requested', deviceId);
   if (!isNative) return false;
-  console.debug('[bluetoothService] connect', deviceId);
   try {
     try {
+      logDebug('calling plugin.connect({address})');
       await plugin.connect({ address: deviceId });
     } catch (firstErr) {
-      console.warn('[bluetoothService] connect({address}) failed, trying fallback', firstErr);
+      logWarn('connect({address}) failed, trying fallback', firstErr);
       try {
         await plugin.connect(deviceId as any);
       } catch (secondErr) {
-        console.warn('[bluetoothService] connect fallback failed', secondErr);
+        logError('connect fallback failed', secondErr);
         throw secondErr ?? firstErr;
       }
     }
     connectedDeviceId = deviceId;
+    logInfo('connected to', deviceId);
 
-    // important per plugin docs: request notifications so the device will push data
+    // per docs: ensure notifications requested
     await _startNotificationsIfAvailable('\n');
 
-    // ensure platform data listener exists (single shared)
+    // ensure data listener shared exists
     if (!dataListener) {
       const tryNames = ['onRead', 'onDataReceived', 'data', 'onData', 'read', 'didReceiveData'];
+      logDebug('registering platform data listener with names', tryNames);
       dataListener = await tryAddListener(tryNames, (ev) => {
-        // forward raw payload
         platformDataHandler(ev);
       });
-      if (!dataListener) console.debug('[bluetoothService] connect: no platform data listener available (yet)');
+      logDebug('dataListener registered?', !!dataListener);
+    } else {
+      logDebug('dataListener already present');
     }
 
-    // disconnect listener (one-shot shared)
+    // disconnect listener
     if (!disconnectListener) {
       disconnectListener = await tryAddListener(['onDisconnect', 'disconnected', 'onConnectionLost', 'connectionLost'], (ev) => {
-        console.debug('[bluetoothService] platform disconnect event', ev);
+        logInfo('platform disconnect event', ev);
         connectedDeviceId = null;
-        for (const cb of Array.from(disconnectSubscribers)) try { cb(); } catch (e) { console.warn(e); }
+        for (const cb of Array.from(disconnectSubscribers)) try { cb(); } catch (e) { logWarn(e); }
       });
     }
 
-    // enabled listener (optional)
+    // enabled listener
     if (!enabledListener) {
       enabledListener = await tryAddListener(['onEnabledChange', 'enabledChange', 'onBluetoothEnabled'], (ev) => {
-        console.debug('[bluetoothService] platform enabled event', ev);
+        logDebug('platform enabled event', ev);
         const val = (ev && (ev as any).enabled) ?? ev;
-        for (const cb of Array.from(enabledSubscribers)) try { cb(Boolean(val)); } catch (e) { console.warn(e); }
+        for (const cb of Array.from(enabledSubscribers)) try { cb(Boolean(val)); } catch (e) { logWarn(e); }
       });
     }
 
@@ -234,7 +297,7 @@ export async function connect(deviceId: string): Promise<boolean> {
     if (!ok) { connectedDeviceId = null; return false; }
     return true;
   } catch (error: unknown) {
-    console.error('[bluetoothService] connect failed', error);
+    logError('connect failed', error);
     try { const msg = error instanceof Error ? error.message : String(error ?? 'Unknown'); toast.error('[BT] Connection failed: ' + msg); } catch {}
     connectedDeviceId = null;
     return false;
@@ -242,22 +305,22 @@ export async function connect(deviceId: string): Promise<boolean> {
 }
 
 export async function disconnect(): Promise<void> {
+  logInfo('disconnect requested');
   if (!isNative) return;
-  console.debug('[bluetoothService] disconnect requested');
   try {
     if (connectedDeviceId) {
-      try { await plugin.disconnect?.({ address: connectedDeviceId }); } catch (e1) { console.warn('[bluetoothService] disconnect({address}) failed', e1); try { await plugin.disconnect?.(); } catch (e2) { console.warn('[bluetoothService] disconnect() fallback also failed', e2); } }
+      try { await plugin.disconnect?.({ address: connectedDeviceId }); } catch (e1) { logWarn('disconnect({address}) failed', e1); try { await plugin.disconnect?.(); } catch (e2) { logWarn('disconnect() fallback failed', e2); } }
     } else {
-      try { await plugin.disconnect?.(); } catch (err) { console.warn('[bluetoothService] disconnect() without address failed', err); }
+      try { await plugin.disconnect?.(); } catch (err) { logWarn('disconnect() without address failed', err); }
     }
   } finally {
     connectedDeviceId = null;
-    // cleanup listeners (best effort)
-    try { if (dataListener && typeof dataListener.remove === 'function') await dataListener.remove(); } catch (e) { console.debug('[bluetoothService] remove dataListener failed', e); }
+    // cleanup listeners
+    try { if (dataListener && typeof dataListener.remove === 'function') await dataListener.remove(); } catch (e) { logWarn('remove dataListener failed', e); }
     dataListener = null;
-    try { if (disconnectListener && typeof disconnectListener.remove === 'function') await disconnectListener.remove(); } catch (e) { console.debug('[bluetoothService] remove disconnectListener failed', e); }
+    try { if (disconnectListener && typeof disconnectListener.remove === 'function') await disconnectListener.remove(); } catch (e) { logWarn('remove disconnectListener failed', e); }
     disconnectListener = null;
-    try { if (enabledListener && typeof enabledListener.remove === 'function') await enabledListener.remove(); } catch (e) { console.debug('[bluetoothService] remove enabledListener failed', e); }
+    try { if (enabledListener && typeof enabledListener.remove === 'function') await enabledListener.remove(); } catch (e) { logWarn('remove enabledListener failed', e); }
     enabledListener = null;
   }
 }
@@ -280,64 +343,72 @@ export async function isConnected(): Promise<boolean> {
   if (!connectedDeviceId) return false;
   try {
     const res = await plugin.isConnected?.({ address: connectedDeviceId });
+    logDebug('isConnected({address}) ->', res);
     const val = extractBooleanFromResult(res);
     if (!val) connectedDeviceId = null;
     return val;
   } catch (e1) {
-    console.warn('[bluetoothService] isConnected({address}) failed', e1);
+    logWarn('isConnected({address}) failed', e1);
   }
   try {
     const res = await plugin.isConnected?.({});
+    logDebug('isConnected({}) ->', res);
     const val = extractBooleanFromResult(res);
     if (!val) connectedDeviceId = null;
     return val;
   } catch (e2) {
-    console.warn('[bluetoothService] isConnected(empty) failed', e2);
+    logWarn('isConnected(empty) failed', e2);
     connectedDeviceId = null;
     return false;
   }
 }
 
 export async function sendString(text: string): Promise<void> {
+  logInfo('sendString', { text });
   if (!isNative) throw new Error('Not native platform');
   if (!connectedDeviceId) throw new Error('Not connected');
   const payload = (text ?? '') + '\n';
-  try { await plugin.write({ address: connectedDeviceId, value: payload }); return; } catch (e1) { console.warn('[bluetoothService] write({address,value}) failed', e1); }
-  try { await plugin.write({ value: payload }); return; } catch (e2) { console.warn('[bluetoothService] write({value}) failed', e2); }
-  try { await plugin.write(payload as any); return; } catch (e3) { console.error('[bluetoothService] final write fallback failed', e3); throw e3; }
+  try { logDebug('write try {address,value}'); await plugin.write({ address: connectedDeviceId, value: payload }); logInfo('write OK {address,value}'); return; } catch (e1) { logWarn('write({address,value}) failed', e1); }
+  try { logDebug('write try {value}'); await plugin.write({ value: payload }); logInfo('write OK {value}'); return; } catch (e2) { logWarn('write({value}) failed', e2); }
+  try { logDebug('write try raw payload'); await plugin.write(payload as any); logInfo('write OK raw'); return; } catch (e3) { logError('final write fallback failed', e3); throw e3; }
 }
 
 /* listeners API */
-
 export async function startDataListener(onData: (s: string) => void): Promise<() => void> {
+  logDebug('startDataListener register subscriber');
   dataSubscribers.add(onData);
 
-  // ensure platform listener exists (connect may not have been called yet)
   if (!dataListener && isNative) {
     const tryNames = ['onRead', 'onDataReceived', 'data', 'onData', 'read', 'didReceiveData'];
+    logDebug('startDataListener will attempt to register platform listener with names', tryNames);
     dataListener = await tryAddListener(tryNames, (ev) => {
+      logDebug('platform event raw', ev);
       platformDataHandler(ev);
     });
-    if (!dataListener) console.debug('[bluetoothService] startDataListener: no platform data listener available');
+    if (!dataListener) logWarn('startDataListener: no platform data listener available');
+  } else {
+    logDebug('startDataListener: dataListener already present or not native', !!dataListener, isNative);
   }
 
   return () => {
+    logDebug('startDataListener unsub called');
     dataSubscribers.delete(onData);
   };
 }
 
 export async function stopDataListener(): Promise<void> {
+  logDebug('stopDataListener');
   dataSubscribers.clear();
 }
 
-/* disconnect / enabled listeners similar pattern */
-
+/* disconnect / enabled listeners */
 export async function startDisconnectListener(onDisconnect: () => void): Promise<() => void> {
   disconnectSubscribers.add(onDisconnect);
   if (!disconnectListener && isNative) {
     disconnectListener = await tryAddListener(['onDisconnect', 'disconnected', 'onConnectionLost', 'connectionLost'], (ev) => {
+      logInfo('platform disconnect event', ev);
       connectedDeviceId = null;
-      for (const cb of Array.from(disconnectSubscribers)) try { cb(); } catch (e) { console.warn(e); }
+      for (const cb of Array.from(disconnectSubscribers)) try { cb(); } catch (e) { logWarn(e); }
     });
   }
   return () => { disconnectSubscribers.delete(onDisconnect); };
@@ -351,8 +422,9 @@ export async function startEnabledListener(onEnabledChange: (enabled: boolean) =
   enabledSubscribers.add(onEnabledChange);
   if (!enabledListener && isNative) {
     enabledListener = await tryAddListener(['onEnabledChange', 'enabledChange', 'onBluetoothEnabled'], (ev) => {
+      logDebug('platform enabled event', ev);
       const val = (ev && (ev as any).enabled) ?? ev;
-      for (const cb of Array.from(enabledSubscribers)) try { cb(Boolean(val)); } catch (e) { console.warn(e); }
+      for (const cb of Array.from(enabledSubscribers)) try { cb(Boolean(val)); } catch (e) { logWarn(e); }
     });
   }
   return () => { enabledSubscribers.delete(onEnabledChange); };
@@ -362,11 +434,16 @@ export async function stopEnabledListener(): Promise<void> {
   enabledSubscribers.clear();
 }
 
-/* convenience onOK: consumer can use this; note we still trim inside this helper (safe) */
+/* onOK convenience */
 async function onOK(callback: () => void): Promise<() => void> {
+  logDebug('onOK registration');
   const unsub = await startDataListener((msg) => {
     const s = String(msg).trim().toLowerCase();
-    if (s === 'ok' || /\bok\b/.test(s)) callback();
+    logDebug('onOK sees msg', { raw: msg, trimmed: s });
+    if (s === 'ok' || /\bok\b/.test(s)) {
+      logInfo('onOK triggered');
+      callback();
+    }
   });
   return unsub;
 }

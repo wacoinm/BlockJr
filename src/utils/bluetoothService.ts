@@ -37,7 +37,7 @@ let enabledListener: PluginListenerHandle = null;
 
 let initialized = false;
 
-/* helpers for logging */
+/* logging helpers */
 function logDebug(...args: any[]) { try { console.debug(TAG, now(), ...args); } catch {} }
 function logInfo(...args: any[])  { try { console.info(TAG, now(), ...args); } catch {} }
 function logWarn(...args: any[])  { try { console.warn(TAG, now(), ...args); } catch {} }
@@ -85,7 +85,7 @@ function decodeBase64ToString(s: string): string {
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       return new TextDecoder().decode(bytes);
     }
-    // fallback node Buffer
+    // fallback node Buffer (rare in WebView)
     // @ts-ignore
     if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64').toString('utf8');
     return s;
@@ -94,7 +94,7 @@ function decodeBase64ToString(s: string): string {
   }
 }
 
-/* comprehensive extractor that also logs raw forms */
+/* extractor that also returns diagnostics */
 function extractDataStringWithDiagnostics(ev: unknown): { asString: string; diagnostics: any } {
   const diag: any = { rawType: typeof ev, raw: ev };
   if (ev == null) {
@@ -113,23 +113,25 @@ function extractDataStringWithDiagnostics(ev: unknown): { asString: string; diag
     if (typeof obj.read === 'string') { diag.field='read(string)'; diag.value = obj.read; return { asString: obj.read, diagnostics: diag }; }
     if (typeof obj.message === 'string') { diag.field='message(string)'; diag.value = obj.message; return { asString: obj.message, diagnostics: diag }; }
     if (typeof obj.base64 === 'string') { diag.field='base64'; diag.decoded = decodeBase64ToString(obj.base64); return { asString: diag.decoded, diagnostics: diag }; }
-    // array-like
     if (obj.value && (obj.value.buffer || Array.isArray(obj.value) || ArrayBuffer.isView(obj.value))) {
       diag.field = 'value(array-like)';
-      const s = decodeArrayLikeToString(obj.value);
-      diag.hex = toHex(obj.value instanceof Uint8Array ? obj.value : new Uint8Array(obj.value));
+      const u8 = obj.value instanceof Uint8Array ? obj.value : new Uint8Array(obj.value);
+      diag.hex = toHex(u8);
+      const s = decodeArrayLikeToString(u8);
       return { asString: s, diagnostics: diag };
     }
     if (obj.data && (obj.data.buffer || Array.isArray(obj.data) || ArrayBuffer.isView(obj.data))) {
       diag.field = 'data(array-like)';
-      const s = decodeArrayLikeToString(obj.data);
-      diag.hex = toHex(obj.data instanceof Uint8Array ? obj.data : new Uint8Array(obj.data));
+      const u8 = obj.data instanceof Uint8Array ? obj.data : new Uint8Array(obj.data);
+      diag.hex = toHex(u8);
+      const s = decodeArrayLikeToString(u8);
       return { asString: s, diagnostics: diag };
     }
     if (Array.isArray(obj.bytes)) {
       diag.field = 'bytes[array]';
-      const s = decodeArrayLikeToString(obj.bytes);
-      diag.hex = toHex(new Uint8Array(obj.bytes));
+      const u8 = new Uint8Array(obj.bytes);
+      diag.hex = toHex(u8);
+      const s = decodeArrayLikeToString(u8);
       return { asString: s, diagnostics: diag };
     }
     if (obj.buffer && (obj.buffer instanceof ArrayBuffer || obj.buffer.constructor?.name === 'ArrayBuffer')) {
@@ -138,28 +140,23 @@ function extractDataStringWithDiagnostics(ev: unknown): { asString: string; diag
       diag.hex = toHex(u8);
       return { asString: decodeArrayLikeToString(u8), diagnostics: diag };
     }
-    // top-level buffer
     if ((ev as any).buffer && ((ev as any).buffer instanceof ArrayBuffer)) {
       const u8 = new Uint8Array((ev as any).buffer);
       diag.field = 'top-buffer';
       diag.hex = toHex(u8);
       return { asString: decodeArrayLikeToString(u8), diagnostics: diag };
     }
-    // fallback
     try { diag.fallback = JSON.stringify(obj); return { asString: diag.fallback, diagnostics: diag }; } catch { diag.fallback = String(obj); return { asString: diag.fallback, diagnostics: diag }; }
   }
   return { asString: String(ev), diagnostics: { note: 'coerced' } };
 }
 
-/* platform handler: logs everything and forwards raw string to subscribers (no trim) */
+/* platform handler: logs diagnostics and forwards raw decoded string to subscribers */
 function platformDataHandler(ev: unknown) {
   try {
     const { asString, diagnostics } = extractDataStringWithDiagnostics(ev);
     logInfo('platformDataHandler event', { diagnostics });
-    // produce a base64 of the raw if possible
-    try {
-      if (diagnostics.hex) logDebug('payload hex:', diagnostics.hex);
-    } catch {}
+    if (diagnostics.hex) logDebug('payload hex:', diagnostics.hex);
     // forward EXACT decoded string (do NOT trim here)
     for (const sub of Array.from(dataSubscribers)) {
       try { sub(asString); } catch (err) { logWarn('subscriber threw', err); }
@@ -169,22 +166,35 @@ function platformDataHandler(ev: unknown) {
   }
 }
 
-/* startNotifications helper */
-async function _startNotificationsIfAvailable(delimiter = '\n') {
+/* startNotifications helper that requires deviceId/address */
+async function _startNotificationsIfAvailable(deviceId: string | null, delimiter = '\n') {
   if (!isNative || !plugin) { logWarn('_startNotifications skipped (not native or plugin missing)'); return; }
+  if (!deviceId) { logWarn('_startNotifications: missing deviceId'); return; }
+
   if (typeof plugin.startNotifications === 'function') {
     try {
-      logInfo('calling startNotifications with delimiter', delimiter);
-      await plugin.startNotifications({ delimiter });
-      logInfo('startNotifications ok (with delimiter)');
-    } catch (e) {
-      logWarn('startNotifications with delimiter failed, trying no-arg', e);
-      try {
-        await (plugin as any).startNotifications();
-        logInfo('startNotifications ok (no-arg)');
-      } catch (e2) {
-        logError('startNotifications failed both ways', e2);
-      }
+      logInfo('calling startNotifications with address+delimiter', { address: deviceId, delimiter });
+      await plugin.startNotifications({ address: deviceId, delimiter });
+      logInfo('startNotifications ok (address+delimiter)', deviceId);
+      return;
+    } catch (e1) {
+      logWarn('startNotifications(address,delimiter) failed', e1);
+    }
+    try {
+      logInfo('calling startNotifications with address only', deviceId);
+      await (plugin as any).startNotifications({ address: deviceId });
+      logInfo('startNotifications ok (address only)', deviceId);
+      return;
+    } catch (e2) {
+      logWarn('startNotifications(address) failed', e2);
+    }
+    try {
+      logInfo('calling startNotifications with no args (fallback)');
+      await (plugin as any).startNotifications();
+      logInfo('startNotifications ok (no-arg fallback)');
+      return;
+    } catch (e3) {
+      logError('startNotifications failed both ways', e3);
     }
   } else {
     logDebug('plugin.startNotifications not available');
@@ -260,10 +270,7 @@ export async function connect(deviceId: string): Promise<boolean> {
     connectedDeviceId = deviceId;
     logInfo('connected to', deviceId);
 
-    // per docs: ensure notifications requested
-    await _startNotificationsIfAvailable('\n');
-
-    // ensure data listener shared exists
+    // IMPORTANT: register data listener BEFORE starting notifications so we don't miss immediate responses
     if (!dataListener) {
       const tryNames = ['onRead', 'onDataReceived', 'data', 'onData', 'read', 'didReceiveData'];
       logDebug('registering platform data listener with names', tryNames);
@@ -275,6 +282,9 @@ export async function connect(deviceId: string): Promise<boolean> {
       logDebug('dataListener already present');
     }
 
+    // per plugin docs: ensure notifications requested (with device address)
+    await _startNotificationsIfAvailable(deviceId, '\n');
+
     // disconnect listener
     if (!disconnectListener) {
       disconnectListener = await tryAddListener(['onDisconnect', 'disconnected', 'onConnectionLost', 'connectionLost'], (ev) => {
@@ -284,7 +294,7 @@ export async function connect(deviceId: string): Promise<boolean> {
       });
     }
 
-    // enabled listener
+    // enabled listener (optional)
     if (!enabledListener) {
       enabledListener = await tryAddListener(['onEnabledChange', 'enabledChange', 'onBluetoothEnabled'], (ev) => {
         logDebug('platform enabled event', ev);
@@ -315,7 +325,7 @@ export async function disconnect(): Promise<void> {
     }
   } finally {
     connectedDeviceId = null;
-    // cleanup listeners
+    // cleanup listeners (best effort)
     try { if (dataListener && typeof dataListener.remove === 'function') await dataListener.remove(); } catch (e) { logWarn('remove dataListener failed', e); }
     dataListener = null;
     try { if (disconnectListener && typeof disconnectListener.remove === 'function') await disconnectListener.remove(); } catch (e) { logWarn('remove disconnectListener failed', e); }
@@ -434,7 +444,7 @@ export async function stopEnabledListener(): Promise<void> {
   enabledSubscribers.clear();
 }
 
-/* onOK convenience */
+/* convenience onOK: trims and checks for 'ok' */
 async function onOK(callback: () => void): Promise<() => void> {
   logDebug('onOK registration');
   const unsub = await startDataListener((msg) => {

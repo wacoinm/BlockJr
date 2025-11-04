@@ -548,7 +548,6 @@ export default function GamepadPage() {
                       <Joystick
                         size={joystickSize}
                         stickSize={Math.round(joystickSize * 0.75)}
-                        controlPlaneShape={JoystickShape.AxisX}
                         baseShape={JoystickShape.Circle}
                         stickShape={JoystickShape.Circle}
                         baseColor={nearTransparentBase}

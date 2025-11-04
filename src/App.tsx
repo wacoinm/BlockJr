@@ -57,6 +57,8 @@ import EmergencyStopButton from './components/EmergencyStopButton';
 
 export const SoundContext = createContext<() => void>(() => {});
 
+const FIRST_RUN_KEY = 'blockjr:firstRunDone';
+
 const App: React.FC = () => {
   const dispatch = useDispatch();
   // read UI values from redux; cast to any for properties that may not be typed
@@ -281,6 +283,46 @@ const App: React.FC = () => {
     selectedProjectRef.current = selectedProject ?? null;
   }, [selectedProject]);
 
+  const startDialogueForChapter = useCallback(
+    async (chapterKey?: string | null) => {
+      try {
+        const chapterKeys = Object.keys(car);
+        if (chapterKeys.length === 0) return;
+
+        let key = chapterKey ?? chapterKeys[0];
+        if (!key || !car[key]) {
+          key = chapterKeys[0];
+        }
+
+        const rawMessages: any[] = Array.isArray(car[key]) ? car[key] : [];
+        setCurrentDialogueChapter(key);
+        const normalized = normalizeMessagesForSides(rawMessages);
+        
+        // Save to redux store
+        dispatch(setCurrentChapter(key));
+        dispatch(setMessages({ chapter: key, messages: normalized }));
+        
+        await dialogue(normalized as any);
+
+        // After dialogue finishes, show tasklist popup if exists for selected project + chapter.
+        try {
+          const projId = selectedProjectRef.current ?? selectedProject ?? 'ماشین';
+          const chapterKeyForTasklist = key;
+          const t = getTaskListForProject(projId, chapterKeyForTasklist);
+          if (t && t.tasks && t.tasks.length > 0) {
+            setActiveTaskList(t.tasks as TaskItem[]);
+            setShowTaskList(true);
+          }
+        } catch (err) {
+          console.warn('failed to load tasklist for project after dialogue', err);
+        }
+      } catch (err) {
+        console.warn("startDialogueForChapter failed", err);
+      }
+    },
+    [dialogue, selectedProject, dispatch],
+  );
+
   const { theme, cycleTheme } = useTheme('system');
 
   // If route param present, load that project's blocks and select it
@@ -350,6 +392,21 @@ const App: React.FC = () => {
 
           loaded = true;
           successfulCandidate = candidate;
+
+          // First-run: if this is the very first app run ever (localStorage), start the dialogue & tasklist
+          try {
+            if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+              const already = window.localStorage.getItem(FIRST_RUN_KEY);
+              if (!already) {
+                window.localStorage.setItem(FIRST_RUN_KEY, '1');
+                // start default chapter (fire and forget)
+                void startDialogueForChapter(null);
+              }
+            }
+          } catch (err) {
+            console.warn('failed to check/set localStorage first-run flag', err);
+          }
+
           break;
         } catch (err) {
           console.warn('Error while reading project candidate', candidate, err);
@@ -383,6 +440,19 @@ const App: React.FC = () => {
           console.warn('saveProjectFile threw synchronously', e);
         }
 
+        // First-run: if this is the very first app run ever (localStorage), start the dialogue & tasklist
+        try {
+          if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+            const already = window.localStorage.getItem(FIRST_RUN_KEY);
+            if (!already) {
+              window.localStorage.setItem(FIRST_RUN_KEY, '1');
+              void startDialogueForChapter(null);
+            }
+          }
+        } catch (err) {
+          console.warn('failed to check/set localStorage first-run flag (init empty)', err);
+        }
+
         return;
       }
 
@@ -391,7 +461,7 @@ const App: React.FC = () => {
       navigate('/', { replace: true });
     })();
     // keep deps explicit
-  }, [params?.id, navigate, handleProjectSelect, rawSubmitCapture]);
+  }, [params?.id, navigate, handleProjectSelect, rawSubmitCapture, startDialogueForChapter]);
 
   // ---------- NEW: execution UI state ----------
   const [isExecuting, setIsExecuting] = useState(false);
@@ -636,50 +706,11 @@ const App: React.FC = () => {
     });
   };
 
-  const startDialogueForChapter = useCallback(
-    async (chapterKey?: string | null) => {
-      try {
-        const chapterKeys = Object.keys(car);
-        if (chapterKeys.length === 0) return;
-
-        let key = chapterKey ?? chapterKeys[0];
-        if (!key || !car[key]) {
-          key = chapterKeys[0];
-        }
-
-        const rawMessages: any[] = Array.isArray(car[key]) ? car[key] : [];
-        setCurrentDialogueChapter(key);
-        const normalized = normalizeMessagesForSides(rawMessages);
-        
-        // Save to redux store
-        dispatch(setCurrentChapter(key));
-        dispatch(setMessages({ chapter: key, messages: normalized }));
-        
-        await dialogue(normalized as any);
-
-        // After dialogue finishes, show tasklist popup if exists for selected project + chapter.
-        try {
-          const projId = selectedProjectRef.current ?? selectedProject ?? 'ماشین';
-          const chapterKeyForTasklist = key;
-          const t = getTaskListForProject(projId, chapterKeyForTasklist);
-          if (t && t.tasks && t.tasks.length > 0) {
-            setActiveTaskList(t.tasks as TaskItem[]);
-            setShowTaskList(true);
-          }
-        } catch (err) {
-          console.warn('failed to load tasklist for project after dialogue', err);
-        }
-      } catch (err) {
-        console.warn("startDialogueForChapter failed", err);
-      }
-    },
-    [dialogue, selectedProject],
-  );
 
   // If navigated with state requesting autoStartDialogue, start it
   useEffect(() => {
     const navState: any = (location && (location as any).state) || null;
-    if (navState && navState.autoStartDialogue) {
+    if (navState && navState.autoStartDialogue && !window.localStorage.getItem(FIRST_RUN_KEY)) {
       const requestedChapter = navState.startChapter ?? null;
       void startDialogueForChapter(requestedChapter);
     }

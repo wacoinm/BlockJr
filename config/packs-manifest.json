@@ -38,12 +38,10 @@
       "name": "جرثقیل",
       "subtitle": "پروژه جرثقیل سقفی",
       "category": "آموزشی",
-      "imgsPath": "public/scenes/car/chapters/",
+      "imgsPath": "/scenes/car/chapters/",
       "storyModule": "src/assets/stories/car/index.ts",
       "storyDir": "src/assets/stories/car",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "isLock": true,
-      "lockReason": "محتوا در دست ساخت است"
+      "validatorPath": "src/utils/validators/car.validator.ts"
     },
     {
       "id": "منجنیق",
@@ -51,10 +49,12 @@
       "subtitle": "پروژه منجنیق",
       "category": "آموزشی",
       "description": "",
-      "imgsPath": "public/scenes/car/chapters/",
+      "imgsPath": "/scenes/car/chapters/",
       "storyModule": "src/assets/stories/car/index.ts",
       "storyDir": "src/assets/stories/car",
-      "validatorPath": "src/utils/validators/car.validator.ts"
+      "validatorPath": "src/utils/validators/car.validator.ts",
+      "isLock": true,
+      "lockReason": "محتوا در دست ساخت است"
     }
   ],
   "stories": [

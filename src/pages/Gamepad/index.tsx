@@ -27,18 +27,9 @@ function SpeedControl({ isFast, onChange }: { isFast: boolean; onChange: (fast: 
   );
 }
 
-/**
- * Gamepad page (rotated presentation wrapper).
- * - Outer layout preserved (no layout shift on resize)
- * - rot-inner is rotated visually
- * - joystick event coordinates are remapped to account for rotation
- * - horizontal scrolling disabled while rotated
- */
+/* ---------- Constants & Commands ---------- */
+const RATE_MS = 200; // throttle gating for consecutive sends (still respected)
 
-const RATE_MS = 200; // Changed to 200ms as requested
-const STRONG_PUSH_THRESHOLD = 0.75;
-
-/* ---------- Command formats ---------- */
 const Commands = {
   UP: 'up',
   DOWN: 'down',
@@ -64,20 +55,8 @@ function speedFromDistance(distance: number) {
 }
 
 /**
- * We rotate the inner content by +90deg (clockwise).
- * Pointer events from the joystick come in the rotated element's coordinate system,
- * but the logical X/Y we want to send to the device must be remapped so directions
- * match the visual orientation.
- *
- * For a +90deg rotation (clockwise), the mapping of coordinates is:
- *   visual_x = original_y
- *   visual_y = -original_x
-/**
- * So to recover "original" (logical) coordinates given the rotated event:
- *   logical_x = evt.x
- *   logical_y = evt.y
- *
- * We'll apply that remapping for all joystick move handlers.
+ * Remap joystick coords for +90deg visual rotation
+ * Given the rotated (visual) event, produce logical coordinates.
  */
 function remapForRotation(evt: any) {
   if (!evt) return evt;
@@ -85,20 +64,19 @@ function remapForRotation(evt: any) {
   if (typeof x !== "number" || typeof y !== "number") {
     return { x, y, distance, direction, ...rest };
   }
-  // For +90deg rotation:
+  // For +90deg rotation visual->logical:
   // logical_x = -visual_y
   // logical_y = visual_x
-  const logicalX = -y;  // Reverse y for x
-  const logicalY = x;   // Use x for y
+  const logicalX = -y;
+  const logicalY = x;
   return { ...rest, x: logicalX, y: logicalY, distance, direction };
 }
 
-/* ----------------- VISUAL WRAPPER (fixed to allow pointer events) ----------------- */
+/* ----------------- VISUAL WRAPPER ----------------- */
 function JoystickVisual({
   children,
   size = 180,
   active = false,
-  rotate = false,
 }: {
   children: React.ReactNode;
   size?: number;
@@ -175,16 +153,14 @@ export default function GamepadPage() {
   const [isFastMode, setIsFastMode] = useState(false);
 
   const lastSentMapRef = useRef<Record<string, number>>({});
-  const lastDirRef = useRef<Record<string, string>>({});
 
-  // new refs for autosend behavior
-  const lastEventRef = useRef<Record<string, any>>({});
-  const autoSendTimerRef = useRef<Record<string, number | null>>({});
-
-  // pending ack map: when true for a key, we will not issue further autosends for that key
+  // track pending ACK per key
   const pendingAckRef = useRef<Record<string, boolean>>({});
-  // pending ack timeout handlers (to avoid permanent deadlocks)
   const pendingAckTimeoutRef = useRef<Record<string, number | null>>({});
+
+  // holdCommand per controller: stores last-sent command signature while stick held
+  // when null => nothing currently held
+  const holdCommandRef = useRef<Record<string, string | null>>({});
 
   useEffect(() => {
     document.title = id ? `Gamepad — ${id}` : "Gamepad";
@@ -192,13 +168,19 @@ export default function GamepadPage() {
 
   const buildCommand = useCallback((commands: string[]) => {
     // Convert time to seconds and format commands
-    if (commands[0] === 'stop') return "stop" 
-    else if (commands[0] === Commands.LAMP_ON) return "lampon()"
-    else if (commands[0] === Commands.LAMP_OFF) return "lampoff()"
-    else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)"
-    else if (commands[0] === Commands.SPEED_LOW) return "speed(50)"
+    if (commands.length === 0) return "";
+    if (commands[0] === 'stop') return "stop";
+    else if (commands[0] === Commands.LAMP_ON) return "lampon()";
+    else if (commands[0] === Commands.LAMP_OFF) return "lampoff()";
+    else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)";
+    else if (commands[0] === Commands.SPEED_LOW) return "speed(50)";
+
     const timeInSec = RATE_MS / 1000; // Convert to seconds
-    const formattedCmds = commands.map(cmd => `${cmd}(${timeInSec})`);
+    const formattedCmds = commands.map(cmd => {
+      // if already formatted like "forward(55)" keep as is
+      if (cmd.includes("(") && cmd.includes(")")) return cmd;
+      return `${cmd}(${timeInSec})`;
+    });
     return formattedCmds.join('_');
   }, []);
 
@@ -206,11 +188,16 @@ export default function GamepadPage() {
   const sendCmd = useCallback(async (commands: string[], key: string = "global", { waitForAck = true } = {}) => {
     const now = Date.now();
     const last = lastSentMapRef.current[key] ?? 0;
-    if (now - last < RATE_MS) return;
+    if (now - last < RATE_MS) {
+      // throttle gating: avoid sending too often
+      return;
+    }
     lastSentMapRef.current[key] = now;
 
     try {
       const formattedCmd = buildCommand(commands);
+      if (!formattedCmd) return;
+
       const connected = await bluetoothService.isConnected();
       if (!connected) {
         toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
@@ -219,7 +206,6 @@ export default function GamepadPage() {
       // write to device
       await bluetoothService.sendString(formattedCmd);
 
-      // if we want to wait for OK, set pending ack and a safety timeout
       if (waitForAck) {
         pendingAckRef.current[key] = true;
         // clear previous timeout if any
@@ -236,7 +222,6 @@ export default function GamepadPage() {
         }, 2000);
         pendingAckTimeoutRef.current[key] = tid;
       }
-
     } catch (e) {
       console.error("Failed to send cmd", e);
       toast.error("خطا در ارسال فرمان بلوتوث.");
@@ -252,13 +237,11 @@ export default function GamepadPage() {
 
   // Send speed command when speed mode changes
   useEffect(() => {
-    // speed commands should wait for OK as well
-      sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed", { waitForAck: true });
-    }, [isFastMode, sendCmd]);
+    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed", { waitForAck: true });
+  }, [isFastMode, sendCmd]);
 
-    /* ---------- Data listener for ACK ("OK") ---------- */
-
-    useEffect(() => {
+  /* ---------- Data listener for ACK ("OK") ---------- */
+  useEffect(() => {
     let unsub: (() => void) | null = null;
 
     bluetoothService.onOK(() => {
@@ -277,20 +260,17 @@ export default function GamepadPage() {
     };
   }, []);
 
-  /* ---------- Autosend helpers ---------- */
-
-  // returns array of command strings or empty array
+  /* ---------- Commands derivation from joystick events ---------- */
   const commandsFromEvent = useCallback((controllerKey: string, evt: any): string[] => {
     if (!evt) return [];
     const e = remapForRotation(evt);
     const { x, y, distance } = e;
 
-    // fallback: if almost centered -> stop
+    // centered -> signal stop
     if ((Math.abs(x ?? 0) < 0.05) && (Math.abs(y ?? 0) < 0.05)) {
       return ['stop'];
     }
 
-    // per-controller logic similar to your existing handlers
     switch (controllerKey) {
       case "car": {
         const cmds: string[] = [];
@@ -341,105 +321,78 @@ export default function GamepadPage() {
     }
   }, []);
 
-  const startAutoSend = useCallback((key: string) => {
-    if (autoSendTimerRef.current[key]) return; // already running
-    // use window.setInterval so we can clear with window.clearInterval
-    const id = window.setInterval(() => {
-      const lastEvt = lastEventRef.current[key];
-      if (!lastEvt) {
-        // nothing to send — keep timer running until explicit stop for reliability
-        return;
-      }
+  /* ---------- Hold-based send logic (single-send while finger held) ---------- */
 
-      // If waiting for ack for this key, skip sending new command
-      if (pendingAckRef.current[key]) {
-        // console.debug(`[Gamepad] waiting for OK for key=${key}; skipping send`);
-        return;
-      }
+  // Helper: attempt to send a set of commands for a controller, but only if they differ
+  // from the currently held command. If commands == ['stop'] treat it as release (send stop and clear).
+  const trySendHoldCommand = useCallback(async (controllerKey: string, cmds: string[]) => {
+    if (!cmds || cmds.length === 0) return;
 
-      const cmds = commandsFromEvent(key, lastEvt);
-      if (cmds.length > 0) {
-        // autosend should wait for OK to enforce serial feedback loop
-        sendCmd(cmds, key, { waitForAck: true });
-      }
-    }, RATE_MS);
-    autoSendTimerRef.current[key] = id;
-  }, [commandsFromEvent, sendCmd]);
-
-  const stopAutoSend = useCallback((key: string) => {
-    const id = autoSendTimerRef.current[key];
-    if (id) {
-      window.clearInterval(id);
-      autoSendTimerRef.current[key] = null;
+    // If explicit 'stop' -> send stop immediately and clear hold
+    if (cmds.length === 1 && cmds[0] === 'stop') {
+      // send stop immediately without waiting for ACK (stop should be quick)
+      await sendCmd(['stop'], controllerKey, { waitForAck: false });
+      holdCommandRef.current[controllerKey] = null;
+      return;
     }
-    lastEventRef.current[key] = null;
 
-    // clear pending ack and timeout for this key as well
-    pendingAckRef.current[key] = false;
-    const prev = pendingAckTimeoutRef.current[key];
+    // create a signature for comparison (join by '|')
+    const signature = cmds.join('_');
+
+    // If same as currently held command, do nothing
+    if (holdCommandRef.current[controllerKey] === signature) {
+      return;
+    }
+
+    // If currently waiting for ACK for this key, skip sending new command until ack clears
+    if (pendingAckRef.current[controllerKey]) {
+      // skip sending until ack comes in; keep holdCommandRef as-is
+      return;
+    }
+
+    // send new command (we will wait for ACK)
+    await sendCmd(cmds, controllerKey, { waitForAck: true });
+
+    // record held command signature
+    holdCommandRef.current[controllerKey] = signature;
+  }, [sendCmd]);
+
+  // Helper to send stop on release
+  const handleRelease = useCallback(async (controllerKey: string) => {
+    // send stop; don't wait for ack (immediate)
+    await sendCmd(['stop'], controllerKey, { waitForAck: false });
+    // clear any pending ack / timeouts for this controller to avoid stale state
+    pendingAckRef.current[controllerKey] = false;
+    const prev = pendingAckTimeoutRef.current[controllerKey];
     if (prev) {
       window.clearTimeout(prev);
-      pendingAckTimeoutRef.current[key] = null;
+      pendingAckTimeoutRef.current[controllerKey] = null;
     }
-  }, []);
+    holdCommandRef.current[controllerKey] = null;
+  }, [sendCmd]);
 
-  // helper to immediately stop controller and stop autosend
-  const sendStopAndClear = useCallback((key: string) => {
-    // send stop but do NOT wait for ack here (stop should be immediate)
-    sendCmd(['stop'], key, { waitForAck: false });
-    stopAutoSend(key);
-  }, [sendCmd, stopAutoSend]);
+  /* ---------- JOYSTICK HANDLERS: compute commands and call trySendHoldCommand / handleRelease ---------- */
 
-  const toggleLight = useCallback(() => {
-    const next = !lightOn;
-    setLightOn(next);
-    const cmd = next ? Commands.LAMP_ON : Commands.LAMP_OFF;
-    // lights also wait for OK
-    sendCmd([cmd], "light", { waitForAck: true });
-  }, [lightOn, sendCmd]);
-
-  /* ---------- MOVE HANDLERS use remapForRotation + autosend ---------- */
-
-  const calculateEffectiveSpeed = useCallback((distance: number) => {
-    const baseSpeed = speedFromDistance(distance);
-    if (isFastMode) {
-      return distance >= STRONG_PUSH_THRESHOLD ? Math.max(baseSpeed, 90) : Math.max(baseSpeed, 45);
-    } else {
-      return distance >= STRONG_PUSH_THRESHOLD ? Math.max(baseSpeed, 70) : Math.max(baseSpeed, 30);
-    }
-  }, [isFastMode]);
-
-  // CAR handlers
   const onCarMove = useCallback((evt: any) => {
     if (!evt) return;
-    lastEventRef.current["car"] = evt;
-    startAutoSend("car");
-
     const cmds = commandsFromEvent("car", evt);
-    if (cmds.length > 0 && !pendingAckRef.current["car"]) {
-      // allow immediate send on move if not waiting for ack
-      sendCmd(cmds, "car", { waitForAck: true });
-    }
-  }, [startAutoSend, sendCmd, commandsFromEvent]);
+    trySendHoldCommand("car", cmds);
+  }, [commandsFromEvent, trySendHoldCommand]);
 
   const onCarStop = useCallback(() => {
-    sendStopAndClear("car");
-  }, [sendStopAndClear]);
+    handleRelease("car");
+  }, [handleRelease]);
 
-  // TELE handlers
   const onTeleMove = useCallback((evt: any) => {
     if (!evt) return;
-    lastEventRef.current["tele"] = evt;
-    startAutoSend("tele");
     const cmds = commandsFromEvent("tele", evt);
-    if (cmds.length > 0 && !pendingAckRef.current["tele"]) sendCmd(cmds, "tele", { waitForAck: true });
-  }, [startAutoSend, sendCmd, commandsFromEvent]);
+    trySendHoldCommand("tele", cmds);
+  }, [commandsFromEvent, trySendHoldCommand]);
 
   const onTeleStop = useCallback(() => {
-    sendStopAndClear("tele");
-  }, [sendStopAndClear]);
+    handleRelease("tele");
+  }, [handleRelease]);
 
-  // CRANE LEFT (movement)
   interface IJoystickUpdateEvent {
     x: number | null;
     y: number | null;
@@ -449,42 +402,54 @@ export default function GamepadPage() {
 
   const onCraneMoveLeft = useCallback((evt: IJoystickUpdateEvent) => {
     if (!evt) return;
-    lastEventRef.current["crane-move"] = evt;
-    startAutoSend("crane-move");
     const cmds = commandsFromEvent("crane-move", evt);
-    if (cmds.length > 0 && !pendingAckRef.current["crane-move"]) sendCmd(cmds, "crane-move", { waitForAck: true });
-  }, [startAutoSend, sendCmd, commandsFromEvent]);
+    trySendHoldCommand("crane-move", cmds);
+  }, [commandsFromEvent, trySendHoldCommand]);
 
   const onCraneMoveLeftStop = useCallback(() => {
-    sendStopAndClear("crane-move");
-  }, [sendStopAndClear]);
+    handleRelease("crane-move");
+  }, [handleRelease]);
 
-  // CRANE RIGHT (elevator)
   const onCraneMoveRight = useCallback((evt: IJoystickUpdateEvent) => {
     if (!evt) return;
-    lastEventRef.current["crane-elevator"] = evt;
-    startAutoSend("crane-elevator");
     const cmds = commandsFromEvent("crane-elevator", evt);
-    if (cmds.length > 0 && !pendingAckRef.current["crane-elevator"]) sendCmd(cmds, "crane-elevator", { waitForAck: true });
-  }, [startAutoSend, sendCmd, commandsFromEvent]);
+    trySendHoldCommand("crane-elevator", cmds);
+  }, [commandsFromEvent, trySendHoldCommand]);
 
   const onCraneMoveRightStop = useCallback(() => {
-    sendStopAndClear("crane-elevator");
-  }, [sendStopAndClear]);
+    handleRelease("crane-elevator");
+  }, [handleRelease]);
 
+  /* ---------- Cleanup on unmount ---------- */
   useEffect(() => {
     return () => {
-      // stop all timers
-      Object.keys(autoSendTimerRef.current).forEach(k => {
-        const id = autoSendTimerRef.current[k];
-        if (id) window.clearInterval(id);
-      });
-      // Send stop command to all controllers on unmount (do not wait for ack)
+      // send stop to all controllers on unmount (do not wait for ack)
       ["car", "tele", "crane-move", "crane-elevator", "fallback"].forEach((controller) => {
         sendCmd(['stop'], controller, { waitForAck: false });
+        // clear timeouts
+        const prev = pendingAckTimeoutRef.current[controller];
+        if (prev) {
+          window.clearTimeout(prev);
+          pendingAckTimeoutRef.current[controller] = null;
+        }
       });
     };
   }, [sendCmd]);
+
+  /* ---------- UI helpers ---------- */
+  const toggleLight = useCallback(() => {
+    const next = !lightOn;
+    setLightOn(next);
+    const cmd = next ? Commands.LAMP_ON : Commands.LAMP_OFF;
+    sendCmd([cmd], "light", { waitForAck: true });
+  }, [lightOn, sendCmd]);
+
+  useEffect(() => {
+    // reset holdCommandRef keys if none exist initially
+    ["car", "tele", "crane-move", "crane-elevator", "fallback", "speed", "light"].forEach(k => {
+      if (!(k in holdCommandRef.current)) holdCommandRef.current[k] = null;
+    });
+  }, []);
 
   const projectId = id ?? "";
   const isMobile = typeof window !== "undefined" ? window.innerWidth <= 420 : true;
@@ -495,15 +460,11 @@ export default function GamepadPage() {
 
   /* ---------- RENDER ---------- */
   return (
-    // Root takes the whole viewport and disables overflow to prevent scrollbars when rotated
     <div className="min-h-screen min-w-screen w-screen h-screen p-4 flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-black transition-colors duration-500 overflow-hidden">
-      {/* Wrapper that preserves layout; content inside will be rotated */}
       <div className="w-full h-full flex items-center justify-center" style={{ touchAction: "none" }}>
-        {/* rot-inner: this block is rotated +90deg (clockwise). 
-            We use viewport-based swapped sizes and overflow-hidden so no X-scroll appears. */}
         <div
           style={{
-            transform: "rotate(-90deg)", // Changed from 90deg to -90deg to reverse the rotation
+            transform: "rotate(-90deg)",
             transformOrigin: "center center",
             width: "100vh",
             height: "100vw",
@@ -566,7 +527,6 @@ export default function GamepadPage() {
 
               {projectId === "جرثقیل" && (
                 <>
-                  {/* Always horizontal layout (do not switch to column on small widths) */}
                   <div className="w-full flex flex-row gap-3 items-start justify-between">
                     <div className="flex-1 flex flex-col items-center gap-2">
                       <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">حرکت: جلو/عقب/چپ/راست</div>
@@ -651,20 +611,18 @@ export default function GamepadPage() {
                       stickImage={stickShape}
                       move={(e) => {
                         if (!e) return;
-                        // store last event and start autosend for fallback
-                        lastEventRef.current["fallback"] = e;
-                        startAutoSend("fallback");
-
                         const ev = remapForRotation(e);
                         const { x, y, distance } = ev;
-                        
+
                         if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
+                          // centered -> stop and clear hold
                           sendCmd(['stop'], "fallback", { waitForAck: false });
+                          holdCommandRef.current["fallback"] = null;
                           return;
                         }
 
                         const commands: string[] = [];
-                        
+
                         if (Math.abs(y) > Math.abs(x)) {
                           if (y < 0) {
                             commands.push(`forward(${speedFromDistance(distance ?? 0)})`);
@@ -679,13 +637,12 @@ export default function GamepadPage() {
                           }
                         }
 
-                        if (commands.length > 0 && !pendingAckRef.current["fallback"]) {
-                          sendCmd(commands, "fallback", { waitForAck: true });
-                        }
+                        // only send when changed and not waiting for ack
+                        trySendHoldCommand("fallback", commands);
                       }}
                       stop={() => {
                         sendCmd(['stop'], "fallback", { waitForAck: false });
-                        stopAutoSend("fallback");
+                        holdCommandRef.current["fallback"] = null;
                       }}
                       throttle={60}
                     />

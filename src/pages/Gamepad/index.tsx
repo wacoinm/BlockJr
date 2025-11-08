@@ -124,30 +124,145 @@ function JoystickVisual({
       <style>{`
         .joy-wrap { position: relative; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 8px; user-select: none; -webkit-tap-highlight-color: transparent; transition: filter 220ms ease, box-shadow 220ms ease; }
         .joy-decor, .joy-base, .joy-radials, .joy-center, .joy-shaft, .joy-glow, .dir-badge { pointer-events: none; }
-        .joy-decor { position: absolute; inset: 0; border-radius: 14px; z-index: 0; background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,249,255,0.95)); box-shadow: 0 10px 24px rgba(12, 24, 48, 0.06), inset 0 2px 6px rgba(255,255,255,0.6); }
-        .dark .joy-decor { background: linear-gradient(180deg, rgba(10,14,24,0.7), rgba(20,26,34,0.75)); box-shadow: 0 12px 28px rgba(2,6,12,0.6), inset 0 2px 6px rgba(255,255,255,0.02); }
-        .joy-base { position: absolute; inset: 10%; border-radius: 999px; z-index: 1; background: radial-gradient(circle at center, rgba(255,255,255,0.92), rgba(240,246,255,0.9)); box-shadow: inset 0 6px 18px rgba(12,20,40,0.04); overflow: hidden; }
-        .joy-base::before { content: ""; position: absolute; inset: 6%; border-radius: 999px; background: radial-gradient(circle, rgba(10,20,40,0.02) 0.5px, transparent 0.5px), repeating-radial-gradient(circle at center, rgba(10,14,30,0.02) 0 6px, transparent 6px 12px); opacity: 0.45; mix-blend-mode: multiply; }
-        .dark .joy-base { background: radial-gradient(circle at center, rgba(30,36,44,0.8), rgba(10,14,20,0.7)); box-shadow: inset 0 6px 18px rgba(0,0,0,0.6); }
-        .dark .joy-base::before { background: radial-gradient(circle, rgba(255,255,255,0.01) 0.5px, transparent 0.5px), repeating-radial-gradient(circle at center, rgba(255,255,255,0.01) 0 6px, transparent 6px 12px); opacity: 0.18; mix-blend-mode: overlay; }
+
+        /* LIGHT THEME — more gray for better contrast */
+        .joy-decor {
+          position: absolute;
+          inset: 0;
+          border-radius: 14px;
+          z-index: 0;
+          background: linear-gradient(180deg, rgba(215,219,225,0.96), rgba(195,200,210,0.95));
+          box-shadow: 0 8px 20px rgba(12,24,40,0.06), inset 0 2px 6px rgba(255,255,255,0.5);
+        }
+
+        /* DARK THEME — softened so details stay visible */
+        .dark .joy-decor {
+          background: linear-gradient(180deg, rgba(26,30,38,0.85), rgba(34,40,48,0.88));
+          box-shadow: 0 10px 24px rgba(0,0,0,0.55), inset 0 2px 6px rgba(255,255,255,0.03);
+        }
+
+        /* BASE DISC */
+        .joy-base {
+          position: absolute;
+          inset: 10%;
+          border-radius: 999px;
+          z-index: 1;
+          background: radial-gradient(circle at center, rgba(210,214,222,0.95), rgba(180,186,196,0.92));
+          box-shadow: inset 0 6px 18px rgba(0,0,0,0.06);
+          overflow: hidden;
+          border: 1px solid rgba(20,30,50,0.08);
+        }
+
+        .joy-base::before {
+          content: "";
+          position: absolute;
+          inset: 6%;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(20,30,40,0.03) 0.5px, transparent 0.5px),
+                      repeating-radial-gradient(circle at center, rgba(20,30,40,0.03) 0 6px, transparent 6px 12px);
+          opacity: 0.4;
+          mix-blend-mode: multiply;
+        }
+
+        .dark .joy-base {
+          background: radial-gradient(circle at center, rgba(50,58,70,0.86), rgba(30,36,44,0.84));
+          box-shadow: inset 0 6px 18px rgba(0,0,0,0.5);
+          border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .dark .joy-base::before {
+          background: radial-gradient(circle, rgba(255,255,255,0.02) 0.5px, transparent 0.5px),
+                      repeating-radial-gradient(circle at center, rgba(255,255,255,0.02) 0 6px, transparent 6px 12px);
+          opacity: 0.2;
+          mix-blend-mode: overlay;
+        }
+
         .joy-radials { position: absolute; inset: 8%; border-radius: 999px; z-index: 2; }
-        .joy-radials::before { content: ""; position: absolute; inset: 0; border-radius: 999px; background: conic-gradient(from 0deg, rgba(12,20,40,0.03) 0.5deg, transparent 1deg); opacity: 0.25; transform: rotate(8deg); }
-        .dark .joy-radials::before { background: conic-gradient(from 0deg, rgba(255,255,255,0.02) 0.5deg, transparent 1deg); opacity: 0.06; }
-        .joy-center { position: absolute; width: 52%; height: 52%; border-radius: 999px; z-index: 3; display:flex; align-items:center; justify-content:center; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,250,255,0.96)); box-shadow: inset 0 6px 14px rgba(0,0,0,0.04); }
-        .dark .joy-center { background: linear-gradient(180deg, rgba(40,48,58,0.9), rgba(18,22,28,0.9)); box-shadow: inset 0 6px 14px rgba(0,0,0,0.6); }
-        .joy-shaft { position: absolute; width: 8px; height: 50%; background: linear-gradient(180deg, #cfd8e3, #98a6bd); border-radius: 6px; z-index: 4; bottom: 50%; transform-origin: 50% 100%; box-shadow: 0 8px 18px rgba(8,12,20,0.08); transition: transform 120ms linear; }
-        .dark .joy-shaft { background: linear-gradient(180deg, rgba(130,144,160,0.12), rgba(90,100,120,0.12)); box-shadow: 0 8px 18px rgba(0,0,0,0.6); }
-        .joy-glow { position: absolute; inset: 6%; border-radius: 999px; z-index: 2; box-shadow: 0 22px 56px rgba(43, 108, 255, 0.08); opacity: 0; transition: opacity 160ms ease; }
+        .joy-radials::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 999px;
+          background: conic-gradient(from 0deg, rgba(20,30,40,0.04) 0.5deg, transparent 1deg);
+          opacity: 0.25;
+          transform: rotate(8deg);
+        }
+
+        .dark .joy-radials::before {
+          background: conic-gradient(from 0deg, rgba(255,255,255,0.04) 0.5deg, transparent 1deg);
+          opacity: 0.08;
+        }
+
+        .joy-center {
+          position: absolute;
+          width: 52%;
+          height: 52%;
+          border-radius: 999px;
+          z-index: 3;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          background: linear-gradient(180deg, rgba(250,252,255,0.96), rgba(226,230,238,0.95));
+          box-shadow: inset 0 6px 14px rgba(0,0,0,0.08);
+        }
+
+        .dark .joy-center {
+          background: linear-gradient(180deg, rgba(74,82,94,0.92), rgba(40,46,56,0.9));
+          box-shadow: inset 0 6px 14px rgba(0,0,0,0.55);
+        }
+
+        .joy-shaft {
+          position: absolute;
+          width: 8px;
+          height: 50%;
+          background: linear-gradient(180deg, #c5ccd8, #8e9bb0);
+          border-radius: 6px;
+          z-index: 4;
+          bottom: 50%;
+          transform-origin: 50% 100%;
+          box-shadow: 0 8px 18px rgba(8,12,20,0.08);
+          transition: transform 120ms linear;
+        }
+
+        .dark .joy-shaft {
+          background: linear-gradient(180deg, rgba(160,176,190,0.18), rgba(110,124,140,0.18));
+          box-shadow: 0 8px 18px rgba(0,0,0,0.6);
+        }
+
+        .joy-glow { position: absolute; inset: 6%; border-radius: 999px; z-index: 2; box-shadow: 0 22px 56px rgba(43,108,255,0.1); opacity: 0; transition: opacity 160ms ease; }
         .joy-glow.on { opacity: 1; }
-        .dark .joy-glow { box-shadow: 0 30px 80px rgba(60,140,255,0.16), 0 10px 24px rgba(20,30,70,0.12); }
-        .dir-badge { position: absolute; width: 28px; height: 28px; border-radius: 8px; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.9); box-shadow: 0 6px 14px rgba(6,12,24,0.08); z-index: 8; color: #123248; border: 1px solid rgba(18,50,72,0.06); }
+        .dark .joy-glow { box-shadow: 0 30px 80px rgba(60,140,255,0.18), 0 10px 24px rgba(20,30,70,0.15); }
+
+        .dir-badge {
+          position: absolute;
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          background: rgba(255,255,255,0.88);
+          box-shadow: 0 6px 14px rgba(6,12,24,0.08);
+          z-index: 8;
+          color: #123248;
+          border: 1px solid rgba(18,50,72,0.06);
+        }
+
+        .dark .dir-badge {
+          background: rgba(36,42,52,0.86);
+          color: #dbeafe;
+          border: 1px solid rgba(255,255,255,0.04);
+          box-shadow: 0 6px 14px rgba(0,0,0,0.45);
+        }
+
         .dir-up { top: 6%; left: 50%; transform: translate(-50%, 0); }
         .dir-down { bottom: 6%; left: 50%; transform: translate(-50%, 0); }
         .dir-left { left: 6%; top: 50%; transform: translate(0, -50%); }
         .dir-right { right: 6%; top: 50%; transform: translate(0, -50%); }
-        .dark .dir-badge { background: rgba(18,22,28,0.76); color: #dbeafe; border: 1px solid rgba(255,255,255,0.03); box-shadow: 0 6px 14px rgba(0,0,0,0.6); }
+
         .joy-holder { position: absolute; width: 58%; height: 58%; z-index: 9999; display:flex; align-items:center; justify-content:center; touch-action: none; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(90deg); pointer-events: auto; }
         .joy-holder > * { width: 100% !important; height: 100% !important; display: block; touch-action: none; pointer-events: auto; background: rgba(0,0,0,0.001); }
+
         @media (max-width: 420px) { .joy-shaft { width:6px; } .dir-badge { width:24px; height:24px; font-size:12px; } }
       `}</style>
 

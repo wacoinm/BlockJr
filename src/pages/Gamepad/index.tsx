@@ -175,11 +175,8 @@ export default function GamepadPage() {
     else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)";
     else if (commands[0] === Commands.SPEED_LOW) return "speed(50)";
 
-    const timeInSec = RATE_MS / 1000; // Convert to seconds
     const formattedCmds = commands.map(cmd => {
-      // if already formatted like "forward(55)" keep as is
-      if (cmd.includes("(") && cmd.includes(")")) return cmd;
-      return `${cmd}(${timeInSec})`;
+      return cmd;
     });
     return formattedCmds.join('_');
   }, []);
@@ -196,6 +193,7 @@ export default function GamepadPage() {
 
     try {
       const formattedCmd = buildCommand(commands);
+      console.log(formattedCmd)
       if (!formattedCmd) return;
 
       const connected = await bluetoothService.isConnected();
@@ -274,8 +272,8 @@ export default function GamepadPage() {
     switch (controllerKey) {
       case "car": {
         const cmds: string[] = [];
-        if (Math.abs(y) > 0.05) cmds.push(y < 0 ? Commands.UP : Commands.DOWN);
-        if (Math.abs(x) > 0.05) cmds.push(x < 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
+        if (Math.abs(y) <= 1 && Math.abs(y) > 0.75 ) cmds.push(y > 0 ? Commands.BACKWARD : Commands.FORWARD)
+        else cmds.push(x > 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
         return cmds;
       }
       case "tele": {

@@ -4,23 +4,53 @@ import { useParams, useNavigate } from "react-router";
 import { Joystick, JoystickShape } from "react-joystick-component";
 import bluetoothService from "../../utils/bluetoothService";
 import { toast } from "react-toastify";
-import { Lightbulb, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Rabbit, Turtle } from "lucide-react";
+import {
+  Lightbulb,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Rabbit,
+  Turtle,
+} from "lucide-react";
 import stickShape from "/shapeStick.svg";
 
 /**
  * Speed Control Component with animation
  */
-function SpeedControl({ isFast, onChange }: { isFast: boolean; onChange: (fast: boolean) => void }) {
+function SpeedControl({
+  isFast,
+  onChange,
+}: {
+  isFast: boolean;
+  onChange: (fast: boolean) => void;
+}) {
   return (
     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-full p-2 shadow-md transition-all duration-300">
-      <div className="relative w-16 h-8 rounded-full bg-slate-100 dark:bg-slate-700 cursor-pointer"
-           onClick={() => onChange(!isFast)}>
-        <div className={`absolute inset-y-1 w-7 bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-500 ease-in-out ${
-          isFast ? 'right-1' : 'left-1'
-        }`} />
-        <div className={`absolute inset-0 flex items-center justify-between px-1.5 transition-opacity duration-300`}>
-          <Turtle size={16} className={`text-slate-600 dark:text-slate-300 transition-opacity duration-300 ${isFast ? 'opacity-40' : 'opacity-100'}`} />
-          <Rabbit size={16} className={`text-slate-600 dark:text-slate-300 transition-opacity duration-300 ${isFast ? 'opacity-100' : 'opacity-40'}`} />
+      <div
+        className="relative w-16 h-8 rounded-full bg-slate-100 dark:bg-slate-700 cursor-pointer"
+        onClick={() => onChange(!isFast)}
+      >
+        <div
+          className={`absolute inset-y-1 w-7 bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-500 ease-in-out ${
+            isFast ? "right-1" : "left-1"
+          }`}
+        />
+        <div
+          className={`absolute inset-0 flex items-center justify-between px-1.5 transition-opacity duration-300`}
+        >
+          <Turtle
+            size={16}
+            className={`text-slate-600 dark:text-slate-300 transition-opacity duration-300 ${
+              isFast ? "opacity-40" : "opacity-100"
+            }`}
+          />
+          <Rabbit
+            size={16}
+            className={`text-slate-600 dark:text-slate-300 transition-opacity duration-300 ${
+              isFast ? "opacity-100" : "opacity-40"
+            }`}
+          />
         </div>
       </div>
     </div>
@@ -31,18 +61,18 @@ function SpeedControl({ isFast, onChange }: { isFast: boolean; onChange: (fast: 
 const RATE_MS = 200; // throttle gating for consecutive sends (still respected)
 
 const Commands = {
-  UP: 'up',
-  DOWN: 'down',
-  DELAY: 'delay',
-  GREEN_FLAG: 'green-flag',
-  FORWARD: 'forward',
-  BACKWARD: 'backward',
-  CLOCKWISE: 'turnright',
-  COUNTERCLOCKWISE: 'turnleft',
-  LAMP_ON: 'lampon',
-  LAMP_OFF: 'lampoff',
-  SPEED_LOW: 'speed-low',
-  SPEED_HIGH: 'speed-high',
+  UP: "up",
+  DOWN: "down",
+  DELAY: "delay",
+  GREEN_FLAG: "green-flag",
+  FORWARD: "forward",
+  BACKWARD: "backward",
+  CLOCKWISE: "turnright",
+  COUNTERCLOCKWISE: "turnleft",
+  LAMP_ON: "lampon",
+  LAMP_OFF: "lampoff",
+  SPEED_LOW: "speed-low",
+  SPEED_HIGH: "speed-high",
 } as const;
 
 /* ---------- helpers ---------- */
@@ -86,7 +116,11 @@ function JoystickVisual({
   const s = Math.max(80, Math.min(320, size));
 
   return (
-    <div style={{ width: s, height: s }} className="joy-wrap" aria-hidden={false}>
+    <div
+      style={{ width: s, height: s }}
+      className="joy-wrap"
+      aria-hidden={false}
+    >
       <style>{`
         .joy-wrap { position: relative; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 8px; user-select: none; -webkit-tap-highlight-color: transparent; transition: filter 220ms ease, box-shadow 220ms ease; }
         .joy-decor, .joy-base, .joy-radials, .joy-center, .joy-shaft, .joy-glow, .dir-badge { pointer-events: none; }
@@ -137,9 +171,7 @@ function JoystickVisual({
         <ArrowRight size={14} />
       </div>
 
-      <div className="joy-holder">
-        {children}
-      </div>
+      <div className="joy-holder">{children}</div>
     </div>
   );
 }
@@ -169,89 +201,100 @@ export default function GamepadPage() {
   const buildCommand = useCallback((commands: string[]) => {
     // Convert time to seconds and format commands
     if (commands.length === 0) return "";
-    if (commands[0] === 'stop') return "stop";
+    if (commands[0] === "stop") return "stop";
     else if (commands[0] === Commands.LAMP_ON) return "lampon()";
     else if (commands[0] === Commands.LAMP_OFF) return "lampoff()";
     else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)";
     else if (commands[0] === Commands.SPEED_LOW) return "speed(50)";
 
-    const formattedCmds = commands.map(cmd => {
+    const formattedCmds = commands.map((cmd) => {
       return cmd;
     });
-    return formattedCmds.join('_');
+    return formattedCmds.join("_");
   }, []);
 
   // sendCmd optionally waits for ACK by setting pendingAck[key] true
-  const sendCmd = useCallback(async (commands: string[], key: string = "global", { waitForAck = true } = {}) => {
-    const now = Date.now();
-    const last = lastSentMapRef.current[key] ?? 0;
-    if (now - last < RATE_MS) {
-      // throttle gating: avoid sending too often
-      return;
-    }
-    lastSentMapRef.current[key] = now;
-
-    try {
-      const formattedCmd = buildCommand(commands);
-      console.log(formattedCmd)
-      if (!formattedCmd) return;
-
-      const connected = await bluetoothService.isConnected();
-      if (!connected) {
-        toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
+  const sendCmd = useCallback(
+    async (
+      commands: string[],
+      key: string = "global",
+      { waitForAck = true } = {}
+    ) => {
+      const now = Date.now();
+      const last = lastSentMapRef.current[key] ?? 0;
+      if (now - last < RATE_MS) {
+        // throttle gating: avoid sending too often
         return;
       }
-      // write to device
-      await bluetoothService.sendString(formattedCmd);
+      lastSentMapRef.current[key] = now;
 
-      if (waitForAck) {
-        pendingAckRef.current[key] = true;
-        // clear previous timeout if any
+      try {
+        const formattedCmd = buildCommand(commands);
+        console.log(formattedCmd);
+        if (!formattedCmd) return;
+
+        const connected = await bluetoothService.isConnected();
+        if (!connected) {
+          toast.warn("بلوتوث متصل نیست — ابتدا دستگاه را متصل کنید.");
+          return;
+        }
+        // write to device
+        await bluetoothService.sendString(formattedCmd);
+
+        if (waitForAck) {
+          pendingAckRef.current[key] = true;
+          // clear previous timeout if any
+          const prev = pendingAckTimeoutRef.current[key];
+          if (prev) {
+            window.clearTimeout(prev);
+            pendingAckTimeoutRef.current[key] = null;
+          }
+          // safety fallback: if no OK received in 2000 ms, clear pending ack to avoid permanent lock
+          const tid = window.setTimeout(() => {
+            pendingAckRef.current[key] = false;
+            pendingAckTimeoutRef.current[key] = null;
+            console.warn(`[Gamepad] pending ACK timeout for key=${key}`);
+          }, 2000);
+          pendingAckTimeoutRef.current[key] = tid;
+        }
+      } catch (e) {
+        console.error("Failed to send cmd", e);
+        toast.error("خطا در ارسال فرمان بلوتوث.");
+        // clear pending ack if send failed
+        pendingAckRef.current[key] = false;
         const prev = pendingAckTimeoutRef.current[key];
         if (prev) {
           window.clearTimeout(prev);
           pendingAckTimeoutRef.current[key] = null;
         }
-        // safety fallback: if no OK received in 2000 ms, clear pending ack to avoid permanent lock
-        const tid = window.setTimeout(() => {
-          pendingAckRef.current[key] = false;
-          pendingAckTimeoutRef.current[key] = null;
-          console.warn(`[Gamepad] pending ACK timeout for key=${key}`);
-        }, 2000);
-        pendingAckTimeoutRef.current[key] = tid;
       }
-    } catch (e) {
-      console.error("Failed to send cmd", e);
-      toast.error("خطا در ارسال فرمان بلوتوث.");
-      // clear pending ack if send failed
-      pendingAckRef.current[key] = false;
-      const prev = pendingAckTimeoutRef.current[key];
-      if (prev) {
-        window.clearTimeout(prev);
-        pendingAckTimeoutRef.current[key] = null;
-      }
-    }
-  }, [buildCommand]);
+    },
+    [buildCommand]
+  );
 
   // Send speed command when speed mode changes
   useEffect(() => {
-    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed", { waitForAck: true });
+    sendCmd([isFastMode ? Commands.SPEED_HIGH : Commands.SPEED_LOW], "speed", {
+      waitForAck: true,
+    });
   }, [isFastMode, sendCmd]);
 
   /* ---------- Data listener for ACK ("OK") ---------- */
   useEffect(() => {
     let unsub: (() => void) | null = null;
 
-    bluetoothService.onOK(() => {
-      Object.keys(pendingAckRef.current).forEach((key) => {
-        pendingAckRef.current[key] = false;
-        const timeout = pendingAckTimeoutRef.current[key];
-        if (timeout) {
-          clearTimeout(timeout);
-          pendingAckTimeoutRef.current[key] = null;
-        }
-      });
-    }).then((u) => (unsub = u));
+    bluetoothService
+      .onOK(() => {
+        Object.keys(pendingAckRef.current).forEach((key) => {
+          pendingAckRef.current[key] = false;
+          const timeout = pendingAckTimeoutRef.current[key];
+          if (timeout) {
+            clearTimeout(timeout);
+            pendingAckTimeoutRef.current[key] = null;
+          }
+        });
+      })
+      .then((u) => (unsub = u));
 
     return () => {
       if (typeof unsub === "function") unsub();
@@ -259,133 +302,170 @@ export default function GamepadPage() {
   }, []);
 
   /* ---------- Commands derivation from joystick events ---------- */
-  const commandsFromEvent = useCallback((controllerKey: string, evt: any): string[] => {
-    if (!evt) return [];
-    const e = remapForRotation(evt);
-    const { x, y, distance } = e;
+  const commandsFromEvent = useCallback(
+    (controllerKey: string, evt: any): string[] => {
+      if (!evt) return [];
+      const e = remapForRotation(evt);
+      const { x, y, distance } = e;
 
-    // centered -> signal stop
-    if ((Math.abs(x ?? 0) < 0.05) && (Math.abs(y ?? 0) < 0.05)) {
-      return ['stop'];
-    }
+      // centered -> signal stop
+      if (Math.abs(x ?? 0) < 0.05 && Math.abs(y ?? 0) < 0.05) {
+        return ["stop"];
+      }
 
-    switch (controllerKey) {
-      case "car": {
-        const cmds: string[] = [];
-        if (Math.abs(y) <= 1 && Math.abs(y) > 0.75 ) cmds.push(y > 0 ? Commands.BACKWARD : Commands.FORWARD)
-        else cmds.push(x > 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
-        return cmds;
-      }
-      case "tele": {
-        const cmds: string[] = [];
-        if (Math.abs(y) > 0.05) cmds.push(y < 0 ? Commands.FORWARD : Commands.BACKWARD);
-        if (Math.abs(x) > 0.05) cmds.push(x < 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
-        return cmds;
-      }
-      case "crane-move": {
-        const cmds: string[] = [];
-        if (x == null || y == null) return [];
-        if (Math.abs(x) > Math.abs(y)) {
-          if (x > 0) cmds.push(Commands.CLOCKWISE);
-          else if (x < 0) cmds.push(Commands.COUNTERCLOCKWISE);
-        } else {
-          if (y < 0) cmds.push(Commands.FORWARD);
-          else if (y > 0) cmds.push(Commands.BACKWARD);
+      switch (controllerKey) {
+        case "car": {
+          const cmds: string[] = [];
+
+          // ensure numbers
+          if (typeof x !== "number" || typeof y !== "number") return [];
+
+          // small deadzone: treat near-center as stop
+          if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) {
+            return ["stop"];
+          }
+
+          // Decide major axis by magnitude: vertical wins -> forward/backward, horizontal wins -> turn
+          if (Math.abs(y) >= Math.abs(x)) {
+            // Vertical: y < 0 => forward, y > 0 => backward (matches your other handlers)
+            if (y < 0) cmds.push(Commands.FORWARD);
+            else cmds.push(Commands.BACKWARD);
+          } else {
+            // Horizontal: x > 0 => left (counterclockwise), x < 0 => right (clockwise)
+            if (x > 0) cmds.push(Commands.COUNTERCLOCKWISE);
+            else cmds.push(Commands.CLOCKWISE);
+          }
+          return cmds;
         }
-        return cmds;
-      }
-      case "crane-elevator": {
-        const cmds: string[] = [];
-        if (y == null) return [];
-        if (Math.abs(y) < 0.05) return ['stop'];
-        if (y < 0) cmds.push(Commands.UP);
-        else cmds.push(Commands.DOWN);
-        return cmds;
-      }
-      case "fallback": {
-        const cmds: string[] = [];
-        if ((Math.abs(x ?? 0) < 0.05) && (Math.abs(y ?? 0) < 0.05)) return ['stop'];
-        if (Math.abs(y) > Math.abs(x)) {
-          if (y < 0) cmds.push(`forward(${speedFromDistance(distance ?? 0)})`);
-          else cmds.push(`backward(${speedFromDistance(distance ?? 0)})`);
-        } else {
-          if (x > 0) cmds.push(`turnright(${speedFromDistance(distance ?? 0)})`);
-          else cmds.push(`turnleft(${speedFromDistance(distance ?? 0)})`);
+        case "tele": {
+          const cmds: string[] = [];
+          if (Math.abs(y) > 0.05)
+            cmds.push(y < 0 ? Commands.FORWARD : Commands.BACKWARD);
+          if (Math.abs(x) > 0.05)
+            cmds.push(x < 0 ? Commands.COUNTERCLOCKWISE : Commands.CLOCKWISE);
+          return cmds;
         }
-        return cmds;
+        case "crane-move": {
+          const cmds: string[] = [];
+          if (x == null || y == null) return [];
+          if (Math.abs(x) > Math.abs(y)) {
+            if (x > 0) cmds.push(Commands.CLOCKWISE);
+            else if (x < 0) cmds.push(Commands.COUNTERCLOCKWISE);
+          } else {
+            if (y < 0) cmds.push(Commands.FORWARD);
+            else if (y > 0) cmds.push(Commands.BACKWARD);
+          }
+          return cmds;
+        }
+        case "crane-elevator": {
+          const cmds: string[] = [];
+          if (y == null) return [];
+          if (Math.abs(y) < 0.05) return ["stop"];
+          if (y < 0) cmds.push(Commands.UP);
+          else cmds.push(Commands.DOWN);
+          return cmds;
+        }
+        case "fallback": {
+          const cmds: string[] = [];
+          if (Math.abs(x ?? 0) < 0.05 && Math.abs(y ?? 0) < 0.05)
+            return ["stop"];
+          if (Math.abs(y) > Math.abs(x)) {
+            if (y < 0)
+              cmds.push(`forward(${speedFromDistance(distance ?? 0)})`);
+            else cmds.push(`backward(${speedFromDistance(distance ?? 0)})`);
+          } else {
+            if (x > 0)
+              cmds.push(`turnright(${speedFromDistance(distance ?? 0)})`);
+            else cmds.push(`turnleft(${speedFromDistance(distance ?? 0)})`);
+          }
+          return cmds;
+        }
+        default:
+          return [];
       }
-      default:
-        return [];
-    }
-  }, []);
+    },
+    []
+  );
 
   /* ---------- Hold-based send logic (single-send while finger held) ---------- */
 
   // Helper: attempt to send a set of commands for a controller, but only if they differ
   // from the currently held command. If commands == ['stop'] treat it as release (send stop and clear).
-  const trySendHoldCommand = useCallback(async (controllerKey: string, cmds: string[]) => {
-    if (!cmds || cmds.length === 0) return;
+  const trySendHoldCommand = useCallback(
+    async (controllerKey: string, cmds: string[]) => {
+      if (!cmds || cmds.length === 0) return;
 
-    // If explicit 'stop' -> send stop immediately and clear hold
-    if (cmds.length === 1 && cmds[0] === 'stop') {
-      // send stop immediately without waiting for ACK (stop should be quick)
-      await sendCmd(['stop'], controllerKey, { waitForAck: false });
-      holdCommandRef.current[controllerKey] = null;
-      return;
-    }
+      // If explicit 'stop' -> send stop immediately and clear hold
+      if (cmds.length === 1 && cmds[0] === "stop") {
+        // send stop immediately without waiting for ACK (stop should be quick)
+        await sendCmd(["stop"], controllerKey, { waitForAck: false });
+        holdCommandRef.current[controllerKey] = null;
+        return;
+      }
 
-    // create a signature for comparison (join by '|')
-    const signature = cmds.join('_');
+      // create a signature for comparison (join by '|')
+      const signature = cmds.join("_");
 
-    // If same as currently held command, do nothing
-    if (holdCommandRef.current[controllerKey] === signature) {
-      return;
-    }
+      // If same as currently held command, do nothing
+      if (holdCommandRef.current[controllerKey] === signature) {
+        return;
+      }
 
-    // If currently waiting for ACK for this key, skip sending new command until ack clears
-    if (pendingAckRef.current[controllerKey]) {
-      // skip sending until ack comes in; keep holdCommandRef as-is
-      return;
-    }
+      // If currently waiting for ACK for this key, skip sending new command until ack clears
+      if (pendingAckRef.current[controllerKey]) {
+        // skip sending until ack comes in; keep holdCommandRef as-is
+        return;
+      }
 
-    // send new command (we will wait for ACK)
-    await sendCmd(cmds, controllerKey, { waitForAck: true });
+      // send new command (we will wait for ACK)
+      await sendCmd(cmds, controllerKey, { waitForAck: true });
 
-    // record held command signature
-    holdCommandRef.current[controllerKey] = signature;
-  }, [sendCmd]);
+      // record held command signature
+      holdCommandRef.current[controllerKey] = signature;
+    },
+    [sendCmd]
+  );
 
   // Helper to send stop on release
-  const handleRelease = useCallback(async (controllerKey: string) => {
-    // send stop; don't wait for ack (immediate)
-    await sendCmd(['stop'], controllerKey, { waitForAck: false });
-    // clear any pending ack / timeouts for this controller to avoid stale state
-    pendingAckRef.current[controllerKey] = false;
-    const prev = pendingAckTimeoutRef.current[controllerKey];
-    if (prev) {
-      window.clearTimeout(prev);
-      pendingAckTimeoutRef.current[controllerKey] = null;
-    }
-    holdCommandRef.current[controllerKey] = null;
-  }, [sendCmd]);
+  const handleRelease = useCallback(
+    async (controllerKey: string) => {
+      // send stop; don't wait for ack (immediate)
+      await sendCmd(["stop"], controllerKey, { waitForAck: false });
+      // clear any pending ack / timeouts for this controller to avoid stale state
+      pendingAckRef.current[controllerKey] = false;
+      const prev = pendingAckTimeoutRef.current[controllerKey];
+      if (prev) {
+        window.clearTimeout(prev);
+        pendingAckTimeoutRef.current[controllerKey] = null;
+      }
+      holdCommandRef.current[controllerKey] = null;
+    },
+    [sendCmd]
+  );
 
   /* ---------- JOYSTICK HANDLERS: compute commands and call trySendHoldCommand / handleRelease ---------- */
 
-  const onCarMove = useCallback((evt: any) => {
-    if (!evt) return;
-    const cmds = commandsFromEvent("car", evt);
-    trySendHoldCommand("car", cmds);
-  }, [commandsFromEvent, trySendHoldCommand]);
+  const onCarMove = useCallback(
+    (evt: any) => {
+      if (!evt) return;
+      const cmds = commandsFromEvent("car", evt);
+      trySendHoldCommand("car", cmds);
+    },
+    [commandsFromEvent, trySendHoldCommand]
+  );
 
   const onCarStop = useCallback(() => {
     handleRelease("car");
   }, [handleRelease]);
 
-  const onTeleMove = useCallback((evt: any) => {
-    if (!evt) return;
-    const cmds = commandsFromEvent("tele", evt);
-    trySendHoldCommand("tele", cmds);
-  }, [commandsFromEvent, trySendHoldCommand]);
+  const onTeleMove = useCallback(
+    (evt: any) => {
+      if (!evt) return;
+      const cmds = commandsFromEvent("tele", evt);
+      trySendHoldCommand("tele", cmds);
+    },
+    [commandsFromEvent, trySendHoldCommand]
+  );
 
   const onTeleStop = useCallback(() => {
     handleRelease("tele");
@@ -398,21 +478,27 @@ export default function GamepadPage() {
     angle?: number | null;
   }
 
-  const onCraneMoveLeft = useCallback((evt: IJoystickUpdateEvent) => {
-    if (!evt) return;
-    const cmds = commandsFromEvent("crane-move", evt);
-    trySendHoldCommand("crane-move", cmds);
-  }, [commandsFromEvent, trySendHoldCommand]);
+  const onCraneMoveLeft = useCallback(
+    (evt: IJoystickUpdateEvent) => {
+      if (!evt) return;
+      const cmds = commandsFromEvent("crane-move", evt);
+      trySendHoldCommand("crane-move", cmds);
+    },
+    [commandsFromEvent, trySendHoldCommand]
+  );
 
   const onCraneMoveLeftStop = useCallback(() => {
     handleRelease("crane-move");
   }, [handleRelease]);
 
-  const onCraneMoveRight = useCallback((evt: IJoystickUpdateEvent) => {
-    if (!evt) return;
-    const cmds = commandsFromEvent("crane-elevator", evt);
-    trySendHoldCommand("crane-elevator", cmds);
-  }, [commandsFromEvent, trySendHoldCommand]);
+  const onCraneMoveRight = useCallback(
+    (evt: IJoystickUpdateEvent) => {
+      if (!evt) return;
+      const cmds = commandsFromEvent("crane-elevator", evt);
+      trySendHoldCommand("crane-elevator", cmds);
+    },
+    [commandsFromEvent, trySendHoldCommand]
+  );
 
   const onCraneMoveRightStop = useCallback(() => {
     handleRelease("crane-elevator");
@@ -422,15 +508,17 @@ export default function GamepadPage() {
   useEffect(() => {
     return () => {
       // send stop to all controllers on unmount (do not wait for ack)
-      ["car", "tele", "crane-move", "crane-elevator", "fallback"].forEach((controller) => {
-        sendCmd(['stop'], controller, { waitForAck: false });
-        // clear timeouts
-        const prev = pendingAckTimeoutRef.current[controller];
-        if (prev) {
-          window.clearTimeout(prev);
-          pendingAckTimeoutRef.current[controller] = null;
+      ["car", "tele", "crane-move", "crane-elevator", "fallback"].forEach(
+        (controller) => {
+          sendCmd(["stop"], controller, { waitForAck: false });
+          // clear timeouts
+          const prev = pendingAckTimeoutRef.current[controller];
+          if (prev) {
+            window.clearTimeout(prev);
+            pendingAckTimeoutRef.current[controller] = null;
+          }
         }
-      });
+      );
     };
   }, [sendCmd]);
 
@@ -444,14 +532,23 @@ export default function GamepadPage() {
 
   useEffect(() => {
     // reset holdCommandRef keys if none exist initially
-    ["car", "tele", "crane-move", "crane-elevator", "fallback", "speed", "light"].forEach(k => {
+    [
+      "car",
+      "tele",
+      "crane-move",
+      "crane-elevator",
+      "fallback",
+      "speed",
+      "light",
+    ].forEach((k) => {
       if (!(k in holdCommandRef.current)) holdCommandRef.current[k] = null;
     });
   }, []);
 
   const projectId = id ?? "";
-  const isMobile = typeof window !== "undefined" ? window.innerWidth <= 420 : true;
-  const joystickSize = isMobile ? 120 : 140;
+  const isMobile =
+    typeof window !== "undefined" ? window.innerWidth <= 420 : true;
+  const joystickSize = isMobile ? 200 : 220;
 
   const nearTransparentBase = "rgba(0,0,0,0.01)";
   const nearTransparentStick = "rgba(255,255,255,0.92)";
@@ -459,7 +556,39 @@ export default function GamepadPage() {
   /* ---------- RENDER ---------- */
   return (
     <div className="min-h-screen min-w-screen w-screen h-screen p-4 flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-black transition-colors duration-500 overflow-hidden">
-      <div className="w-full h-full flex items-center justify-center" style={{ touchAction: "none" }}>
+      {/* Fixed top-left controls: Back, Light, Speed */}
+      <div className="fixed left-11 bottom-2 z-50 flex items-center flex-col gap-3 " style={{transform: "rotate(-90deg)"}}>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-3 py-2 rounded-md bg-neutral-100 dark:bg-neutral-800 shadow"
+          title="بازگشت"
+        >
+          بازگشت
+        </button>
+
+        <button
+          onClick={toggleLight}
+          aria-pressed={lightOn}
+          className={`p-2 rounded-full transition-transform duration-300 shadow ${
+            lightOn ? "scale-105" : ""
+          } bg-white dark:bg-slate-800`}
+          title={lightOn ? "خاموش کردن چراغ" : "روشن کردن چراغ"}
+        >
+          <Lightbulb
+            className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`}
+          />
+        </button>
+
+        <div className="mt-0">
+          <SpeedControl isFast={isFastMode} onChange={setIsFastMode} />
+        </div>
+      </div>
+
+      {/* Centered content */}
+      <div
+        className="w-full h-full flex items-center justify-center"
+        style={{ touchAction: "none" }}
+      >
         <div
           style={{
             transform: "rotate(-90deg)",
@@ -475,39 +604,26 @@ export default function GamepadPage() {
           }}
         >
           <div className="max-w-lg mx-auto">
-            <header className="flex items-center justify-between mb-4 flex-row-reverse">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleLight}
-                  aria-pressed={lightOn}
-                  className={`p-2 rounded-full transition-transform duration-300 shadow ${lightOn ? "scale-105" : ""} bg-white dark:bg-slate-800`}
-                  title={lightOn ? "خاموش کردن چراغ" : "روشن کردن چراغ"}
-                >
-                  <Lightbulb className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`} />
-                </button>
-                <SpeedControl isFast={isFastMode} onChange={setIsFastMode} />
-              </div>
-
-              <div className="text-end mx-12">
-                <h1 className="text-xl font-semibold">{projectId}</h1>
-                <p className="text-sm text-nowrap text-neutral-500 dark:text-neutral-400">کنترل از راه دور — صفحه‌ی بازی</p>
-              </div>
-
-              <button onClick={() => navigate(-1)} className="px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800">
-                بازگشت
-              </button>
+            {/* Small header left empty (controls are fixed) */}
+            <header className="flex items-center justify-between mb-4 flex-row-reverse pointer-events-none">
+              <div />
+              <div />
+              <div />
             </header>
 
             <div className="flex flex-col gap-6 mt-[6vw] items-center">
               {projectId === "ماشین" && (
                 <>
-                  <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">جوی‌استیک: حرکت بالا / پایین</div>
+                  <div className="text-sm text-center text-neutral-600 dark:text-neutral-300">
+                    جوی‌استیک: حرکت بالا / پایین
+                  </div>
                   <div className="w-full flex justify-center my-8">
                     <JoystickVisual size={joystickSize} active={false}>
                       <Joystick
-                        size={joystickSize}
-                        stickSize={Math.round(joystickSize * 0.75)}
+                        size={joystickSize + 1}
+                        stickSize={Math.round(joystickSize * 0.575)}
                         baseShape={JoystickShape.Circle}
+                        controlPlaneShape={JoystickShape.Circle}
                         stickShape={JoystickShape.Circle}
                         baseColor={nearTransparentBase}
                         stickColor={nearTransparentStick}
@@ -527,7 +643,9 @@ export default function GamepadPage() {
                 <>
                   <div className="w-full flex flex-row gap-3 items-start justify-between">
                     <div className="flex-1 flex flex-col items-center gap-2">
-                      <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">حرکت: جلو/عقب/چپ/راست</div>
+                      <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">
+                        حرکت: جلو/عقب/چپ/راست
+                      </div>
                       <JoystickVisual size={joystickSize} active={false}>
                         <Joystick
                           size={joystickSize}
@@ -547,7 +665,9 @@ export default function GamepadPage() {
                     </div>
 
                     <div className="flex-1 flex flex-col items-center gap-2">
-                      <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">بالا/پایین (محدود روی Y)</div>
+                      <div className="text-sm my-8 text-center text-neutral-600 text-nowrap dark:text-neutral-300">
+                        بالا/پایین (محدود روی Y)
+                      </div>
                       <JoystickVisual size={joystickSize} active={false}>
                         <Joystick
                           size={joystickSize}
@@ -571,7 +691,9 @@ export default function GamepadPage() {
 
               {projectId === "منجنیق" && (
                 <>
-                  <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">جوی‌استیک: فقط محور X (چپ/راست)</div>
+                  <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">
+                    جوی‌استیک: فقط محور X (چپ/راست)
+                  </div>
                   <div className="w-full flex justify-center my-8">
                     <JoystickVisual size={joystickSize} active={false}>
                       <Joystick
@@ -593,67 +715,90 @@ export default function GamepadPage() {
                 </>
               )}
 
-              {projectId !== "ماشین" && projectId !== "جرثقیل" && projectId !== "منجنیق" && (
-                <>
-                  <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">پروژه‌ی مشخص‌شده پشتیبانی نمی‌شود. یک جوی‌استیک عمومی نمایش داده شده است.</div>
-                  <JoystickVisual size={joystickSize} active={false}>
-                    <Joystick
-                      size={joystickSize}
-                      stickSize={Math.round(joystickSize * 0.75)}
-                      controlPlaneShape={JoystickShape.Circle}
-                      baseShape={JoystickShape.Circle}
-                      stickShape={JoystickShape.Circle}
-                      baseColor={nearTransparentBase}
-                      stickColor={nearTransparentStick}
-                      minDistance={0}
-                      stickImage={stickShape}
-                      move={(e) => {
-                        if (!e) return;
-                        const ev = remapForRotation(e);
-                        const { x, y, distance } = ev;
+              {projectId !== "ماشین" &&
+                projectId !== "جرثقیل" &&
+                projectId !== "منجنیق" && (
+                  <>
+                    <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">
+                      پروژه‌ی مشخص‌شده پشتیبانی نمی‌شود. یک جوی‌استیک عمومی
+                      نمایش داده شده است.
+                    </div>
+                    <JoystickVisual size={joystickSize} active={false}>
+                      <Joystick
+                        size={joystickSize}
+                        stickSize={Math.round(joystickSize * 0.75)}
+                        controlPlaneShape={JoystickShape.Circle}
+                        baseShape={JoystickShape.Circle}
+                        stickShape={JoystickShape.Circle}
+                        baseColor={nearTransparentBase}
+                        stickColor={nearTransparentStick}
+                        minDistance={0}
+                        stickImage={stickShape}
+                        move={(e) => {
+                          if (!e) return;
+                          const ev = remapForRotation(e);
+                          const { x, y, distance } = ev;
 
-                        if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
-                          // centered -> stop and clear hold
-                          sendCmd(['stop'], "fallback", { waitForAck: false });
+                          if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
+                            // centered -> stop and clear hold
+                            sendCmd(["stop"], "fallback", {
+                              waitForAck: false,
+                            });
+                            holdCommandRef.current["fallback"] = null;
+                            return;
+                          }
+
+                          const commands: string[] = [];
+
+                          if (Math.abs(y) > Math.abs(x)) {
+                            if (y < 0) {
+                              commands.push(
+                                `forward(${speedFromDistance(distance ?? 0)})`
+                              );
+                            } else {
+                              commands.push(
+                                `backward(${speedFromDistance(distance ?? 0)})`
+                              );
+                            }
+                          } else {
+                            if (x > 0) {
+                              commands.push(
+                                `turnright(${speedFromDistance(distance ?? 0)})`
+                              );
+                            } else {
+                              commands.push(
+                                `turnleft(${speedFromDistance(distance ?? 0)})`
+                              );
+                            }
+                          }
+
+                          // only send when changed and not waiting for ack
+                          trySendHoldCommand("fallback", commands);
+                        }}
+                        stop={() => {
+                          sendCmd(["stop"], "fallback", { waitForAck: false });
                           holdCommandRef.current["fallback"] = null;
-                          return;
-                        }
-
-                        const commands: string[] = [];
-
-                        if (Math.abs(y) > Math.abs(x)) {
-                          if (y < 0) {
-                            commands.push(`forward(${speedFromDistance(distance ?? 0)})`);
-                          } else {
-                            commands.push(`backward(${speedFromDistance(distance ?? 0)})`);
-                          }
-                        } else {
-                          if (x > 0) {
-                            commands.push(`turnright(${speedFromDistance(distance ?? 0)})`);
-                          } else {
-                            commands.push(`turnleft(${speedFromDistance(distance ?? 0)})`);
-                          }
-                        }
-
-                        // only send when changed and not waiting for ack
-                        trySendHoldCommand("fallback", commands);
-                      }}
-                      stop={() => {
-                        sendCmd(['stop'], "fallback", { waitForAck: false });
-                        holdCommandRef.current["fallback"] = null;
-                      }}
-                      throttle={60}
-                    />
-                  </JoystickVisual>
-                </>
-              )}
+                        }}
+                        throttle={60}
+                      />
+                    </JoystickVisual>
+                  </>
+                )}
             </div>
 
-            <footer dir="rtl" className="mt-8 text-xs text-neutral-500 dark:text-neutral-400 text-center">
+            <footer className="mt-8 text-xs text-neutral-500 dark:text-neutral-400 text-center pointer-events-none">
               توجه: قبل از استفاده، از طریق بخش بلوتوث به دستگاه متصل شوید.
             </footer>
           </div>
         </div>
+      </div>
+
+      {/* Fixed project title + subtitle at right-bottom for all projects */}
+      <div className="fixed top-10 left-1 z-50 text-right text-wrap" style={{transform: "rotate(-90deg)"}}>
+        <h1 className="text-xl font-semibold">{projectId}</h1>
+        <p className="text-sm w-20 text-neutral-500 dark:text-neutral-400">
+         صفحه‌ی بازی
+        </p>
       </div>
     </div>
   );

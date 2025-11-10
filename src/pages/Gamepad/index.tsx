@@ -1,7 +1,6 @@
 // src/pages/Gamepad/index.tsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { Joystick, JoystickShape } from "react-joystick-component";
 import bluetoothService from "../../utils/bluetoothService";
 import { toast } from "react-toastify";
 import {
@@ -102,7 +101,7 @@ function remapForRotation(evt: any) {
   return { ...rest, x: logicalX, y: logicalY, distance, direction };
 }
 
-/* ----------------- VISUAL WRAPPER ----------------- */
+/* ----------------- VISUAL WRAPPER (KEEP STYLES UNCHANGED) ----------------- */
 function JoystickVisual({
   children,
   size = 180,
@@ -287,6 +286,276 @@ function JoystickVisual({
       </div>
 
       <div className="joy-holder">{children}</div>
+    </div>
+  );
+}
+
+/* ----------------- Custom Joystick (pointer-based) ----------------- */
+
+type JoystickEvent = {
+  x: number; // -1..1 (right positive)
+  y: number; // -1..1 (down positive)
+  distance: number; // 0..1
+  angle: number; // degrees (-180..180)
+  pointerType?: string;
+};
+
+function useThrottle(ms: number) {
+  const lastRef = useRef<number>(0);
+  return function allowed(): boolean {
+    const now = Date.now();
+    if (now - lastRef.current >= ms) {
+      lastRef.current = now;
+      return true;
+    }
+    return false;
+  };
+}
+function CustomJoystick({
+  size = 250,
+  stickSizePercentage = 0.35,
+  throttle = 30,
+  axis = "both", // "both" | "x" | "y"
+  move,
+  start,
+  stop,
+  stickImage,
+  safeZonePercentage = 0.3, // NEW: 0..1 fraction of usable radius
+}: {
+  size?: number;
+  stickSizePercentage?: number;
+  minDistance?: number;
+  throttle?: number;
+  axis?: "both" | "x" | "y";
+  move?: (evt: JoystickEvent) => void;
+  start?: (evt?: JoystickEvent) => void;
+  stop?: () => void;
+  stickImage?: string;
+  safeZonePercentage?: number;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const activeRef = useRef(false);
+  const pointerIdRef = useRef<number | null>(null);
+  const stickRef = useRef<HTMLDivElement | null>(null);
+  const allowed = useThrottle(throttle);
+
+  // track whether pointer is currently considered "inside" the safe zone
+  const inSafeZoneRef = useRef(true);
+
+  // small helper: clamp 0..1
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+  // Helper to emit event
+  const emit = useCallback(
+    (clientX: number, clientY: number, pointerType?: string) => {
+      const el = ref.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const radius = Math.min(rect.width, rect.height) / 2;
+
+      // raw delta from center (screen coords: +y is down)
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+
+      // visual stick radius (px)
+      const stickRadiusPx = radius * stickSizePercentage;
+      // maximum movement for the stick center so it doesn't go outside the base
+      const maxPx = Math.max(1, radius - stickRadiusPx) + 20;
+
+      // clamp the visual displacement to the circle of radius maxPx
+      const distPx = Math.hypot(dx, dy);
+      let clampedDx = dx;
+      let clampedDy = dy;
+      if (distPx > maxPx && distPx > 0) {
+        const scale = maxPx / distPx;
+        clampedDx = dx * scale;
+        clampedDy = dy * scale;
+      }
+
+      // axis locks must affect both visual and logical values
+      if (axis === "x") {
+        clampedDy = 0;
+        dy = 0;
+      } else if (axis === "y") {
+        clampedDx = 0;
+        dx = 0;
+      }
+
+      // normalized distance 0..1 (based on maxPx)
+      const distanceNorm = clamp01(Math.hypot(clampedDx, clampedDy) / maxPx);
+
+      // Logical normalized coordinates in range -1..1
+      // IMPORTANT: invert Y so that "up" (screen negative dy) becomes positive logical Y.
+      const nx = clamp01(Math.abs(clampedDx / maxPx)) * (clampedDx < 0 ? -1 : 1);
+      const ny = clamp01(Math.abs(-clampedDy / maxPx)) * (clampedDy < 0 ? 1 : -1);
+
+      // angle: compute with inverted Y so 0° = right, 90° = up
+      const angleRad = Math.atan2(-clampedDy, clampedDx);
+      let angleDeg = (angleRad * 180) / Math.PI;
+      if (angleDeg < 0) angleDeg += 360;
+
+      // SAFE ZONE logic:
+      const safePerc = clamp01(safeZonePercentage); // ensure 0..1
+      const currentlyInsideSafe = distanceNorm <= safePerc;
+
+      // transition: inside -> outside  => should start sending (call start then move)
+      if (inSafeZoneRef.current && !currentlyInsideSafe) {
+        inSafeZoneRef.current = false;
+        // create event object for start
+        const startEv: JoystickEvent = {
+          x: nx,
+          y: ny,
+          distance: distanceNorm,
+          angle: angleDeg,
+          pointerType,
+        };
+        if (start) start(startEv);
+        // fall through to move below (subject to throttle)
+      }
+
+      // transition: outside -> inside => should stop sending (call stop) and do not call move
+      if (!inSafeZoneRef.current && currentlyInsideSafe) {
+        inSafeZoneRef.current = true;
+        if (stickRef.current) {
+          // optionally snap visual stick to center when entering safe zone
+          stickRef.current.style.transition = "transform 120ms ease";
+          stickRef.current.style.transform = `translate(0px, 0px)`;
+        }
+        if (stop) stop();
+        return; // don't call move while inside safe zone
+      }
+
+      // move visual stick (use clamped values) — only for visual, even if inside safe zone we may keep center
+      if (stickRef.current) {
+        stickRef.current.style.transform = `translate(${clampedDx}px, ${clampedDy}px)`;
+      }
+
+      // if currently inside safe zone, don't emit move
+      if (currentlyInsideSafe) {
+        return;
+      }
+
+      // At this point: outside safe zone and we may send move (throttled)
+      const ev: JoystickEvent = {
+        x: nx,
+        y: ny,
+        distance: distanceNorm,
+        angle: angleDeg,
+        pointerType,
+      };
+      if (move && allowed()) move(ev);
+    },
+    [axis, move, stickSizePercentage, safeZonePercentage, start, stop, throttle]
+  );
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    function onPointerDown(e: PointerEvent) {
+      if (pointerIdRef.current != null) return;
+      pointerIdRef.current = e.pointerId;
+      try {
+        (e.target as Element).setPointerCapture(e.pointerId);
+      } catch {}
+      activeRef.current = true;
+      if (stickRef.current) {
+        stickRef.current.style.transition = "transform 0s";
+        stickRef.current.style.willChange = "transform";
+      }
+      // Reset safe-zone state: treat initial pointer as "inside" until checked by emit
+      inSafeZoneRef.current = true;
+      // Let emit decide whether to call start/stop/move according to safe zone
+      emit(e.clientX, e.clientY, e.pointerType);
+      // don't call start() here unconditionally — emit handles transitions
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      if (!activeRef.current) return;
+      if (pointerIdRef.current !== e.pointerId) return;
+      emit(e.clientX, e.clientY, e.pointerType);
+    }
+
+    function onPointerUp(e: PointerEvent) {
+      if (pointerIdRef.current !== e.pointerId) return;
+      try {
+        (e.target as Element).releasePointerCapture(e.pointerId);
+      } catch {}
+      pointerIdRef.current = null;
+      activeRef.current = false;
+      inSafeZoneRef.current = true; // reset safe zone on release
+      if (stickRef.current) {
+        stickRef.current.style.transition = "transform 120ms ease";
+        stickRef.current.style.transform = `translate(0px, 0px)`;
+      }
+      // call stop regardless (user expectation on release)
+      if (stop) stop();
+    }
+
+    el.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      el.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [emit, start, stop]);
+
+  const stickSize = Math.round(size * stickSizePercentage);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        width: size,
+        height: size,
+        position: "relative",
+        touchAction: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      aria-hidden={false}
+    >
+      <div
+        ref={stickRef}
+        style={{
+          position: "absolute",
+          width: stickSize,
+          height: stickSize,
+          borderRadius: "999px",
+          transform: "translate(0px, 0px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+          zIndex: 10000,
+        }}
+      >
+        {stickImage ? (
+          <img
+            src={stickImage}
+            alt="stick"
+            style={{ width: "100%", height: "100%", display: "block" }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.95)",
+              boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -734,19 +1003,25 @@ export default function GamepadPage() {
                   </div>
                   <div className="w-full flex justify-center my-8">
                     <JoystickVisual size={joystickSize} active={false}>
-                      <Joystick
+                      <CustomJoystick
                         size={joystickSize + 1}
-                        stickSize={Math.round(joystickSize * 0.575)}
-                        baseShape={JoystickShape.Circle}
-                        controlPlaneShape={JoystickShape.Circle}
-                        stickShape={JoystickShape.Circle}
-                        baseColor={nearTransparentBase}
-                        stickColor={nearTransparentStick}
+                        stickSizePercentage={0.575}
                         minDistance={0}
-                        move={onCarMove}
-                        stop={onCarStop}
-                        start={() => {}}
                         throttle={30}
+                        axis="both" /* keep unrestricted (original used Circle) */
+                        move={(e) => {
+                          // remap for rotation happens later in commandsFromEvent
+                          onCarMove({
+                            x: e.x,
+                            y: e.y,
+                            distance: e.distance,
+                            angle: e.angle,
+                          });
+                        }}
+                        stop={() => {
+                          onCarStop();
+                        }}
+                        start={() => {}}
                         stickImage={stickShape}
                       />
                     </JoystickVisual>
@@ -762,18 +1037,22 @@ export default function GamepadPage() {
                         حرکت: جلو/عقب/چپ/راست
                       </div>
                       <JoystickVisual size={joystickSize} active={false}>
-                        <Joystick
+                        <CustomJoystick
                           size={joystickSize}
-                          stickSize={Math.round(joystickSize * 0.65)}
-                          controlPlaneShape={JoystickShape.Circle}
-                          baseShape={JoystickShape.Circle}
-                          stickShape={JoystickShape.Circle}
-                          baseColor={nearTransparentBase}
-                          stickColor={nearTransparentStick}
+                          stickSizePercentage={0.65}
                           minDistance={0}
-                          move={onCraneMoveLeft}
-                          stop={onCraneMoveLeftStop}
                           throttle={25}
+                          axis="both" /* original used Circle */
+                          move={(e) =>
+                            onCraneMoveLeft({
+                              x: e.x,
+                              y: e.y,
+                              distance: e.distance,
+                              angle: e.angle,
+                            })
+                          }
+                          stop={onCraneMoveLeftStop}
+                          start={() => {}}
                           stickImage={stickShape}
                         />
                       </JoystickVisual>
@@ -784,18 +1063,22 @@ export default function GamepadPage() {
                         بالا/پایین (محدود روی Y)
                       </div>
                       <JoystickVisual size={joystickSize} active={false}>
-                        <Joystick
+                        <CustomJoystick
                           size={joystickSize}
-                          stickSize={Math.round(joystickSize * 0.65)}
-                          controlPlaneShape={JoystickShape.AxisX}
-                          baseShape={JoystickShape.Circle}
-                          stickShape={JoystickShape.Circle}
-                          baseColor={nearTransparentBase}
-                          stickColor={nearTransparentStick}
+                          stickSizePercentage={0.65}
                           minDistance={0}
-                          move={onCraneMoveRight}
-                          stop={onCraneMoveRightStop}
                           throttle={25}
+                          axis="x" /* original had AxisX — keep that restriction */
+                          move={(e) =>
+                            onCraneMoveRight({
+                              x: e.x,
+                              y: e.y,
+                              distance: e.distance,
+                              angle: e.angle,
+                            })
+                          }
+                          stop={onCraneMoveRightStop}
+                          start={() => {}}
                           stickImage={stickShape}
                         />
                       </JoystickVisual>
@@ -811,18 +1094,22 @@ export default function GamepadPage() {
                   </div>
                   <div className="w-full flex justify-center my-8">
                     <JoystickVisual size={joystickSize} active={false}>
-                      <Joystick
+                      <CustomJoystick
                         size={joystickSize}
-                        stickSize={Math.round(joystickSize * 0.75)}
-                        controlPlaneShape={JoystickShape.AxisX}
-                        baseShape={JoystickShape.Circle}
-                        stickShape={JoystickShape.Circle}
-                        baseColor={nearTransparentBase}
-                        stickColor={nearTransparentStick}
+                        stickSizePercentage={0.75}
                         minDistance={0}
-                        move={onTeleMove}
-                        stop={onTeleStop}
                         throttle={30}
+                        axis="x" /* original used AxisX */
+                        move={(e) =>
+                          onTeleMove({
+                            x: e.x,
+                            y: e.y,
+                            distance: e.distance,
+                            angle: e.angle,
+                          })
+                        }
+                        stop={onTeleStop}
+                        start={() => {}}
                         stickImage={stickShape}
                       />
                     </JoystickVisual>
@@ -839,19 +1126,20 @@ export default function GamepadPage() {
                       نمایش داده شده است.
                     </div>
                     <JoystickVisual size={joystickSize} active={false}>
-                      <Joystick
+                      <CustomJoystick
                         size={joystickSize}
-                        stickSize={Math.round(joystickSize * 0.75)}
-                        controlPlaneShape={JoystickShape.Circle}
-                        baseShape={JoystickShape.Circle}
-                        stickShape={JoystickShape.Circle}
-                        baseColor={nearTransparentBase}
-                        stickColor={nearTransparentStick}
+                        stickSizePercentage={0.75}
                         minDistance={0}
-                        stickImage={stickShape}
+                        throttle={60}
+                        axis="both"
                         move={(e) => {
                           if (!e) return;
-                          const ev = remapForRotation(e);
+                          const ev = remapForRotation({
+                            x: e.x,
+                            y: e.y,
+                            distance: e.distance,
+                            angle: e.angle,
+                          });
                           const { x, y, distance } = ev;
 
                           if (Math.abs(y) < 0.05 && Math.abs(x) < 0.05) {
@@ -894,7 +1182,6 @@ export default function GamepadPage() {
                           sendCmd(["stop"], "fallback", { waitForAck: false });
                           holdCommandRef.current["fallback"] = null;
                         }}
-                        throttle={60}
                       />
                     </JoystickVisual>
                   </>

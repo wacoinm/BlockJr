@@ -57,7 +57,7 @@ function SpeedControl({
 }
 
 /* ---------- Constants & Commands ---------- */
-const RATE_MS = 200; // throttle gating for consecutive sends (still respected)
+const RATE_MS = 0; // throttle gating for consecutive sends (still respected)
 
 const Commands = {
   UP: "up",
@@ -482,7 +482,7 @@ function CustomJoystick({
       if (pointerIdRef.current !== e.pointerId) return;
       try {
         (e.target as Element).releasePointerCapture(e.pointerId);
-      } catch {}
+      } catch { /* empty */ }
       pointerIdRef.current = null;
       activeRef.current = false;
       inSafeZoneRef.current = true; // reset safe zone on release
@@ -687,7 +687,7 @@ export default function GamepadPage() {
 
   /* ---------- Commands derivation from joystick events ---------- */
   const commandsFromEvent = useCallback(
-    (controllerKey: string, evt: any): string[] => {
+    (controllerKey: string, evt: unknown): string[] => {
       if (!evt) return [];
       const e = remapForRotation(evt);
       const { x, y, distance } = e;
@@ -797,8 +797,11 @@ export default function GamepadPage() {
 
       // If currently waiting for ACK for this key, skip sending new command until ack clears
       if (pendingAckRef.current[controllerKey]) {
-        // skip sending until ack comes in; keep holdCommandRef as-is
         return;
+      }
+
+      if (holdCommandRef.current[controllerKey]){
+        await sendCmd(["stop"], `${controllerKey}-stop`, { waitForAck: false });
       }
 
       // send new command (we will wait for ACK)
@@ -806,6 +809,7 @@ export default function GamepadPage() {
 
       // record held command signature
       holdCommandRef.current[controllerKey] = signature;
+
     },
     [sendCmd]
   );

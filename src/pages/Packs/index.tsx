@@ -221,7 +221,7 @@ const PacksPage: React.FC = () => {
       </main>
 
       <QRScannerFAB onScanned={handleScanned} />
-      <ToastContainer position="top-right" />
+      {/* <ToastContainer position="top-right" /> */}
     </div>
   );
 };

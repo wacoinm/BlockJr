@@ -1,59 +1,38 @@
 {
   "characters": {
-    "andy": [
-      "default.png",
-      "out.png",
-      "proud.png",
-      "surprised.png"
+    "arash": [
+      "default.png", 
+      "1.png",       
+      "2.png",       
+      "3.png",       
+      "4.png",       
+      "5.png",       
+      "6.png",       
+      "7.png",       
+      "8.png",       
+      "9.png"        
     ],
-    "andy-mother": [
-      "affectionate.png",
-      "default.png",
-      "encouraging.png",
-      "suprised.png"
+    "sina": [
+      "default.png", 
+      "1.png",       
+      "2.png",       
+      "3.png",       
+      "4.png",       
+      "5.png",       
+      "6.png",       
+      "7.png",       
+      "8.png"        
     ],
-    "buzz": [
-      "brave.png",
-      "celebrating.png",
-      "default.png",
-      "think.png",
-      "worried.png"
-    ],
-    "mr-potato": [
-      "approving.png",
-      "critical.png",
-      "default.png",
-      "directing.png"
-    ],
-    "ms-potato": [
-      "focused.png",
-      "playful.png",
-      "warm.png"
-    ],
-    "piggy": [
-      "default.png",
-      "joking.png",
-      "serious.png",
-      "thoughtful.png"
-    ],
-    "rex": [
-      "default.png",
-      "nervous.png",
-      "proud.png",
-      "secret.png"
-    ],
-    "slinky": [
-      "caching.png",
-      "default.png",
-      "playful.png",
-      "proud.png"
-    ],
-    "woody": [
-      "calm.png",
-      "default.png",
-      "happy.png",
-      "poud.png",
-      "suprised.png"
+    "mohammad": [
+      "default.png", 
+      "1.png",       
+      "2.png",       
+      "3.png",       
+      "4.png",       
+      "5.png",       
+      "6.png",       
+      "7.png",       
+      "8.png"        
     ]
   }
 }

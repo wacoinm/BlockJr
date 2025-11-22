@@ -32,3 +32,4 @@ local-maven/
 *.todo
 cache
 stru.*
+*TS.md

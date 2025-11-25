@@ -72,6 +72,7 @@ const Commands = {
   LAMP_OFF: "lampoff",
   SPEED_LOW: "speed-low",
   SPEED_HIGH: "speed-high",
+  SHOOT: "shoot",
 } as const;
 
 /* ---------- helpers ---------- */
@@ -388,8 +389,10 @@ function CustomJoystick({
 
       // Logical normalized coordinates in range -1..1
       // IMPORTANT: invert Y so that "up" (screen negative dy) becomes positive logical Y.
-      const nx = clamp01(Math.abs(clampedDx / maxPx)) * (clampedDx < 0 ? -1 : 1);
-      const ny = clamp01(Math.abs(-clampedDy / maxPx)) * (clampedDy < 0 ? 1 : -1);
+      const nx =
+        clamp01(Math.abs(clampedDx / maxPx)) * (clampedDx < 0 ? -1 : 1);
+      const ny =
+        clamp01(Math.abs(-clampedDy / maxPx)) * (clampedDy < 0 ? 1 : -1);
 
       // angle: compute with inverted Y so 0° = right, 90° = up
       const angleRad = Math.atan2(-clampedDy, clampedDx);
@@ -482,7 +485,9 @@ function CustomJoystick({
       if (pointerIdRef.current !== e.pointerId) return;
       try {
         (e.target as Element).releasePointerCapture(e.pointerId);
-      } catch { /* empty */ }
+      } catch {
+        /* empty */
+      }
       pointerIdRef.current = null;
       activeRef.current = false;
       inSafeZoneRef.current = true; // reset safe zone on release
@@ -590,6 +595,7 @@ export default function GamepadPage() {
     else if (commands[0] === Commands.LAMP_OFF) return "lampoff()";
     else if (commands[0] === Commands.SPEED_HIGH) return "speed(100)";
     else if (commands[0] === Commands.SPEED_LOW) return "speed(50)";
+    else if (commands[0] === Commands.SHOOT) return "shoot";
 
     const formattedCmds = commands.map((cmd) => {
       return cmd;
@@ -800,7 +806,7 @@ export default function GamepadPage() {
         return;
       }
 
-      if (holdCommandRef.current[controllerKey]){
+      if (holdCommandRef.current[controllerKey]) {
         await sendCmd(["stop"], `${controllerKey}-stop`, { waitForAck: false });
       }
 
@@ -809,7 +815,6 @@ export default function GamepadPage() {
 
       // record held command signature
       holdCommandRef.current[controllerKey] = signature;
-
     },
     [sendCmd]
   );
@@ -858,6 +863,10 @@ export default function GamepadPage() {
   const onTeleStop = useCallback(() => {
     handleRelease("tele");
   }, [handleRelease]);
+
+  const onTeleShoot = useCallback(() => {
+    sendCmd([Commands.SHOOT], "tele-shoot", { waitForAck: true });
+  }, [sendCmd]);
 
   interface IJoystickUpdateEvent {
     x: number | null;
@@ -945,7 +954,10 @@ export default function GamepadPage() {
   return (
     <div className="min-h-screen min-w-screen w-screen h-screen p-4 flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-black transition-colors duration-500 overflow-hidden">
       {/* Fixed top-left controls: Back, Light, Speed */}
-      <div className="fixed left-11 bottom-2 z-50 flex items-center flex-col gap-3 " style={{transform: "rotate(-90deg)"}}>
+      <div
+        className="fixed left-11 bottom-2 z-50 flex items-center flex-col gap-3 "
+        style={{ transform: "rotate(-90deg)" }}
+      >
         <button
           onClick={() => navigate(-1)}
           className="px-3 py-2 rounded-md bg-neutral-100 dark:bg-neutral-800 shadow"
@@ -963,7 +975,9 @@ export default function GamepadPage() {
           title={lightOn ? "خاموش کردن چراغ" : "روشن کردن چراغ"}
         >
           <Lightbulb
-            className={`w-5 h-5 ${lightOn ? "text-yellow-400" : "text-neutral-400"}`}
+            className={`w-5 h-5 ${
+              lightOn ? "text-yellow-400" : "text-neutral-400"
+            }`}
           />
         </button>
 
@@ -1096,14 +1110,13 @@ export default function GamepadPage() {
                   <div className="text-sm text-center text-neutral-600 text-nowrap dark:text-neutral-300">
                     جوی‌استیک: فقط محور X (چپ/راست)
                   </div>
-                  <div className="w-full flex justify-center my-8">
+                  <div className="w-full flex flex-col items-center gap-6 my-8">
                     <JoystickVisual size={joystickSize} active={false}>
                       <CustomJoystick
                         size={joystickSize}
                         stickSizePercentage={0.75}
                         minDistance={0}
                         throttle={30}
-                        axis="x" /* original used AxisX */
                         move={(e) =>
                           onTeleMove({
                             x: e.x,
@@ -1117,6 +1130,13 @@ export default function GamepadPage() {
                         stickImage={stickShape}
                       />
                     </JoystickVisual>
+                    <button
+                      type="button"
+                      onClick={onTeleShoot}
+                      className="fixed w-28 h-28 rounded-full bottom-4 left-[-11rem] shadow-2xl bg-gradient-to-b from-orange-400 to-orange-600 text-white font-semibold text-lg tracking-wide flex items-center justify-center hover:scale-[1.03] active:scale-95 transition-transform duration-150"
+                    >
+                      شلیک
+                    </button>
                   </div>
                 </>
               )}
@@ -1200,10 +1220,13 @@ export default function GamepadPage() {
       </div>
 
       {/* Fixed project title + subtitle at right-bottom for all projects */}
-      <div className="fixed top-10 left-1 z-50 text-right text-wrap" style={{transform: "rotate(-90deg)"}}>
+      <div
+        className="fixed top-10 left-1 z-50 text-right text-wrap"
+        style={{ transform: "rotate(-90deg)" }}
+      >
         <h1 className="text-xl font-semibold">{projectId}</h1>
         <p className="text-sm w-20 text-neutral-500 dark:text-neutral-400">
-         صفحه‌ی بازی
+          صفحه‌ی بازی
         </p>
       </div>
     </div>

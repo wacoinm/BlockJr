@@ -52,9 +52,7 @@
       "imgsPath": "/scenes/car/chapters/",
       "storyModule": "src/assets/stories/car/index.ts",
       "storyDir": "src/assets/stories/car",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "isLock": true,
-      "lockReason": "محتوا در دست ساخت است"
+      "validatorPath": "src/utils/validators/car.validator.ts"
     }
   ],
   "stories": [

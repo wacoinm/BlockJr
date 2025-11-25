@@ -57,6 +57,7 @@ import EmergencyStopButton from './components/EmergencyStopButton';
 export const SoundContext = createContext<() => void>(() => {});
 
 const FIRST_RUN_KEY = 'blockjr:firstRunDone';
+const STORY_STATE_KEY = 'blockjr:storyState';
 
 const App: React.FC = () => {
   const dispatch = useDispatch();
@@ -370,8 +371,8 @@ const App: React.FC = () => {
   const startDialogueForChapter = useCallback(
     async (chapterKey?: string | null) => {
       try {
-        const chapterKeys = Object.keys(car);
-        if (chapterKeys.length === 0) return;
+    const chapterKeys = Object.keys(car);
+    if (chapterKeys.length === 0) return;
 
         let key = chapterKey ?? chapterKeys[0];
         if (!key || !car[key]) {
@@ -408,6 +409,18 @@ const App: React.FC = () => {
         dispatch(setCurrentChapter(key));
         dispatch(setMessages({ chapter: key, messages: normalized }));
 
+        // Persist last chapter/messages so replay buttons stay enabled after refresh
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(
+              STORY_STATE_KEY,
+              JSON.stringify({ chapter: key, messages: normalized }),
+            );
+          }
+        } catch (err) {
+          console.warn('Failed to persist story state', err);
+        }
+
         await playUntilBlocking(normalized, 0);
       } catch (err) {
         console.warn("startDialogueForChapter failed", err);
@@ -417,6 +430,30 @@ const App: React.FC = () => {
   );
 
   const { theme, cycleTheme } = useTheme('system');
+
+  // Rehydrate last chapter/messages so replay/task buttons are enabled after refresh
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const raw = window.localStorage.getItem(STORY_STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const chapterFromStorage = parsed?.chapter;
+      const messagesFromStorage = parsed?.messages;
+      if (!chapterFromStorage || !Array.isArray(messagesFromStorage) || messagesFromStorage.length === 0) return;
+
+      setCurrentDialogueChapter((prev) => prev ?? chapterFromStorage);
+      setChapterMessages((prev) => (prev && prev.length > 0 ? prev : messagesFromStorage));
+      setMessageCursor(0);
+      setBlockingItem(null);
+      setPendingResumeAfterValidation(false);
+
+      dispatch(setCurrentChapter(chapterFromStorage));
+      dispatch(setMessages({ chapter: chapterFromStorage, messages: messagesFromStorage }));
+    } catch (err) {
+      console.warn('Failed to rehydrate story state', err);
+    }
+  }, [dispatch]);
 
   // If route param present, load that project's blocks and select it
   const params = useParams();

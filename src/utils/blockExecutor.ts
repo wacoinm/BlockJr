@@ -94,6 +94,8 @@ export const mapBlockToCommand = (block: Block, delayUnits?: number, unitMs: num
       return `lampon(${unitsToMs(delayUnits)})`;
     case 'lamp-off':
       return `lampoff(${unitsToMs(delayUnits)})`;
+    case 'shoot':
+      return 'shoot';
     default: {
       const v = block.value !== undefined ? block.value : '';
       return `${block.type}(${v})`;
@@ -129,6 +131,7 @@ export const buildCommandQueue = (blocks: Block[], unit: number = 100): { id: st
     'countclockwise',
     'lamp-on',
     'lamp-off',
+    'shoot',
   ]);
 
   const isSpeed = (t: Block['type'] | undefined) => t === 'speed-low' || t === 'speed-high';

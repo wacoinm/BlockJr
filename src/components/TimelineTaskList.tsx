@@ -44,7 +44,7 @@ const TimelineTaskList: React.FC<Props> = ({ visible, onClose, tasks, title }) =
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const s = tasks.map((t) => (t.locked ? "locked" : "locked"));
+    const s = tasks.map(() => "locked");
     const firstUnlocked = tasks.findIndex((t) => !t.locked);
     if (firstUnlocked >= 0) s[firstUnlocked] = "pending";
     else if (s.length > 0) s[0] = "pending";

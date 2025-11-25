@@ -59,13 +59,17 @@ export const ReplayPalette: React.FC<ReplayPaletteProps> = ({
       
       <button
         onClick={() => {
+          if (onReplayTasks) {
+            onReplayTasks();
+            return;
+          }
+          // fallback
           if (!selectedProject || !currentChapter) return;
           const taskList = getTaskListForProject(selectedProject, currentChapter);
           if (taskList && taskList.tasks && taskList.tasks.length > 0) {
             setActiveTaskList(taskList.tasks);
             setShowTaskList(true);
           }
-          onReplayTasks();
         }}
         disabled={!selectedProject || !currentChapter}
         className="w-10 h-10 rounded-xl flex items-center justify-center

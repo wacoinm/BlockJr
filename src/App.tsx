@@ -58,6 +58,7 @@ export const SoundContext = createContext<() => void>(() => {});
 
 const FIRST_RUN_KEY = 'blockjr:firstRunDone';
 const STORY_STATE_KEY = 'blockjr:storyState';
+const STORY_TASKS_KEY = 'blockjr:storyTasks';
 
 const App: React.FC = () => {
   const dispatch = useDispatch();
@@ -298,13 +299,55 @@ const App: React.FC = () => {
     selectedProjectRef.current = selectedProject ?? null;
   }, [selectedProject]);
 
+  const createTaskFromMessage = useCallback(
+    (m: any, idx: number): TaskItem | null => {
+      if (!m || m.type === 'dialogue') return null;
+
+      const deriveTaskType = (meta: any): TaskItem['type'] => {
+        const t = (meta?.taskType ?? '').toString().toLowerCase();
+        if (t.includes('video')) return 'video';
+        if (t.includes('image')) return 'image';
+        if (t.includes('mission') || t.includes('challenge') || t.includes('task')) return 'task';
+        return meta?.mediaUrl ? 'image' : 'text';
+      };
+
+      const blockingMeta = m.meta ?? {};
+      return {
+        id: blockingMeta.id ?? `task-${idx}`,
+        title: blockingMeta.title ?? blockingMeta.mediaText ?? (m.type === 'validator' ? 'اعتبارسنجی بلوک‌ها' : 'تسک'),
+        description: blockingMeta.description ?? blockingMeta.shortDescription ?? blockingMeta.notes ?? undefined,
+        mediaUrl: blockingMeta.mediaUrl ?? undefined,
+        mediaText: blockingMeta.mediaText ?? undefined,
+        locked: typeof blockingMeta.locked === 'boolean' ? blockingMeta.locked : false,
+        type: m.type === 'validator' ? 'validator' : deriveTaskType(blockingMeta),
+      };
+    },
+    [],
+  );
+
+  const persistActiveTasks = useCallback(
+    (tasks: TaskItem[]) => {
+      try {
+        if (typeof window === 'undefined') return;
+        if (!tasks || tasks.length === 0) return;
+        window.localStorage.setItem(
+          STORY_TASKS_KEY,
+          JSON.stringify({ chapter: currentDialogueChapter, tasks }),
+        );
+      } catch (err) {
+        console.warn('persistActiveTasks failed', err);
+      }
+    },
+    [currentDialogueChapter],
+  );
+
   const playUntilBlocking = useCallback(
     async (msgs: any[], startIdx: number) => {
       let idx = startIdx;
       while (idx < msgs.length) {
         const m = msgs[idx];
         if (m && m.type && m.type !== 'dialogue') {
-          setShowNextButton(false);
+          setShowNextButton(true); // allow skipping to next even if user does not advance naturally
           setShowConfetti(false);
           setMessageCursor(idx);
           setBlockingItem(m);
@@ -316,7 +359,6 @@ const App: React.FC = () => {
               blockTypes: Array.isArray(m.meta.blockTypes) ? m.meta.blockTypes : null,
               taskId: m.meta.taskId ?? null,
             });
-            setShowNextButton(false);
           } else {
             setActiveValidator(null);
           }
@@ -330,17 +372,10 @@ const App: React.FC = () => {
           };
 
           const blockingMeta = m.meta ?? {};
-          const asTask: TaskItem = {
-            id: blockingMeta.id ?? `task-${idx}`,
-            title: blockingMeta.title ?? blockingMeta.mediaText ?? (m.type === 'validator' ? 'اعتبارسنجی بلوک‌ها' : 'تسک'),
-            description: blockingMeta.description ?? blockingMeta.shortDescription ?? blockingMeta.notes ?? undefined,
-            mediaUrl: blockingMeta.mediaUrl ?? undefined,
-            mediaText: blockingMeta.mediaText ?? undefined,
-            locked: typeof blockingMeta.locked === 'boolean' ? blockingMeta.locked : false,
-            type: m.type === 'validator' ? 'validator' : deriveTaskType(blockingMeta),
-          };
-
-          setActiveTaskList([asTask]);
+          const asTask = createTaskFromMessage({ ...m, meta: blockingMeta }, idx);
+          const combinedTasks = asTask ? [asTask] : [];
+          setActiveTaskList(combinedTasks);
+          persistActiveTasks(combinedTasks);
           setShowTaskList(true);
           return;
         }
@@ -365,14 +400,14 @@ const App: React.FC = () => {
       setShowNextButton(true);
       setPendingResumeAfterValidation(false);
     },
-    [dialogue],
+    [dialogue, persistActiveTasks, createTaskFromMessage],
   );
 
   const startDialogueForChapter = useCallback(
     async (chapterKey?: string | null) => {
       try {
-    const chapterKeys = Object.keys(car);
-    if (chapterKeys.length === 0) return;
+        const chapterKeys = Object.keys(car);
+        if (chapterKeys.length === 0) return;
 
         let key = chapterKey ?? chapterKeys[0];
         if (!key || !car[key]) {
@@ -450,10 +485,62 @@ const App: React.FC = () => {
 
       dispatch(setCurrentChapter(chapterFromStorage));
       dispatch(setMessages({ chapter: chapterFromStorage, messages: messagesFromStorage }));
+
+      setShowNextButton(true);
+
+      try {
+        const rawTasks = window.localStorage.getItem(STORY_TASKS_KEY);
+        if (rawTasks) {
+          const parsedTasks = JSON.parse(rawTasks);
+          if (parsedTasks?.chapter === chapterFromStorage && Array.isArray(parsedTasks?.tasks)) {
+            setActiveTaskList(parsedTasks.tasks);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to rehydrate story tasks', err);
+      }
     } catch (err) {
       console.warn('Failed to rehydrate story state', err);
     }
   }, [dispatch]);
+
+  const handleReplayTasks = useCallback(() => {
+    let tasksToShow = activeTaskList;
+
+    if (!tasksToShow || tasksToShow.length === 0) {
+      try {
+        if (typeof window !== 'undefined') {
+          const raw = window.localStorage.getItem(STORY_TASKS_KEY);
+          const parsed = raw ? JSON.parse(raw) : null;
+          if (parsed?.chapter === currentDialogueChapter && Array.isArray(parsed?.tasks)) {
+            tasksToShow = parsed.tasks;
+          }
+        }
+      } catch (err) {
+        console.warn('handleReplayTasks rehydrate failed', err);
+      }
+    }
+
+    // If still nothing, derive from last blocking message in current chapter messages
+    if ((!tasksToShow || tasksToShow.length === 0) && chapterMessages && chapterMessages.length > 0) {
+      for (let i = chapterMessages.length - 1; i >= 0; i--) {
+        const candidate = chapterMessages[i];
+        if (candidate && candidate.type && candidate.type !== 'dialogue') {
+          const built = createTaskFromMessage(candidate, i);
+          if (built) {
+            tasksToShow = [built];
+            break;
+          }
+        }
+      }
+    }
+
+    if (tasksToShow && tasksToShow.length > 0) {
+      setActiveTaskList(tasksToShow);
+      setShowTaskList(true);
+      persistActiveTasks(tasksToShow);
+    }
+  }, [activeTaskList, chapterMessages, currentDialogueChapter, persistActiveTasks, createTaskFromMessage]);
 
   // If route param present, load that project's blocks and select it
   const params = useParams();
@@ -1072,6 +1159,7 @@ const App: React.FC = () => {
           setBlockPaletteBottom={setBlockPaletteBottom}
           setShowTaskList={setShowTaskList}
           setActiveTaskList={setActiveTaskList}
+          onReplayTasks={handleReplayTasks}
           // NEW: muted block ids so the workspace can render grayscale/disable UI
           mutedBlockIds={mutedBlockIds}
         />
@@ -1081,7 +1169,7 @@ const App: React.FC = () => {
 
         {/* Next chapter rounded button (floating) */}
         {showNextButton && (
-          <div className="fixed bottom-44 right-4 z-[9999]">
+          <div className="fixed bottom-[40vh] right-4 z-[40]">
             <button
               onClick={handleNextChapter}
               aria-label="رفتن به فصل بعد"

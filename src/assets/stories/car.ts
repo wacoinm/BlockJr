@@ -36,6 +36,7 @@ export const car = {
       fontSize: 14,
       meta: null,
     },
+
     {
       type: "dialogue",
       text: "«سلام! من آرشم. همیشه دوست دارم بدونم؛ مدام می‌پرسم چرا و چطور. چند بار امتحان می‌کنم تا مطمئن بشم همه‌چی درست کار می‌کنه. رنگ مورد علاقه‌ام بنفشه!»",
@@ -72,6 +73,7 @@ export const car = {
       fontSize: 15,
       meta: null,
     },
+
     {
       type: "dialogue",
       text: "«بچه‌ها، اگه بزرگ شدیم، دوست دارید چی‌کاره بشید؟ من یه عالمه گزینه تو ذهنمه.»",
@@ -156,6 +158,7 @@ export const car = {
       fontSize: 14,
       meta: null,
     },
+
     {
       type: "dialogue",
       text: "«وقتی دارم بازی می‌کنم، اسباب‌بازی‌های کوچیک یا پیچ‌ها می‌افتن روی زمین؛ جمع‌کردنشون برام سخته.»",
@@ -204,6 +207,7 @@ export const car = {
       fontSize: 15,
       meta: null,
     },
+
     {
       type: "dialogue",
       text: "«گاهی باید جامدادی یا جعبه‌های کوچیک رو از این‌طرف اتاق به اون‌طرف ببریم، بدون اینکه با دست بلندش کنیم. چی بسازیم؟»",
@@ -264,6 +268,7 @@ export const car = {
       fontSize: 15,
       meta: null,
     },
+
     {
       type: "task",
       text: null,
@@ -278,23 +283,38 @@ export const car = {
         projectId: "car-project-1",
         sceneId: "scene-5",
         order: 1,
-        taskType: "mission",
+        taskType: "video",
         title: "پروژه ۱: ساخت ماشین یدک‌کش",
         shortDescription:
-          "ساخت یک ماشین کنترلی کوچک برای کشیدن جامدادی و وسایل سبک روی زمین.",
+          "ویدیوی معرفی پروژه ماشین یدک‌کش و توضیح مسئله جابه‌جایی جامدادی.",
         description:
-          "کودک با کمک سه قهرمان داستان، یک ماشین کنترلی یدک‌کش می‌سازد تا وسایل سبک را در اتاق جابه‌جا کند.",
-        mediaUrl: null,
-        mediaText: "شروع پروژه",
+          "در این ویدیو، سه قهرمان برای کودک توضیح می‌دهند که چرا ساخت یک ماشین یدک‌کش می‌تواند مشکل جابه‌جایی وسایل سبک در اتاق را حل کند.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "پخش ویدیو معرفی پروژه",
         locked: false,
         dependsOn: [],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "شروع پروژه یدک‌کش پس از گفتگو درباره مشکلات اتاق.",
+        notes: "شروع پروژه با یک ویدیوی داستانی.",
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«خب حالا که می‌دونیم چرا به یک ماشین یدک‌کش احتیاج داریم، وقتشه قدم‌به‌قدم ساختنش رو شروع کنیم.»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/5.png",
+      fontSize: 14,
+      meta: null,
+    },
+
     {
       type: "task",
       text: null,
@@ -310,21 +330,49 @@ export const car = {
         sceneId: "scene-6",
         order: 2,
         taskType: "video",
-        title: "ویدیو: مونتاژ ماشین یدک‌کش",
-        shortDescription: "تماشای ویدیو آموزشی برای بستن موتور، چرخ‌ها و شاسی.",
+        title: "آموزش مونتاژ ماشین یدک‌کش",
+        shortDescription: "ویدیو قدم‌به‌قدم بستن موتور، چرخ‌ها و شاسی.",
         description:
-          "کودک قدم‌به‌قدم با ویدیو پیش می‌رود تا اجزای اصلی ماشین یدک‌کش را سرهم کند.",
-        mediaUrl: null,
-        mediaText: "تماشای ویدیو",
+          "ویدیویی آموزشی که در آن کودک یاد می‌گیرد چطور موتور، چرخ‌ها، شاسی و یدک‌کش را به هم متصل کند.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای آموزش مونتاژ",
         locked: false,
         dependsOn: ["car-1-mission-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "مرحلهٔ مونتاژ اولیه.",
+        notes:
+          "بهتر است کودک همراه با ویدیو، قطعات واقعی را هم روی میز داشته باشد.",
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«عالی بود! حالا که ماشینت آماده‌ست، می‌تونیم باهاش چند تمرین رانندگی انجام بدیم تا هم تو و هم ماشین آمادهٔ مأموریت‌های سخت‌تر بشید.»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 14,
+      meta: null,
+    },
+    {
+      type: "dialogue",
+      text: "«اولین تمرین با بلوک‌نویسیه؛ فقط حرکت رو به جلو رو استفاده می‌کنیم تا از زیر صندلی‌ها رد بشیم.»",
+      charecter: "arash",
+      mode: "5",
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#7c3aed",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 15,
+      meta: null,
+    },
+
     {
       type: "task",
       text: null,
@@ -337,48 +385,26 @@ export const car = {
       meta: {
         id: "car-1-video-2",
         projectId: "car-project-1",
-        sceneId: "scene-6",
+        sceneId: "scene-7",
         order: 3,
         taskType: "video",
-        title: "ویدیو: تست نهایی و جابه‌جا کردن جامدادی",
-        shortDescription: "آموزش نصب یدک‌کش و تست حرکت همراه با جامدادی.",
+        title: "بازی ۱: توضیح بلوکنویسی حرکت رو به جلو",
+        shortDescription: "ویدیو آموزش چیدن بلوک‌ها برای عبور از زیر سه صندلی.",
         description:
-          "در این ویدیو کودک یاد می‌گیرد چطور یدک‌کش را وصل کند، سرعت را تنظیم کند و مسیری امن برای حرکت بسازد.",
-        mediaUrl: null,
-        mediaText: "پخش تست نهایی",
+          "در این ویدیو، آرش با زبان ساده توضیح می‌دهد چطور فقط با استفاده از بلوک «حرکت به جلو» مسیری طراحی کنیم که ماشین از زیر هر سه صندلی عبور کند.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی ۱",
         locked: false,
         dependsOn: ["car-1-video-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "تست نهایی قبل از ورود به بخش چالش‌ها.",
+        notes: "بعد از دیدن این ویدیو کودک آمادهٔ تمرین بلوک‌نویسی است.",
       },
     },
-    {
-      type: "dialogue",
-      text: "«حالا وقت چالش‌هاست؛ سه بازی داریم: راه مستقیم، مسیر ترکیبی و پارک دقیق.»",
-      charecter: "ravi",
 
-      typeSpeed: 26,
-      textColor: "#ffffff",
-      bgColor: "#0b3b4a",
-      bgImage: "/scenes/car/chapters/6.png",
-      fontSize: 14,
-      meta: null,
-    },
-    {
-      type: "dialogue",
-      text: "«آماده‌ای قهرمان؟ بزن بریم!»",
-      charecter: "sina",
-      mode: "2",
-      typeSpeed: 26,
-      textColor: "#000000",
-      bgColor: "#fef3c7",
-      bgImage: "/scenes/car/chapters/6.png",
-      fontSize: 15,
-      meta: null,
-    },
     {
       type: "task",
       text: null,
@@ -393,23 +419,24 @@ export const car = {
         projectId: "car-project-1",
         sceneId: "scene-7",
         order: 4,
-        taskType: "challenge",
-        title: "بازی ۱: بلوکنویسی حرکت رو به جلو",
-        shortDescription:
-          "عبور از زیر سه صندلی با استفاده از بلوک‌های حرکت رو به جلو بدون برخورد.",
+        taskType: "video",
+        title: "تمرین بلوک‌نویسی: حرکت رو به جلو",
+        shortDescription: "چیدن بلوک‌ها برای عبور از زیر سه صندلی بدون برخورد.",
         description:
-          "کودک سه صندلی را در یک مسیر می‌چیند، یک اسباب‌بازی سبک را به یدک‌کش وصل می‌کند و با چیدن بلوک‌های «حرکت به جلو» تلاش می‌کند از زیر هر سه صندلی عبور کند.",
-        mediaUrl: null,
-        mediaText: "شروع بازی حرکت مستقیم",
+          "کودک طبق آنچه در ویدیو دیده، بلوک‌های «پرچم سبز» و «حرکت به جلو» را طوری می‌چیند که ماشین یدک‌کش از زیر سه صندلی رد شود.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "شروع تمرین بلوک‌نویسی",
         locked: false,
         dependsOn: ["car-1-video-2"],
         rewardIds: ["badge-straight-path"],
         validatorId: "validator-car-1-challenge-1",
         minScoreToPass: 1,
         maxScore: 3,
-        notes: "هر برخورد با پایه صندلی یعنی تلاش دوباره.",
+        notes: "این مرحله با سیستم بلوک‌نویسی اپ بررسی می‌شود.",
       },
     },
+
     {
       type: "validator",
       text: null,
@@ -445,68 +472,32 @@ export const car = {
           "نمونه‌هایی از دنباله بلوک‌های قابل قبول برای عبور از زیر صندلی‌ها.",
       },
     },
+
     {
-      type: "task",
-      text: null,
-      charecter: null,
-      typeSpeed: null,
-      textColor: null,
-      bgColor: null,
+      type: "dialogue",
+      text: "«آفرین! اگر تونستی بدون برخورد از زیر هر سه صندلی رد بشی، یعنی خیلی خوب برنامه‌ریزی کردی.»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
       bgImage: "/scenes/car/chapters/6.png",
-      fontSize: null,
-      meta: {
-        id: "car-1-challenge-2",
-        projectId: "car-project-1",
-        sceneId: "scene-7",
-        order: 5,
-        taskType: "challenge",
-        title: "بازی ۲: مسیر ترکیبی و فرمان نرم",
-        shortDescription:
-          "دور زدن صندلی دوم و بازگشت به زیر صندلی اول با ترکیب فرمان‌ها.",
-        description:
-          "کودک دو صندلی را با فاصله مناسب می‌چیند. ماشین باید از زیر صندلی اول عبور کند، دور صندلی دوم یک دور کامل بزند و دوباره به زیر صندلی اول برگردد.",
-        mediaUrl: null,
-        mediaText: "شروع بازی فرمان نرم",
-        locked: false,
-        dependsOn: ["car-1-challenge-1"],
-        rewardIds: ["badge-soft-steering"],
-        validatorId: null,
-        minScoreToPass: 1,
-        maxScore: 3,
-        notes: "تمرکز روی فرمان نرم و کنترل دقیق پیچ‌ها.",
-      },
+      fontSize: 14,
+      meta: null,
     },
     {
-      type: "task",
-      text: null,
-      charecter: null,
-      typeSpeed: null,
-      textColor: null,
-      bgColor: null,
+      type: "dialogue",
+      text: "«این یعنی تو در مسیر مستقیم هم رانندهٔ خیلی خوبی هستی!»",
+      charecter: "sina",
+      mode: "3",
+      typeSpeed: 26,
+      textColor: "#000000",
+      bgColor: "#fef3c7",
       bgImage: "/scenes/car/chapters/6.png",
-      fontSize: null,
-      meta: {
-        id: "car-1-challenge-3",
-        projectId: "car-project-1",
-        sceneId: "scene-7",
-        order: 6,
-        taskType: "challenge",
-        title: "بازی ۳: کنترل سرعت و پارک دقیق",
-        shortDescription:
-          "سه دور آرام دور صندلی و پارک نهایی زیر آن بدون برخورد.",
-        description:
-          "ماشین از جلوی صندلی شروع می‌کند، سه دور آرام دور صندلی می‌چرخد و در پایان زیر صندلی پارک می‌کند، بدون برخورد به پایه‌ها.",
-        mediaUrl: null,
-        mediaText: "شروع بازی پارک دقیق",
-        locked: false,
-        dependsOn: ["car-1-challenge-2"],
-        rewardIds: ["badge-precise-parking"],
-        validatorId: null,
-        minScoreToPass: 1,
-        maxScore: 3,
-        notes: "کنترل سرعت و دقت در موقعیت توقف.",
-      },
+      fontSize: 15,
+      meta: null,
     },
+
     {
       type: "unlock",
       text: null,
@@ -522,11 +513,70 @@ export const car = {
         projectId: "car-project-1",
         title: "نشان مسیر مستقیم",
         description:
-          "با موفقیت در بازی حرکت رو به جلو، نشان مسیر مستقیم را می‌گیری.",
+          "با موفقیت در تمرین حرکت مستقیم، نشان مسیر مستقیم را می‌گیری.",
         icon: "badge-straight-path",
         dependsOnRewards: [],
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«حالا می‌تونیم بریم سراغ مسیرهای سخت‌تر و فرمان‌دادن‌های نرم و دقیق.»",
+      charecter: "sina",
+      mode: "3",
+      typeSpeed: 26,
+      textColor: "#000000",
+      bgColor: "#fef3c7",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 15,
+      meta: null,
+    },
+
+    {
+      type: "task",
+      text: null,
+      charecter: null,
+      typeSpeed: null,
+      textColor: null,
+      bgColor: null,
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: null,
+      meta: {
+        id: "car-1-challenge-2",
+        projectId: "car-project-1",
+        sceneId: "scene-7",
+        order: 5,
+        taskType: "video",
+        title: "بازی ۲: مسیر ترکیبی و فرمان نرم",
+        shortDescription: "ویدیو توضیح مسیر دوتایی و دورزدن صندلی دوم.",
+        description:
+          "در این ویدیو، سینا توضیح می‌دهد چگونه ماشین باید از زیر صندلی اول رد شود، دور صندلی دوم بگردد و دوباره به نقطه شروع برگردد.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی ۲",
+        locked: false,
+        dependsOn: ["car-1-challenge-1"],
+        rewardIds: ["badge-soft-steering"],
+        validatorId: null,
+        minScoreToPass: null,
+        maxScore: null,
+        notes: "این مرحله روی فرمان نرم و پیچیدن‌های دقیق تمرکز دارد.",
+      },
+    },
+
+    {
+      type: "dialogue",
+      text: "«اگر این مسیر ترکیبی رو هم بدون برخورد رفتی، یعنی فرمان‌هات خیلی نرم و حساب‌شده‌ست!»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 14,
+      meta: null,
+    },
+
     {
       type: "unlock",
       text: null,
@@ -543,9 +593,56 @@ export const car = {
         title: "نشان فرمان نرم",
         description: "با عبور از مسیر ترکیبی، نشان فرمان نرم را می‌گیری.",
         icon: "badge-soft-steering",
-        dependsOnRewards: [],
+        dependsOnRewards: ["badge-straight-path"],
       },
     },
+
+    {
+      type: "task",
+      text: null,
+      charecter: null,
+      typeSpeed: null,
+      textColor: null,
+      bgColor: null,
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: null,
+      meta: {
+        id: "car-1-challenge-3",
+        projectId: "car-project-1",
+        sceneId: "scene-7",
+        order: 6,
+        taskType: "video",
+        title: "بازی ۳: کنترل سرعت و پارک دقیق",
+        shortDescription: "ویدیو تمرین چرخیدن دور صندلی و پارک نهایی زیر آن.",
+        description:
+          "در این ویدیو، آرش و محمد نشان می‌دهند چطور با سرعت کم سه دور دور صندلی بچرخیم و در پایان زیر صندلی پارک کنیم.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی ۳",
+        locked: false,
+        dependsOn: ["car-1-challenge-2"],
+        rewardIds: ["badge-precise-parking"],
+        validatorId: null,
+        minScoreToPass: null,
+        maxScore: null,
+        notes:
+          "کودک می‌تواند چند بار این تمرین را تکرار کند تا مهارت بیشتری پیدا کند.",
+      },
+    },
+
+    {
+      type: "dialogue",
+      text: "«اگر سه دور آرام دور صندلی چرخیدی و آخرش زیر صندلی پارک کردی، یعنی یک رانندهٔ دقیق واقعی هستی.»",
+      charecter: "mohammad",
+      mode: "3",
+      typeSpeed: 26,
+      textColor: "#000000",
+      bgColor: "#e0f2fe",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 15,
+      meta: null,
+    },
+
     {
       type: "unlock",
       text: null,
@@ -562,9 +659,35 @@ export const car = {
         title: "نشان پارک دقیق",
         description: "با پارک دقیق زیر صندلی، نشان پارک دقیق را می‌گیری.",
         icon: "badge-precise-parking",
-        dependsOnRewards: [],
+        dependsOnRewards: ["badge-straight-path", "badge-soft-steering"],
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«چون هر سه نشان رانندگی را گرفتی، حالا یک جایزهٔ ویژه برات باز شده!»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 14,
+      meta: null,
+    },
+    {
+      type: "dialogue",
+      text: "«از این به بعد می‌تونی با دستهٔ کنترل، مثل یک ماشین کنترلی واقعی، ماشینت رو هدایت کنی.»",
+      charecter: "arash",
+      mode: "3",
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#7c3aed",
+      bgImage: "/scenes/car/chapters/6.png",
+      fontSize: 15,
+      meta: null,
+    },
+
     {
       type: "unlock",
       text: null,
@@ -590,6 +713,7 @@ export const car = {
       },
     },
   ],
+
   "chapter-02": [
     {
       type: "dialogue",
@@ -651,6 +775,7 @@ export const car = {
       fontSize: 15,
       meta: null,
     },
+
     {
       type: "task",
       text: null,
@@ -665,24 +790,38 @@ export const car = {
         projectId: "car-project-2",
         sceneId: "scene-8",
         order: 1,
-        taskType: "mission",
-        title: "پروژه ۲: ساخت جرثقیل آهنربایی",
+        taskType: "video",
+        title: "پروژه ۲: معرفی جرثقیل آهنربایی",
         shortDescription:
-          "ساخت یک جرثقیل کنترلی کوچک با آهنربا برای جمع کردن پیچ‌ها و قطعات فلزی.",
+          "ویدیوی داستانی درباره مشکل پیچ‌های گمشده و راه‌حل جرثقیل آهنربایی.",
         description:
-          "کودک یک سازه متحرک با بازوی ساده می‌سازد که سر آن یک آهنربای کوچک نصب شده تا پیچ‌ها را از روی زمین جمع کند.",
-        mediaUrl: null,
-        mediaText: "شروع پروژه",
+          "راوی و بچه‌ها در این ویدیو توضیح می‌دهند چرا یک بازوی آهنربایی متحرک برای جمع‌کردن پیچ‌ها مناسب است.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "پخش ویدیو معرفی جرثقیل",
         locked: false,
         dependsOn: [],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes:
-          "شروع پروژه جرثقیل آهنربایی بعد از طوفان فکری درباره روش‌های جمع‌کردن پیچ‌ها.",
+        notes: "شروع پروژه ۲ با یک ویدیوی ساده.",
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«خب، حالا که با ایده آشنا شدیم، بریم سراغ ساختنِ جرثقیل آهنربایی‌مون.»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/7.png",
+      fontSize: 14,
+      meta: null,
+    },
+
     {
       type: "task",
       text: null,
@@ -698,26 +837,41 @@ export const car = {
         sceneId: "scene-9",
         order: 2,
         taskType: "video",
-        title: "ویدیو: مونتاژ جرثقیل آهنربایی",
-        shortDescription: "آموزش بستن شاسی، بازو و نصب آهنربا روی ربات.",
+        title: "آموزش مونتاژ جرثقیل آهنربایی",
+        shortDescription: "ویدیو ساخت شاسی، بازو و نصب آهنربا روی ربات.",
         description:
-          "کودک با تماشای ویدیو یاد می‌گیرد چگونه بازو، چرخ‌ها و آهنربا را طوری مونتاژ کند که بتواند پیچ‌ها را جمع کند.",
-        mediaUrl: null,
-        mediaText: "تماشای ویدیو",
+          "در این ویدیو مراحل ساخت شاسی، اتصال بازو و وصل کردن آهنربا آموزش داده می‌شود.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای آموزش مونتاژ جرثقیل",
         locked: false,
         dependsOn: ["car-2-mission-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "ویدیو اصلی آموزش مونتاژ.",
+        notes:
+          "پیشنهاد می‌شود کودک چند بار ویدیو را متوقف کند و قدم‌به‌قدم همراه شود.",
       },
+    },
+
+    {
+      type: "dialogue",
+      text: "«حالا جرثقیل آهنربایی‌ات آماده است؛ وقتشه باهاش چند بازی جذاب انجام بدیم.»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/7.png",
+      fontSize: 14,
+      meta: null,
     },
     {
       type: "dialogue",
-      text: "«آماده؟ مأموریت نجات پیچ‌های گمشده شروع شد!»",
+      text: "«اول با جعبه‌های دستمال کاغذی یک برج می‌سازیم.»",
       charecter: "sina",
-      mode: "4",
+      mode: "3",
       typeSpeed: 26,
       textColor: "#000000",
       bgColor: "#fef3c7",
@@ -725,18 +879,7 @@ export const car = {
       fontSize: 15,
       meta: null,
     },
-    {
-      type: "dialogue",
-      text: "«سرعت چرخ‌ها خوبه؛ حالا آهنربا را پایین بیاور و بعد آرام بالا ببر.»",
-      charecter: "mohammad",
-      mode: "2",
-      typeSpeed: 26,
-      textColor: "#000000",
-      bgColor: "#e0f2fe",
-      bgImage: "/scenes/car/chapters/7.png",
-      fontSize: 15,
-      meta: null,
-    },
+
     {
       type: "task",
       text: null,
@@ -751,23 +894,37 @@ export const car = {
         projectId: "car-project-2",
         sceneId: "scene-10",
         order: 3,
-        taskType: "challenge",
+        taskType: "video",
         title: "بازی ۱: برج دستمال کاغذی",
-        shortDescription:
-          "برداشتن و چیدن جعبه‌های دستمال کاغذی روی هم با جرثقیل.",
+        shortDescription: "ویدیو آموزش برداشتن و چیدن جعبه‌های دستمال روی هم.",
         description:
-          "کودک دو جعبه دستمال کاغذی را سوراخ می‌کند (با کمک بزرگ‌ترها) و با گیره جرثقیل آن‌ها را بلند می‌کند و به صورت برج روی هم می‌چیند.",
-        mediaUrl: null,
-        mediaText: "شروع بازی برج دستمال",
+          "در این ویدیو، سینا نشان می‌دهد چگونه با گیره جرثقیل، جعبه‌ها را بلند کنیم و بدون افتادن روی هم قرار دهیم.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی ۱",
         locked: false,
         dependsOn: ["car-2-video-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "تمرین تعادل و حرکت آرام جرثقیل.",
+        notes: "تمرکز بر دقت و تعادل در حرکت بازو.",
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«عالی بود! حالا بریم سراغ بازی رنگ‌ها.»",
+      charecter: "mohammad",
+      mode: "3",
+      typeSpeed: 26,
+      textColor: "#000000",
+      bgColor: "#e0f2fe",
+      bgImage: "/scenes/car/chapters/7.png",
+      fontSize: 15,
+      meta: null,
+    },
+
     {
       type: "task",
       text: null,
@@ -782,23 +939,37 @@ export const car = {
         projectId: "car-project-2",
         sceneId: "scene-10",
         order: 4,
-        taskType: "challenge",
+        taskType: "video",
         title: "بازی ۲: لیوان‌های همرنگ",
-        shortDescription:
-          "انتقال لیوان‌ها روی کاغذ همرنگ با استفاده از جرثقیل.",
+        shortDescription: "ویدیو انتقال لیوان‌های رنگی روی کاغذ همرنگ.",
         description:
-          "کودک لیوان‌های رنگی را با گیره جرثقیل بلند می‌کند و روی کاغذ همرنگشان قرار می‌دهد؛ تمرینی برای دقت و تطبیق رنگ‌ها.",
-        mediaUrl: null,
-        mediaText: "شروع بازی لیوان‌های همرنگ",
+          "در این ویدیو، محمد توضیح می‌دهد که چطور لیوان‌ها را با جرثقیل برداریم و روی کاغذ همرنگشان قرار دهیم.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی ۲",
         locked: false,
         dependsOn: ["car-2-challenge-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "ترکیب مهارت فیزیکی و تشخیص رنگ.",
+        notes: "کمک به ارتباط بین رنگ‌ها و هماهنگی چشم و دست.",
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«حالا نوبت اینه که اتاقت رو هم با جرثقیل مرتب‌تر کنی.»",
+      charecter: "arash",
+      mode: "3",
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#7c3aed",
+      bgImage: "/scenes/car/chapters/7.png",
+      fontSize: 15,
+      meta: null,
+    },
+
     {
       type: "task",
       text: null,
@@ -813,26 +984,28 @@ export const car = {
         projectId: "car-project-2",
         sceneId: "scene-10",
         order: 5,
-        taskType: "challenge",
+        taskType: "video",
         title: "بازی ۳: چیدن بار در ظرف",
         shortDescription:
-          "جمع‌کردن اسباب‌بازی‌ها و قرار دادن آن‌ها در یک ظرف با جرثقیل.",
+          "ویدیو جمع‌کردن اسباب‌بازی‌ها و قرار دادن آن‌ها در یک ظرف.",
         description:
-          "کودک با جرثقیل اسباب‌بازی‌های سبک را برمی‌دارد و آرام داخل ظرف می‌چیند تا فضای اتاق مرتب شود.",
-        mediaUrl: null,
-        mediaText: "شروع بازی چیدن بار",
+          "در این ویدیو، آرش نشان می‌دهد چگونه اسباب‌بازی‌های سبک را با جرثقیل برداریم و داخل یک ظرف کنار اتاق بچینیم.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی ۳",
         locked: false,
         dependsOn: ["car-2-challenge-2"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "تمیزی اتاق و مدیریت فضا را تمرین می‌کند.",
+        notes: "ایده‌ای برای مرتب کردن اتاق و تبدیل کار به بازی.",
       },
     },
+
     {
       type: "dialogue",
-      text: "«دیدی؟ وقتی مسئله‌ات را به پروژه تبدیل می‌کنی، می‌توانی با یک ربات ساده، پیچ‌ها و حتی اسباب‌بازی‌ها را مرتب کنی.»",
+      text: "«دیدی؟ با یک بازوی آهنربایی ساده، هم پیچ‌ها را جمع کردی، هم بازی ساختی، هم اتاقت را مرتب‌تر کردی.»",
       charecter: "ravi",
 
       typeSpeed: 26,
@@ -844,7 +1017,7 @@ export const car = {
     },
     {
       type: "dialogue",
-      text: "«آفرین! امروز یک قدم دیگر دانشمندتر شدی.»",
+      text: "«هر بار که مسئله‌ای پیدا می‌کنی، می‌تونی با ساختن یک پروژه جدید بهش جواب بدی.»",
       charecter: "ravi",
 
       typeSpeed: 26,
@@ -855,6 +1028,7 @@ export const car = {
       meta: null,
     },
   ],
+
   "chapter-03": [
     {
       type: "dialogue",
@@ -870,7 +1044,7 @@ export const car = {
     },
     {
       type: "dialogue",
-      text: "«اگر با دست پرتاب کنیم، رباتی نساختیم؛ می‌خوایم یک وسیلهٔ جدید بسازیم.»",
+      text: "«اگر با دست پرتاب کنیم، رباتی نساختیم؛ ما می‌خوایم یک وسیلهٔ جدید بسازیم.»",
       charecter: "mohammad",
       mode: "2",
       typeSpeed: 26,
@@ -916,6 +1090,7 @@ export const car = {
       fontSize: 14,
       meta: null,
     },
+
     {
       type: "task",
       text: null,
@@ -930,23 +1105,38 @@ export const car = {
         projectId: "car-project-3",
         sceneId: "scene-11",
         order: 1,
-        taskType: "mission",
-        title: "پروژه ۳: ساخت منجنیق کنترلی",
+        taskType: "video",
+        title: "پروژه ۳: معرفی منجنیق کنترلی",
         shortDescription:
-          "ساخت یک منجنیق کوچک روی ماشین برای پرتاب توپ‌های سبک به سمت سبد.",
+          "ویدیو معرفی ایدهٔ منجنیق و کاربرد آن در پرتاب توپ‌ها.",
         description:
-          "کودک با اضافه کردن بازوی منجنیق به ماشین، یک سیستم پرتاب توپ می‌سازد و زاویه و کشش را تنظیم می‌کند.",
-        mediaUrl: null,
-        mediaText: "شروع پروژه",
+          "راوی و بچه‌ها در این ویدیو توضیح می‌دهند که چرا ساخت یک منجنیق کوچک می‌تواند پرتاب توپ‌ها را جذاب‌تر و علمی‌تر کند.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "پخش ویدیو معرفی منجنیق",
         locked: false,
         dependsOn: [],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "پروژه سوم بر پایهٔ ماشین کنترلی قبلی ساخته می‌شود.",
+        notes: "شروع پروژه ۳ با یک ویدیوی داستانی.",
       },
     },
+
+    {
+      type: "dialogue",
+      text: "«حالا بریم منجنیق‌مون رو قدم‌به‌قدم بسازیم.»",
+      charecter: "ravi",
+
+      typeSpeed: 26,
+      textColor: "#ffffff",
+      bgColor: "#0b3b4a",
+      bgImage: "/scenes/car/chapters/8.png",
+      fontSize: 14,
+      meta: null,
+    },
+
     {
       type: "task",
       text: null,
@@ -962,21 +1152,24 @@ export const car = {
         sceneId: "scene-12",
         order: 2,
         taskType: "video",
-        title: "ویدیو: مونتاژ منجنیق",
-        shortDescription: "آموزش ساخت بازوی منجنیق و نصب آن روی ماشین.",
+        title: "آموزش ساخت منجنیق",
+        shortDescription: "ویدیوی آموزش ساخت بازوی منجنیق و نصب آن روی ماشین.",
         description:
-          "در این ویدیو کودک با کش، بازوی پلاستیکی و نقطهٔ اتصال توپ آشنا می‌شود و آن را روی ماشین سوار می‌کند.",
-        mediaUrl: null,
-        mediaText: "تماشای ویدیو",
+          "در این ویدیو، نحوهٔ اتصال کش، بازوی پلاستیکی و محل قرارگیری توپ آموزش داده می‌شود.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای آموزش ساخت منجنیق",
         locked: false,
         dependsOn: ["car-3-mission-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "تأکید بر توپ‌های سبک و نکات ایمنی.",
+        notes:
+          "یادآوری می‌شود که توپ‌ها باید سبک باشند و نکات ایمنی رعایت شود.",
       },
     },
+
     {
       type: "dialogue",
       text: "«آماده؟ مأموریت توپ‌های سه‌امتیازی شروع شد!»",
@@ -1001,18 +1194,7 @@ export const car = {
       fontSize: 15,
       meta: null,
     },
-    {
-      type: "dialogue",
-      text: "«عالی! توپ‌ها با موفقیت داخل سبد افتادند.»",
-      charecter: "mohammad",
-      mode: "3",
-      typeSpeed: 26,
-      textColor: "#000000",
-      bgColor: "#e0f2fe",
-      bgImage: "/scenes/car/chapters/9.png",
-      fontSize: 15,
-      meta: null,
-    },
+
     {
       type: "task",
       text: null,
@@ -1027,22 +1209,25 @@ export const car = {
         projectId: "car-project-3",
         sceneId: "scene-13",
         order: 3,
-        taskType: "challenge",
+        taskType: "video",
         title: "بازی ۱: نقطه‌زن",
-        shortDescription: "پرتاب توپ به دایره‌های امتیازی روی زمین.",
+        shortDescription: "ویدیو آموزش کشیدن دایره‌های امتیازی و هدف‌گیری.",
         description:
-          "کودک سه دایره با امتیازهای مختلف روی زمین می‌کشد و سعی می‌کند توپ را طوری پرتاب کند که در پرامتیازترین دایره فرود بیاید.",
-        mediaUrl: null,
-        mediaText: "شروع بازی نقطه‌زن",
+          "در این ویدیو، محمد توضیح می‌دهد چطور سه دایره با امتیازهای مختلف روی زمین بکشیم و توپ‌ها را به سمت آن‌ها پرتاب کنیم.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی نقطه‌زن",
         locked: false,
         dependsOn: ["car-3-video-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "تنظیم زاویهٔ پرتاب و قدرت کشش.",
+        notes:
+          "کودک می‌تواند امتیازها را جمع بزند و رکورد شخصی خودش را ثبت کند.",
       },
     },
+
     {
       type: "task",
       text: null,
@@ -1057,22 +1242,24 @@ export const car = {
         projectId: "car-project-3",
         sceneId: "scene-13",
         order: 4,
-        taskType: "challenge",
+        taskType: "video",
         title: "بازی ۲: تخریب دیوار لیوانی",
-        shortDescription: "چیدن هرم لیوانی و هدف‌گیری برای تخریب دیوار.",
+        shortDescription: "ویدیو ساخت هرم لیوانی و پرتاب برای تخریب.",
         description:
-          "کودک با لیوان‌های پلاستیکی یک هرم می‌سازد و تلاش می‌کند با پرتاب توپ به سمت آن، دیوار را کامل خراب کند.",
-        mediaUrl: null,
-        mediaText: "شروع بازی دیوار لیوانی",
+          "در این ویدیو، سینا نشان می‌دهد چگونه با لیوان‌های پلاستیکی یک دیوار درست کنیم و با پرتاب توپ آن را خراب کنیم.",
+        mediaUrl:
+          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        mediaText: "تماشای توضیح بازی دیوار لیوانی",
         locked: false,
         dependsOn: ["car-3-challenge-1"],
         rewardIds: [],
         validatorId: null,
         minScoreToPass: null,
         maxScore: null,
-        notes: "آزمایش نیرو و جهت، همراه با رعایت نکات ایمنی.",
+        notes: "تأکید بر رعایت فاصلهٔ ایمن از صورت و چشم.",
       },
     },
+
     {
       type: "dialogue",
       text: "«قهرمان‌های لاله! یادتون باشه همهٔ بچه‌ها می‌تونن به دانشمندهای بزرگ تبدیل بشن؛ فقط کافیه سؤال بپرسن و شجاعانه دنبالش برن.»",
@@ -1133,6 +1320,7 @@ export const car = {
       fontSize: 14,
       meta: null,
     },
+
     {
       type: "unlock",
       text: null,
@@ -1148,7 +1336,7 @@ export const car = {
         projectId: "car-all-projects",
         title: "باز شدن همهٔ بخش‌ها",
         description:
-          "پس از گذراندن هر سه پروژه و چالش‌هایشان، همه‌ی بخش‌های اپلیکیشن برای کودک باز می‌شود.",
+          "پس از گذراندن هر سه پروژه و بازی‌هایشان، همه‌ی بخش‌های اپلیکیشن برای کودک باز می‌شود.",
         icon: "star",
         dependsOnRewards: [
           "badge-straight-path",

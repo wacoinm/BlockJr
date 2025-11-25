@@ -45,12 +45,11 @@ import { useParams, useNavigate, useLocation } from 'react-router';
 import Confetti from 'react-confetti';
 import { useDialogue } from 'dialogue-story';
 import { car } from './assets/stories/car';
-import validateCarChapter from './assets/stories/car-validate';
+import validateCarChapter, { validateBlocksAgainstRuleSets } from './assets/stories/car-validate';
 import { advanceSessionStep, getSession } from './utils/sessionStorage';
 
 /* Timeline tasklist imports */
 import TimelineTaskList, { TaskItem } from './components/TimelineTaskList';
-import { getTaskListForProject } from './utils/manifest';
 
 /* Emergency stop button (styled FAB) */
 import EmergencyStopButton from './components/EmergencyStopButton';
@@ -170,6 +169,16 @@ const App: React.FC = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [showNextButton, setShowNextButton] = useState(false);
   const [currentDialogueChapter, setCurrentDialogueChapter] = useState<string | null>(null);
+  const [activeValidator, setActiveValidator] = useState<{
+    id?: string | null;
+    states: string[][];
+    blockTypes?: string[] | null;
+    taskId?: string | null;
+  } | null>(null);
+  const [chapterMessages, setChapterMessages] = useState<any[]>([]);
+  const [messageCursor, setMessageCursor] = useState<number>(0);
+  const [blockingItem, setBlockingItem] = useState<any | null>(null);
+  const [pendingResumeAfterValidation, setPendingResumeAfterValidation] = useState<boolean>(false);
 
   // Autosave wrapper: call rawSubmitCapture then attempt to save blocks.json for the selected project
   const submitCapture = useCallback(
@@ -188,21 +197,26 @@ const App: React.FC = () => {
         console.warn('autosave serialization failed', err);
       }
 
-      // run car validator if this project is car
+      // run validator if this project is car and validator states exist for the chapter
       try {
         if (projectId === 'ماشین' && currentDialogueChapter) {
-          const ok = validateCarChapter(snapshot ?? blocksRef.current, currentDialogueChapter);
+          const rulesFromStory = activeValidator?.states;
+          const ok =
+            (rulesFromStory && rulesFromStory.length > 0
+              ? validateBlocksAgainstRuleSets(snapshot ?? blocksRef.current, rulesFromStory)
+              : validateCarChapter(snapshot ?? blocksRef.current, currentDialogueChapter)) ?? false;
           if (ok && !showNextButton) {
             setShowConfetti(true);
             setShowNextButton(true);
             setTimeout(() => setShowConfetti(false), 3500);
+            setPendingResumeAfterValidation(true);
           }
         }
       } catch (e) {
         console.warn('validator check failed', e);
       }
     },
-    [rawSubmitCapture, showNextButton, currentDialogueChapter],
+    [rawSubmitCapture, showNextButton, currentDialogueChapter, activeValidator],
   );
 
   // block updates & normalization
@@ -283,6 +297,76 @@ const App: React.FC = () => {
     selectedProjectRef.current = selectedProject ?? null;
   }, [selectedProject]);
 
+  const playUntilBlocking = useCallback(
+    async (msgs: any[], startIdx: number) => {
+      let idx = startIdx;
+      while (idx < msgs.length) {
+        const m = msgs[idx];
+        if (m && m.type && m.type !== 'dialogue') {
+          setShowNextButton(false);
+          setShowConfetti(false);
+          setMessageCursor(idx);
+          setBlockingItem(m);
+          if (m.type === 'validator' && m.meta && Array.isArray(m.meta.states)) {
+            const states = (m.meta.states as any[]).filter((s) => Array.isArray(s)) as string[][];
+            setActiveValidator({
+              id: m.meta.id ?? m.meta.taskId ?? null,
+              states,
+              blockTypes: Array.isArray(m.meta.blockTypes) ? m.meta.blockTypes : null,
+              taskId: m.meta.taskId ?? null,
+            });
+            setShowNextButton(false);
+          } else {
+            setActiveValidator(null);
+          }
+
+          const deriveTaskType = (meta: any): TaskItem['type'] => {
+            const t = (meta?.taskType ?? '').toString().toLowerCase();
+            if (t.includes('video')) return 'video';
+            if (t.includes('image')) return 'image';
+            if (t.includes('mission') || t.includes('challenge') || t.includes('task')) return 'task';
+            return meta?.mediaUrl ? 'image' : 'text';
+          };
+
+          const blockingMeta = m.meta ?? {};
+          const asTask: TaskItem = {
+            id: blockingMeta.id ?? `task-${idx}`,
+            title: blockingMeta.title ?? blockingMeta.mediaText ?? (m.type === 'validator' ? 'اعتبارسنجی بلوک‌ها' : 'تسک'),
+            description: blockingMeta.description ?? blockingMeta.shortDescription ?? blockingMeta.notes ?? undefined,
+            mediaUrl: blockingMeta.mediaUrl ?? undefined,
+            mediaText: blockingMeta.mediaText ?? undefined,
+            locked: typeof blockingMeta.locked === 'boolean' ? blockingMeta.locked : false,
+            type: m.type === 'validator' ? 'validator' : deriveTaskType(blockingMeta),
+          };
+
+          setActiveTaskList([asTask]);
+          setShowTaskList(true);
+          return;
+        }
+
+        // collect dialogue run
+        const dialogBatch: any[] = [];
+        while (idx < msgs.length) {
+          const d = msgs[idx];
+          if (d && d.type && d.type !== 'dialogue') break;
+          dialogBatch.push(d);
+          idx += 1;
+        }
+        if (dialogBatch.length > 0) {
+          await dialogue(dialogBatch as any);
+        }
+      }
+
+      // reached end of chapter without blocking
+      setBlockingItem(null);
+      setActiveValidator(null);
+      setShowTaskList(false);
+      setShowNextButton(true);
+      setPendingResumeAfterValidation(false);
+    },
+    [dialogue],
+  );
+
   const startDialogueForChapter = useCallback(
     async (chapterKey?: string | null) => {
       try {
@@ -295,32 +379,41 @@ const App: React.FC = () => {
         }
 
         const rawMessages: any[] = Array.isArray(car[key]) ? car[key] : [];
+        setShowNextButton(false);
+        setShowConfetti(false);
+
+        const chapterValidatorEntry = rawMessages.find(
+          (m) => m && m.type === 'validator' && m.meta && Array.isArray(m.meta.states) && m.meta.states.length > 0,
+        );
+        if (chapterValidatorEntry) {
+          const states = (chapterValidatorEntry.meta.states as any[]).filter((s) => Array.isArray(s)) as string[][];
+          setActiveValidator({
+            id: chapterValidatorEntry.meta.id ?? chapterValidatorEntry.meta.taskId ?? null,
+            states,
+            blockTypes: Array.isArray(chapterValidatorEntry.meta.blockTypes) ? chapterValidatorEntry.meta.blockTypes : null,
+            taskId: chapterValidatorEntry.meta.taskId ?? null,
+          });
+        } else {
+          setActiveValidator(null);
+        }
+
         setCurrentDialogueChapter(key);
         const normalized = normalizeMessagesForSides(rawMessages);
+        setChapterMessages(normalized);
+        setMessageCursor(0);
+        setBlockingItem(null);
+        setPendingResumeAfterValidation(false);
         
         // Save to redux store
         dispatch(setCurrentChapter(key));
         dispatch(setMessages({ chapter: key, messages: normalized }));
-        
-        await dialogue(normalized as any);
 
-        // After dialogue finishes, show tasklist popup if exists for selected project + chapter.
-        try {
-          const projId = selectedProjectRef.current ?? selectedProject ?? 'ماشین';
-          const chapterKeyForTasklist = key;
-          const t = getTaskListForProject(projId, chapterKeyForTasklist);
-          if (t && t.tasks && t.tasks.length > 0) {
-            setActiveTaskList(t.tasks as TaskItem[]);
-            setShowTaskList(true);
-          }
-        } catch (err) {
-          console.warn('failed to load tasklist for project after dialogue', err);
-        }
+        await playUntilBlocking(normalized, 0);
       } catch (err) {
         console.warn("startDialogueForChapter failed", err);
       }
     },
-    [dialogue, selectedProject, dispatch],
+    [dialogue, selectedProject, dispatch, playUntilBlocking],
   );
 
   const { theme, cycleTheme } = useTheme('system');
@@ -717,9 +810,21 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
-  // Next-chapter handler (now also advances session & updates project progress)
+  // Next handler: resume story after blocking or advance chapter if end reached
   const handleNextChapter = useCallback(async () => {
     setShowNextButton(false);
+    setShowConfetti(false);
+
+    if (blockingItem) {
+      const nextIdx = messageCursor + 1;
+      setShowTaskList(false);
+      setActiveTaskList(null);
+      setBlockingItem(null);
+      setActiveValidator(null);
+      setPendingResumeAfterValidation(false);
+      await playUntilBlocking(chapterMessages, nextIdx);
+      return;
+    }
 
     const keys = Object.keys(car);
     if (!keys || keys.length === 0) return;
@@ -764,7 +869,17 @@ const App: React.FC = () => {
     } else {
       toast.info("فصل بعدی موجود نیست.");
     }
-  }, [currentDialogueChapter, startDialogueForChapter]);
+  }, [blockingItem, messageCursor, playUntilBlocking, chapterMessages, currentDialogueChapter, startDialogueForChapter]);
+
+  const handleTaskComplete = useCallback(() => {
+    setShowTaskList(false);
+    setActiveTaskList(null);
+    if (blockingItem && blockingItem.type !== 'validator') {
+      setShowConfetti(true);
+      setShowNextButton(true);
+      setTimeout(() => setShowConfetti(false), 2500);
+    }
+  }, [blockingItem]);
 
   // UI local state
   const [interactionMode, setInteractionMode] = useState<'runner' | 'deleter'>(reduxInteractionMode ?? 'runner');
@@ -945,10 +1060,7 @@ const App: React.FC = () => {
         {showTaskList && activeTaskList ? (
           <TimelineTaskList
             visible={showTaskList}
-            onClose={() => {
-              setShowTaskList(false);
-              setActiveTaskList(null);
-            }}
+            onClose={handleTaskComplete}
             tasks={activeTaskList}
             title={`${selectedProjectRef.current ?? selectedProject ?? ""} — تسک‌های فصل`}
           />

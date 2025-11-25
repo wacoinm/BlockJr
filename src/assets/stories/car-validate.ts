@@ -21,7 +21,9 @@ export type BlockLike = {
  * The validator will return true when any one rule-sequence appears
  * as a contiguous subsequence inside any chain (follow childId links).
  */
-export const carValidationRules: Record<string, Array<Array<string>>> = {
+export type RuleSequence = Array<string>;
+
+export const carValidationRules: Record<string, Array<RuleSequence>> = {
   // example for chapter-01:
   // sequence examples:
   //  - exact match tokens
@@ -203,15 +205,16 @@ function sequenceMatches(tokens: string[], sequenceMatchers: ((t: string) => boo
  *
  * Returns true if any rule for the chapter is satisfied.
  */
-export function validateCarChapter(blocks: BlockLike[], chapterKey: string): boolean {
+export function validateBlocksAgainstRuleSets(
+  blocks: BlockLike[],
+  ruleSets: Array<RuleSequence> | undefined | null,
+): boolean {
   if (!Array.isArray(blocks)) return false;
-  const rules = carValidationRules[chapterKey];
-  if (!rules || rules.length === 0) return false;
-
+  if (!ruleSets || ruleSets.length === 0) return false;
   const chains = buildChains(blocks); // array of token arrays
 
   // pre-compile matchers for each rule
-  for (const rule of rules) {
+  for (const rule of ruleSets) {
     // rule is array of strings (exact token or regex-string)
     const compiled = rule.map((m) => makeMatcher(m));
     // test each chain for presence
@@ -221,6 +224,11 @@ export function validateCarChapter(blocks: BlockLike[], chapterKey: string): boo
   }
 
   return false;
+}
+
+export function validateCarChapter(blocks: BlockLike[], chapterKey: string): boolean {
+  const rules = carValidationRules[chapterKey];
+  return validateBlocksAgainstRuleSets(blocks, rules);
 }
 
 export default validateCarChapter;

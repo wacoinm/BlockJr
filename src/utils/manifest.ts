@@ -40,7 +40,7 @@ export type TaskItem = {
   title: string;
   description?: string;
   shortDescription?: string;
-  type?: "image" | "video" | "text";
+  type?: "image" | "video" | "text" | "task" | "validator";
   mediaUrl?: string;
   mediaText?: string;
   locked?: boolean;

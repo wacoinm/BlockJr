@@ -58,6 +58,7 @@
       "fontSize": 14,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -87,6 +88,7 @@
         "notes": "شروع پروژه ۳ با یک ویدیوی داستانی."
       }
     },
+
     {
       "type": "dialogue",
       "text": "«حالا بریم منجنیق‌مون رو قدم‌به‌قدم بسازیم.»",
@@ -98,6 +100,7 @@
       "fontSize": 14,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -129,6 +132,7 @@
         "notes": "یادآوری می‌شود که توپ‌ها باید سبک باشند و نکات ایمنی رعایت شود."
       }
     },
+
     {
       "type": "dialogue",
       "text": "«آماده؟ مأموریت توپ‌های سه‌امتیازی شروع شد!»",
@@ -153,6 +157,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -177,13 +182,69 @@
         "dependsOn": [
           "car-3-video-1"
         ],
-        "rewardIds": [],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "rewardIds": [
+          "badge-catapult-target"
+        ],
+        "validatorId": "validator-car-3-challenge-1",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "کودک می‌تواند امتیازها را جمع بزند و رکورد شخصی خودش را ثبت کند."
       }
     },
+    {
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-3-challenge-1",
+        "taskId": "car-3-challenge-1",
+        "states": [
+          ["green-flag", "speed-low", "forward", "delay"],
+          ["green-flag", "speed-low", "forward", "forward", "delay"],
+          ["/^green[- ]?flag$/i", "forward", "delay", "forward"]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله بلوکی برای تنظیم فاصله و زمان پرتاب به سمت دایره‌های امتیازی."
+      }
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-catapult-target",
+        "unlockType": "badge",
+        "projectId": "car-project-3",
+        "title": "نشان نقطه‌زن",
+        "description": "با زدن چند هدف امتیازی، نشان نقطه‌زن را می‌گیری.",
+        "icon": "badge-catapult-target",
+        "dependsOnRewards": []
+      }
+    },
+
     {
       "type": "task",
       "text": null,
@@ -208,13 +269,71 @@
         "dependsOn": [
           "car-3-challenge-1"
         ],
-        "rewardIds": [],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "rewardIds": [
+          "badge-catapult-wall"
+        ],
+        "validatorId": "validator-car-3-challenge-2",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "تأکید بر رعایت فاصلهٔ ایمن از صورت و چشم."
       }
     },
+    {
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-3-challenge-2",
+        "taskId": "car-3-challenge-2",
+        "states": [
+          ["green-flag", "speed-high", "forward", "delay"],
+          ["green-flag", "speed-high", "forward", "forward", "delay"],
+          ["/^green[- ]?flag$/i", "speed-high", "forward", "delay"]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله بلوکی برای پرتاب پرقدرت به سمت دیوار لیوانی."
+      }
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-catapult-wall",
+        "unlockType": "badge",
+        "projectId": "car-project-3",
+        "title": "نشان دیوارشکن",
+        "description": "با خراب کردن دیوار لیوانی، نشان دیوارشکن را می‌گیری.",
+        "icon": "badge-catapult-wall",
+        "dependsOnRewards": [
+          "badge-catapult-target"
+        ]
+      }
+    },
+
     {
       "type": "dialogue",
       "text": "«قهرمان‌های لاله! یادتون باشه همهٔ بچه‌ها می‌تونن به دانشمندهای بزرگ تبدیل بشن؛ فقط کافیه سؤال بپرسن و شجاعانه دنبالش برن.»",
@@ -262,6 +381,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "dialogue",
       "text": "«حالا خبر خوب: همهٔ بخش‌های اپ باز شده و می‌تونی هرطور خواستی با برنامه‌نویسی یا با دستهٔ کنترل بازی و آزمایش‌های جدید بسازی. دنیا آزمایشگاه توست!»",

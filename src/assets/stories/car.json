@@ -354,6 +354,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -385,6 +386,7 @@
         "notes": "بعد از دیدن این ویدیو کودک آمادهٔ تمرین بلوک‌نویسی است."
       }
     },
+
     {
       "type": "task",
       "text": null,
@@ -466,6 +468,26 @@
       }
     },
     {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-straight-path",
+        "unlockType": "badge",
+        "projectId": "car-project-1",
+        "title": "نشان مسیر مستقیم",
+        "description": "با موفقیت در تمرین حرکت مستقیم، نشان مسیر مستقیم را می‌گیری.",
+        "icon": "badge-straight-path",
+        "dependsOnRewards": []
+      }
+    },
+
+    {
       "type": "dialogue",
       "text": "«آفرین! اگر تونستی بدون برخورد از زیر هر سه صندلی رد بشی، یعنی خیلی خوب برنامه‌ریزی کردی.»",
       "charecter": "ravi",
@@ -488,25 +510,7 @@
       "fontSize": 15,
       "meta": null
     },
-    {
-      "type": "unlock",
-      "text": null,
-      "charecter": null,
-      "typeSpeed": null,
-      "textColor": null,
-      "bgColor": null,
-      "bgImage": null,
-      "fontSize": null,
-      "meta": {
-        "id": "unlock-badge-straight-path",
-        "unlockType": "badge",
-        "projectId": "car-project-1",
-        "title": "نشان مسیر مستقیم",
-        "description": "با موفقیت در تمرین حرکت مستقیم، نشان مسیر مستقیم را می‌گیری.",
-        "icon": "badge-straight-path",
-        "dependsOnRewards": []
-      }
-    },
+
     {
       "type": "dialogue",
       "text": "«حالا می‌تونیم بریم سراغ مسیرهای سخت‌تر و فرمان‌دادن‌های نرم و دقیق.»",
@@ -519,6 +523,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -546,22 +551,67 @@
         "rewardIds": [
           "badge-soft-steering"
         ],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "validatorId": "validator-car-1-challenge-2",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "این مرحله روی فرمان نرم و پیچیدن‌های دقیق تمرکز دارد."
       }
     },
     {
-      "type": "dialogue",
-      "text": "«اگر این مسیر ترکیبی رو هم بدون برخورد رفتی، یعنی فرمان‌هات خیلی نرم و حساب‌شده‌ست!»",
-      "charecter": "ravi",
-      "typeSpeed": 26,
-      "textColor": "#ffffff",
-      "bgColor": "#0b3b4a",
-      "bgImage": "/scenes/car/chapters/6.png",
-      "fontSize": 14,
-      "meta": null
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-1-challenge-2",
+        "taskId": "car-1-challenge-2",
+        "states": [
+          [
+            "green-flag",
+            "forward",
+            "forward",
+            "clockwise",
+            "forward",
+            "forward",
+            "clockwise",
+            "forward",
+            "forward",
+            "clockwise",
+            "forward",
+            "forward"
+          ],
+          [
+            "/^green[- ]?flag$/i",
+            "forward",
+            "clockwise",
+            "forward",
+            "clockwise",
+            "forward",
+            "clockwise",
+            "backward",
+            "backward"
+          ]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله‌های بلوکی که در آن‌ها ماشین از زیر صندلی اول رد می‌شود، دور صندلی دوم می‌چرخد و دوباره برمی‌گردد."
+      }
     },
     {
       "type": "unlock",
@@ -584,6 +634,18 @@
         ]
       }
     },
+    {
+      "type": "dialogue",
+      "text": "«اگر این مسیر ترکیبی رو هم بدون برخورد رفتی، یعنی فرمان‌هات خیلی نرم و حساب‌شده‌ست!»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 14,
+      "meta": null
+    },
+
     {
       "type": "task",
       "text": null,
@@ -611,23 +673,68 @@
         "rewardIds": [
           "badge-precise-parking"
         ],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "validatorId": "validator-car-1-challenge-3",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "کودک می‌تواند چند بار این تمرین را تکرار کند تا مهارت بیشتری پیدا کند."
       }
     },
     {
-      "type": "dialogue",
-      "text": "«اگر سه دور آرام دور صندلی چرخیدی و آخرش زیر صندلی پارک کردی، یعنی یک رانندهٔ دقیق واقعی هستی.»",
-      "charecter": "mohammad",
-      "mode": "3",
-      "typeSpeed": 26,
-      "textColor": "#000000",
-      "bgColor": "#e0f2fe",
-      "bgImage": "/scenes/car/chapters/6.png",
-      "fontSize": 15,
-      "meta": null
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-1-challenge-3",
+        "taskId": "car-1-challenge-3",
+        "states": [
+          [
+            "green-flag",
+            "speed-low",
+            "forward",
+            "clockwise",
+            "forward",
+            "clockwise",
+            "forward",
+            "clockwise",
+            "forward"
+          ],
+          [
+            "/^green[- ]?flag$/i",
+            "speed-low",
+            "forward",
+            "forward",
+            "clockwise",
+            "forward",
+            "forward",
+            "clockwise",
+            "forward",
+            "forward",
+            "clockwise",
+            "forward",
+            "forward"
+          ]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله‌های بلوکی با سرعت کم که شامل چند دور چرخیدن و در نهایت پارک زیر صندلی است."
+      }
     },
     {
       "type": "unlock",
@@ -651,6 +758,20 @@
         ]
       }
     },
+
+    {
+      "type": "dialogue",
+      "text": "«اگر سه دور آرام دور صندلی چرخیدی و آخرش زیر صندلی پارک کردی، یعنی یک رانندهٔ دقیق واقعی هستی.»",
+      "charecter": "mohammad",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 15,
+      "meta": null
+    },
+
     {
       "type": "dialogue",
       "text": "«چون هر سه نشان رانندگی را گرفتی، حالا یک جایزهٔ ویژه برات باز شده!»",

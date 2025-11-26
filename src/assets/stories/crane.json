@@ -59,6 +59,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -88,6 +89,7 @@
         "notes": "شروع پروژه ۲ با یک ویدیوی ساده."
       }
     },
+
     {
       "type": "dialogue",
       "text": "«خب، حالا که با ایده آشنا شدیم، بریم سراغ ساختنِ جرثقیل آهنربایی‌مون.»",
@@ -99,6 +101,7 @@
       "fontSize": 14,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -130,6 +133,7 @@
         "notes": "پیشنهاد می‌شود کودک چند بار ویدیو را متوقف کند و قدم‌به‌قدم همراه شود."
       }
     },
+
     {
       "type": "dialogue",
       "text": "«حالا جرثقیل آهنربایی‌ات آماده است؛ وقتشه باهاش چند بازی جذاب انجام بدیم.»",
@@ -153,6 +157,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -177,13 +182,69 @@
         "dependsOn": [
           "car-2-video-1"
         ],
-        "rewardIds": [],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "rewardIds": [
+          "badge-crane-tissue-tower"
+        ],
+        "validatorId": "validator-car-2-challenge-1",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "تمرکز بر دقت و تعادل در حرکت بازو."
       }
     },
+    {
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-2-challenge-1",
+        "taskId": "car-2-challenge-1",
+        "states": [
+          ["green-flag", "up", "down"],
+          ["green-flag", "up", "up", "down", "down"],
+          ["/^green[- ]?flag$/i", "up", "delay", "down"]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله بلوک برای برداشتن و گذاشتن آرام جعبه‌ها."
+      }
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-crane-tissue-tower",
+        "unlockType": "badge",
+        "projectId": "car-project-2",
+        "title": "نشان برج دستمالی",
+        "description": "با ساختن برج دستمال کاغذی بدون ریختن، این نشان را می‌گیری.",
+        "icon": "badge-crane-tissue-tower",
+        "dependsOnRewards": []
+      }
+    },
+
     {
       "type": "dialogue",
       "text": "«عالی بود! حالا بریم سراغ بازی رنگ‌ها.»",
@@ -196,6 +257,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -220,13 +282,71 @@
         "dependsOn": [
           "car-2-challenge-1"
         ],
-        "rewardIds": [],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "rewardIds": [
+          "badge-crane-color-match"
+        ],
+        "validatorId": "validator-car-2-challenge-2",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "کمک به ارتباط بین رنگ‌ها و هماهنگی چشم و دست."
       }
     },
+    {
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-2-challenge-2",
+        "taskId": "car-2-challenge-2",
+        "states": [
+          ["green-flag", "up", "forward", "down"],
+          ["green-flag", "up", "forward", "forward", "down"],
+          ["/^green[- ]?flag$/i", "up", "delay", "forward", "down"]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله بلوکی برای برداشتن لیوان و گذاشتن روی جای همرنگ."
+      }
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-crane-color-match",
+        "unlockType": "badge",
+        "projectId": "car-project-2",
+        "title": "نشان رنگ‌های مرتب",
+        "description": "با چیدن درست لیوان‌های همرنگ، این نشان را می‌گیری.",
+        "icon": "badge-crane-color-match",
+        "dependsOnRewards": [
+          "badge-crane-tissue-tower"
+        ]
+      }
+    },
+
     {
       "type": "dialogue",
       "text": "«حالا نوبت اینه که اتاقت رو هم با جرثقیل مرتب‌تر کنی.»",
@@ -239,6 +359,7 @@
       "fontSize": 15,
       "meta": null
     },
+
     {
       "type": "task",
       "text": null,
@@ -263,13 +384,72 @@
         "dependsOn": [
           "car-2-challenge-2"
         ],
-        "rewardIds": [],
-        "validatorId": null,
-        "minScoreToPass": null,
-        "maxScore": null,
+        "rewardIds": [
+          "badge-crane-room-tidy"
+        ],
+        "validatorId": "validator-car-2-challenge-3",
+        "minScoreToPass": 1,
+        "maxScore": 3,
         "notes": "ایده‌ای برای مرتب کردن اتاق و تبدیل کار به بازی."
       }
     },
+    {
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-2-challenge-3",
+        "taskId": "car-2-challenge-3",
+        "states": [
+          ["green-flag", "forward", "up", "down", "backward"],
+          ["green-flag", "forward", "forward", "up", "down", "backward", "backward"],
+          ["/^green[- ]?flag$/i", "forward", "up", "delay", "down", "backward"]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه دنباله بلوکی برای برداشتن اسباب‌بازی و رساندن آن به ظرف."
+      }
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-crane-room-tidy",
+        "unlockType": "badge",
+        "projectId": "car-project-2",
+        "title": "نشان اتاق مرتب",
+        "description": "با چیدن مرتب اسباب‌بازی‌ها در ظرف، این نشان را می‌گیری.",
+        "icon": "badge-crane-room-tidy",
+        "dependsOnRewards": [
+          "badge-crane-tissue-tower",
+          "badge-crane-color-match"
+        ]
+      }
+    },
+
     {
       "type": "dialogue",
       "text": "«دیدی؟ با یک بازوی آهنربایی ساده، هم پیچ‌ها را جمع کردی، هم بازی ساختی، هم اتاقت را مرتب‌تر کردی.»",

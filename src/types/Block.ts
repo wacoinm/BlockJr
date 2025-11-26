@@ -10,7 +10,8 @@ export type BlockType =
   | "lamp-on"
   | "lamp-off"
   | "speed-low"
-  | "speed-high";
+  | "speed-high"
+  | "shoot";
 
 export interface Block {
   id: string;

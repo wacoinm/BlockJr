@@ -1,0 +1,300 @@
+{
+  "chapter-01": [
+    {
+      "type": "dialogue",
+      "text": "«حالا می‌رسیم به مسئلهٔ توپ‌ها؛ چطور توپ‌ها را از دور به داخل سبد بندازیم؟»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«اگر با دست پرتاب کنیم، رباتی نساختیم؛ ما می‌خوایم یک وسیلهٔ جدید بسازیم.»",
+      "charecter": "mohammad",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«چطوره یک بازوی بلند با کش بسازیم که توپ را پرتاب کند؟ شبیه منجنیق!»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«می‌تونیم این منجنیق را روی ماشین‌مان سوار کنیم و از طریق اپلیکیشن شلیک کنیم.»",
+      "charecter": "arash",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«نکتهٔ علمی: منجنیق از اهرم و انرژی کشسانی کمک می‌گیرد؛ زاویه و نیروی کشش روی برد پرتاب اثر دارد.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/catapult/chapters/8.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-3-mission-1",
+        "projectId": "car-project-3",
+        "sceneId": "scene-11",
+        "order": 1,
+        "taskType": "video",
+        "title": "پروژه ۳: معرفی منجنیق کنترلی",
+        "shortDescription": "ویدیو معرفی ایدهٔ منجنیق و کاربرد آن در پرتاب توپ‌ها.",
+        "description": "راوی و بچه‌ها در این ویدیو توضیح می‌دهند که چرا ساخت یک منجنیق کوچک می‌تواند پرتاب توپ‌ها را جذاب‌تر و علمی‌تر کند.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "پخش ویدیو معرفی منجنیق",
+        "locked": false,
+        "dependsOn": [],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "شروع پروژه ۳ با یک ویدیوی داستانی."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«حالا بریم منجنیق‌مون رو قدم‌به‌قدم بسازیم.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/catapult/chapters/8.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/catapult/chapters/8.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-3-video-1",
+        "projectId": "car-project-3",
+        "sceneId": "scene-12",
+        "order": 2,
+        "taskType": "video",
+        "title": "آموزش ساخت منجنیق",
+        "shortDescription": "ویدیوی آموزش ساخت بازوی منجنیق و نصب آن روی ماشین.",
+        "description": "در این ویدیو، نحوهٔ اتصال کش، بازوی پلاستیکی و محل قرارگیری توپ آموزش داده می‌شود.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای آموزش ساخت منجنیق",
+        "locked": false,
+        "dependsOn": [
+          "car-3-mission-1"
+        ],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "یادآوری می‌شود که توپ‌ها باید سبک باشند و نکات ایمنی رعایت شود."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«آماده؟ مأموریت توپ‌های سه‌امتیازی شروع شد!»",
+      "charecter": "sina",
+      "mode": "4",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«سه، دو، یک... پرتاب!»",
+      "charecter": "arash",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-3-challenge-1",
+        "projectId": "car-project-3",
+        "sceneId": "scene-13",
+        "order": 3,
+        "taskType": "video",
+        "title": "بازی ۱: نقطه‌زن",
+        "shortDescription": "ویدیو آموزش کشیدن دایره‌های امتیازی و هدف‌گیری.",
+        "description": "در این ویدیو، محمد توضیح می‌دهد چطور سه دایره با امتیازهای مختلف روی زمین بکشیم و توپ‌ها را به سمت آن‌ها پرتاب کنیم.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای توضیح بازی نقطه‌زن",
+        "locked": false,
+        "dependsOn": [
+          "car-3-video-1"
+        ],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "کودک می‌تواند امتیازها را جمع بزند و رکورد شخصی خودش را ثبت کند."
+      }
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/catapult/chapters/1.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-3-challenge-2",
+        "projectId": "car-project-3",
+        "sceneId": "scene-13",
+        "order": 4,
+        "taskType": "video",
+        "title": "بازی ۲: تخریب دیوار لیوانی",
+        "shortDescription": "ویدیو ساخت هرم لیوانی و پرتاب برای تخریب.",
+        "description": "در این ویدیو، سینا نشان می‌دهد چگونه با لیوان‌های پلاستیکی یک دیوار درست کنیم و با پرتاب توپ آن را خراب کنیم.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای توضیح بازی دیوار لیوانی",
+        "locked": false,
+        "dependsOn": [
+          "car-3-challenge-1"
+        ],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "تأکید بر رعایت فاصلهٔ ایمن از صورت و چشم."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«قهرمان‌های لاله! یادتون باشه همهٔ بچه‌ها می‌تونن به دانشمندهای بزرگ تبدیل بشن؛ فقط کافیه سؤال بپرسن و شجاعانه دنبالش برن.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/catapult/chapters/2.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«هر سؤال یک راه جدیده!»",
+      "charecter": "arash",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/catapult/chapters/2.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«هر تلاش یک قدم رو به جلوست!»",
+      "charecter": "sina",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/catapult/chapters/2.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«هر اشتباه یک تجربهٔ تازه است!»",
+      "charecter": "mohammad",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/catapult/chapters/2.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«حالا خبر خوب: همهٔ بخش‌های اپ باز شده و می‌تونی هرطور خواستی با برنامه‌نویسی یا با دستهٔ کنترل بازی و آزمایش‌های جدید بسازی. دنیا آزمایشگاه توست!»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/catapult/chapters/2.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-all-sections",
+        "unlockType": "feature",
+        "projectId": "car-all-projects",
+        "title": "باز شدن همهٔ بخش‌ها",
+        "description": "پس از گذراندن هر سه پروژه و بازی‌هایشان، همه‌ی بخش‌های اپلیکیشن برای کودک باز می‌شود.",
+        "icon": "star",
+        "dependsOnRewards": [
+          "badge-straight-path",
+          "badge-soft-steering",
+          "badge-precise-parking"
+        ]
+      }
+    }
+  ]
+}

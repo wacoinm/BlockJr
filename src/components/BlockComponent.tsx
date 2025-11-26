@@ -15,7 +15,8 @@ import {
   Turtle,
   Rabbit,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Crosshair
 } from 'lucide-react';
 import { Block } from '../types/Block';
 import { SoundContext } from '../App';
@@ -105,6 +106,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
       case 'lamp-off': return 'bg-gray-400 shadow-gray-500 bg-gradient-to-b from-gray-300 to-gray-500 dark:from-gray-700 dark:to-gray-900 dark:shadow-black/30';
       case 'speed-low': return 'bg-cyan-400 shadow-cyan-500 bg-gradient-to-b from-cyan-300 to-cyan-500 dark:from-cyan-700 dark:to-cyan-900 dark:shadow-black/30';
       case 'speed-high': return 'bg-purple-500 shadow-purple-600 bg-gradient-to-b from-purple-400 to-purple-600 dark:from-purple-700 dark:to-purple-900 dark:shadow-black/40';
+      case 'shoot': return 'bg-orange-500 shadow-orange-600 bg-gradient-to-b from-orange-400 to-orange-600 dark:from-orange-700 dark:to-orange-900 dark:shadow-black/40';
       default: return 'bg-gray-500 shadow-gray-600 bg-gradient-to-b from-gray-400 to-gray-600 dark:from-slate-700 dark:to-slate-800 dark:shadow-black/30';
     }
   };
@@ -123,6 +125,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
       case 'lamp-off': return 'bg-gray-400 dark:bg-gray-700';
       case 'speed-low': return 'bg-cyan-400 dark:bg-cyan-700';
       case 'speed-high': return 'bg-purple-500 dark:bg-purple-700';
+      case 'shoot': return 'bg-orange-500 dark:bg-orange-700';
       default: return 'bg-gray-500 dark:bg-slate-700';
     }
   };
@@ -143,6 +146,7 @@ export const BlockComponent: React.FC<BlockComponentProps> = ({
       case 'lamp-off': return <LightbulbOff size={iconSize} className={baseIconColor} />;
       case 'speed-low': return <Turtle size={iconSize} className={baseIconColor} />;
       case 'speed-high': return <Rabbit size={iconSize} className={baseIconColor} />;
+      case 'shoot': return <Crosshair size={iconSize} className={baseIconColor} />;
       default: return null;
     }
   };

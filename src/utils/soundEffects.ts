@@ -43,6 +43,8 @@ function colorForBlockType(type: string) {
     case "speed-low":
     case "speed-high":
       return "teal";
+    case "shoot":
+      return "red";
     default:
       return "gray";
   }

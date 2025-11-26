@@ -185,10 +185,6 @@ const ProjectActionSheet: React.FC<Props> = ({ project, onClose }) => {
           type StoryKey = 'car' | 'ماشین' | 'elevator' | 'tele-elev-crane';
           interface StoryModule { car?: Record<string, unknown>; [key: string]: Record<string, unknown> | undefined; }
           const importMap: Record<StoryKey, () => Promise<StoryModule>> = {
-            'car': () => import('../../assets/stories/car.ts'),
-            'ماشین': () => import('../../assets/stories/car.ts'),
-            'elevator': () => import('../../assets/stories/car.ts'),
-            'tele-elev-crane': () => import('../../assets/stories/car.ts')
           };
 
           if (importMap[cand as StoryKey]) {

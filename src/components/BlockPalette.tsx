@@ -111,6 +111,14 @@ const paletteBlocks: Block[] = [
     parentId: null,
     childId: null,
   },
+  {
+    id: "shoot-template",
+    type: "shoot",
+    x: 0,
+    y: 0,
+    parentId: null,
+    childId: null,
+  },
 ];
 
 export const BlockPalette: React.FC<BlockPaletteProps> = ({
@@ -173,6 +181,15 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({
       "countclockwise",
       "up",
       "down",
+      "delay",
+    ],
+    "منجنیق": [
+      "green-flag",
+      "forward",
+      "backward",
+      "clockwise",
+      "countclockwise",
+      "shoot",
       "delay",
     ],
   };

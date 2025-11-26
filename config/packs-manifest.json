@@ -1,14 +1,40 @@
 {
-  "generatedAt": "2025-10-07T00:00:00Z",
   "packStorageKey": "selected_pack_v1",
   "packs": [
     {
       "id": "pack-tele-elev-crane",
       "name": "پَک ماشین و منجنیق",
       "description": "ماشین، جرثقیل، منجنیق",
-      "items": ["ماشین", "جرثقیل", "منجنیق"],
       "qrRaw": "ABCDEFGHIJKLMNOP",
-      "qrBase64": "QUJDREVGR0hJSktMTU5PUA=="
+      "qrBase64": "QUJDREVGR0hJSktMTU5PUA==",
+      "projects": [
+        {
+          "name": "ماشین",
+          "subtitle": "پروژه نصب و راه‌اندازی ماشین",
+          "category": "آموزشی",
+          "description": "آن شب، زمستان انگار تصمیم گرفته بود همهٔ پنجره‌های جهان را منجمد کند. پشت شیشهٔ اتاق اندی، دانه‌های برف آرام آرام بر روی هم می‌نشستند. بخاریِ سالن خاموش شده بود، و اندی آن‌قدر خسته بود که با لباس مدرسه و جوراب‌های راه‌راهش،",
+          "imgsPath": "/scenes/car/chapters/",
+          "storyModule": "src/assets/stories/car.json",
+          "isLock": true,
+          "lockReason": "محتوا در دست ساخت است"
+        },
+        {
+          "name": "جرثقیل",
+          "subtitle": "پروژه جرثقیل سقفی",
+          "category": "آموزشی",
+          "description": "",
+          "imgsPath": "/scenes/crane/chapters/",
+          "storyModule": "src/assets/stories/crane.json"
+        },
+        {
+          "name": "منجنیق",
+          "subtitle": "پروژه منجنیق",
+          "category": "آموزشی",
+          "description": "",
+          "imgsPath": "/scenes/catapult/chapters/",
+          "storyModule": "src/assets/stories/catapult.json"
+        }
+      ]
     },
     {
       "id": "pack-lift-buildozer",
@@ -16,159 +42,8 @@
       "description": "لیفت تراک، بلدوزر",
       "items": ["lift truck", "buildozer"],
       "qrRaw": "QRSTUVWXYZABCDEF",
-      "qrBase64": "UVJTVFVWV1hZWkFCQ0RFRg=="
+      "qrBase64": "UVJTVFVWV1hZWkFCQ0RFRg==",
+      "projects": []
     }
-  ],
-  "projects": [
-    {
-      "id": "ماشین",
-      "name": "ماشین",
-      "subtitle": "پروژه نصب و راه‌اندازی ماشین",
-      "category": "آموزشی",
-      "description": "آن شب، زمستان انگار تصمیم گرفته بود همهٔ پنجره‌های جهان را منجمد کند. پشت شیشهٔ اتاق اندی، دانه‌های برف آرام آرام بر روی هم می‌نشستند. بخاریِ سالن خاموش شده بود، و اندی آن‌قدر خسته بود که با لباس مدرسه و جوراب‌های راه‌راهش،",
-      "imgsPath": "/scenes/car/chapters/",
-      "storyModule": "src/assets/stories/car/index.ts",
-      "storyDir": "src/assets/stories/car",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "isLock": false,
-      "notes": "Demo project used in ProjectSelection page."
-    },
-    {
-      "id": "جرثقیل",
-      "name": "جرثقیل",
-      "subtitle": "پروژه جرثقیل سقفی",
-      "category": "آموزشی",
-      "imgsPath": "/scenes/car/chapters/",
-      "storyModule": "src/assets/stories/car/index.ts",
-      "storyDir": "src/assets/stories/car",
-      "validatorPath": "src/utils/validators/car.validator.ts"
-    },
-    {
-      "id": "منجنیق",
-      "name": "منجنیق",
-      "subtitle": "پروژه منجنیق",
-      "category": "آموزشی",
-      "description": "",
-      "imgsPath": "/scenes/car/chapters/",
-      "storyModule": "src/assets/stories/car/index.ts",
-      "storyDir": "src/assets/stories/car",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "isLock": true,
-      "lockReason": "محتوا در دست ساخت است"
-    }
-  ],
-  "stories": [
-    {
-      "projectId": "car",
-      "storyPath": "src/assets/stories/car",
-      "storyModule": "src/assets/stories/car/index.ts",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "notes": "Main car story module (exported as `car` in your code)."
-    },
-    {
-      "projectId": "crane",
-      "storyPath": "src/assets/stories/car",
-      "storyModule": "src/assets/stories/car/index.ts",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "notes": "Reuses car demo story for UI tests; replace with real story when available."
-    },
-    {
-      "projectId": "catapult",
-      "storyPath": "src/assets/stories/car",
-      "storyModule": "src/assets/stories/car/index.ts",
-      "validatorPath": "src/utils/validators/car.validator.ts",
-      "notes": "Catapult/منجنیق story placeholder."
-    }
-  ],
-  "tasklists": [
-    {
-      "projectId": "ماشین",
-      "chapterKey": "chapter-1",
-      "tasks": [
-        {
-          "id": "elev-1-1",
-          "title": "بازدید محل نصب",
-          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
-          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
-          "type": "image",
-          "mediaText": "بازدید محل نصب",
-          "locked": false,
-          "mediaUrl": "https://www.ultratechcement.com/content/ultratechcement/in/en/home/for-homebuilders/home-building-explained-single/descriptive-articles/low-cost-home-construction-techniques/_jcr_content/root/container/container_1646056284/teaser_copy_86651871.coreimg.jpeg/1711525970470/house-budget-1.jpeg"
-        },
-        {
-          "id": "elev-1-2",
-          "title": "تماشای ویدیوی معرفی",
-          "shortDescription": "ویدیوی ۳ دقیقه‌ای معرفی",
-          "description": "ویدیو کوتاه راهنمای نصب ماشین را تماشا کنید.",
-          "type": "video",
-          "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
-          "mediaText": "ویدیو آموزشی",
-          "locked": true
-        },
-        {
-          "id": "elev-1-1",
-          "title": "بازدید محل نصب",
-          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
-          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
-          "type": "image",
-          "mediaText": "بازدید محل نصب",
-          "locked": false,
-          "mediaUrl": "https://boomilia.com/media/media/Worker_Man_19.jpg_7DEllNG.webp"
-        },{
-          "id": "elev-1-1",
-          "title": "بازدید محل نصب",
-          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
-          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
-          "type": "image",
-          "mediaText": "بازدید محل نصب",
-          "locked": false,
-          "mediaUrl": "https://placehold.co/800x600?text=project"
-        },{
-          "id": "elev-1-1",
-          "title": "بازدید محل نصب",
-          "shortDescription": "بررسی ایمنی و اندازه‌گیری فضای نصب",
-          "description": "نکات ایمنی را بررسی کنید و از ارتفاع و فضای کافی اطمینان حاصل کنید.",
-          "type": "image",
-          "mediaText": "بازدید محل نصب",
-          "locked": false,
-          "mediaUrl": "https://placehold.co/800x600?text=project"
-        }
-      ]
-    },
-    {
-      "projectId": "ماشین",
-      "chapterKey": "chapter-2",
-      "tasks": [
-        {
-          "id": "elev-2-1",
-          "title": "ثبت عکس محل",
-          "shortDescription": "آپلود عکس محل نصب",
-          "description": "یک عکس از محل نصب آپلود کنید و توضیحات مختصری بنویسید.",
-          "type": "image",
-          "mediaText": "ثبت عکس",
-          "locked": false,
-          "mediaUrl": "https://placehold.co/800x600?text=project"
-        }
-      ]
-    }
-  ],
-  "packToProjectKeywords": {
-    "pack-tele-elev-crane": [
-      "ماشین",
-      "جرثقیل",
-      "منجنیق",
-      "car",
-      "catapult",
-      "crane"
-    ],
-    "pack-lift-buildozer": [
-      "ماشین‌آلات",
-      "ماشین‌آلات سنگین",
-      "لیفت",
-      "بلدوزر",
-      "lift",
-      "buildozer"
-    ]
-  },
-  "notes": "This manifest centralizes packs, projects and story/validator paths for development. Update when adding new packs/projects/stories."
+  ]
 }

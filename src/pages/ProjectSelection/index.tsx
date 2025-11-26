@@ -14,16 +14,9 @@ import { loadProjects } from "../../utils/projectStorage";
 /**
  * ProjectSelection — improved matching that treats pack.items as project selectors.
  *
- * Matching order for each item:
- * 1. project.id === item
- * 2. project.id includes item
- * 3. project.name includes item
- * 4. project.subtitle includes item
- * 5. try packToProjectKeywords-based best-effort matching
- *
- * If you still see items not matched (e.g. "telecabin" -> "gondola"),
- * add "telecabin" to the packToProjectKeywords for that pack in your manifest
- * or change the "items" array to use canonical project ids.
+ * در نسخه‌ی جدید:
+ * اگر pack.projects وجود داشته باشد، همان به عنوان لیست پروژه‌های این پَک استفاده می‌شود.
+ * فقط برای پَک‌های قدیمی / اسکن‌شده که projects ندارند، از منطق items/keywords استفاده می‌کنیم.
  */
 
 type Project = {
@@ -39,7 +32,7 @@ type Project = {
   [key: string]: any;
 };
 
-const normalize = (s: string | undefined | null) => (String(s ?? "").trim().toLowerCase());
+const normalize = (s: string | undefined | null) => String(s ?? "").trim().toLowerCase();
 
 /** small slugify helper to try filename-like candidates */
 function slugify(s?: string | null) {
@@ -80,7 +73,7 @@ const ProjectSelection: React.FC = () => {
         const manifestProjects = (getAllProjects() || []) as Project[];
         const manifestPacks = (getAllPacks() || []) as any[];
         const persistedProjects = (await loadProjects().catch(() => [])) as Project[];
-        const manifestStories = (getAllStories() || []);
+        const manifestStories = getAllStories() || [];
 
         // Merge projects: persisted overrides manifest
         const projectsMap = new Map<string, Project>();
@@ -110,7 +103,11 @@ const ProjectSelection: React.FC = () => {
                 try {
                   if (!s) continue;
                   // if s.projectId matches this project id/name, prioritize its module
-                  if (String(s.projectId) === String(p.id) || slugify(String(s.projectId)) === slugify(p.id) || slugify(String(s.projectId)) === slugify(p.name)) {
+                  if (
+                    String(s.projectId) === String(p.id) ||
+                    slugify(String(s.projectId)) === slugify(p.id) ||
+                    slugify(String(s.projectId)) === slugify(p.name)
+                  ) {
                     const arr = candidateFromStoryModule(s.storyModule);
                     arr.forEach((c) => candidates.add(c.replace(/^src\//, "").replace(/^\/+/, "")));
                   } else {
@@ -136,7 +133,13 @@ const ProjectSelection: React.FC = () => {
                     // eslint-disable-next-line no-await-in-loop
                     const mod: any = await import(pth).catch(() => null);
                     if (mod) {
-                                            storyObj = mod[p.id] ?? mod.default ?? mod[slugify(p.id)] ?? mod.car ?? mod;
+                      // try a few keys; keep old behaviour
+                      storyObj =
+                        mod[p.id] ??
+                        mod.default ??
+                        mod[slugify(p.id)] ??
+                        mod.car ??
+                        mod;
                       if (storyObj) break;
                     }
                   } catch {
@@ -156,8 +159,8 @@ const ProjectSelection: React.FC = () => {
 
             return {
               ...p,
-              project: storyObj ?? p.project,
-              checkpoints: checkpoints ?? p.checkpoints ?? [],
+              project: storyObj ?? (p as any).project,
+              checkpoints: checkpoints ?? (p as any).checkpoints ?? [],
             } as Project;
           })
         );
@@ -170,135 +173,201 @@ const ProjectSelection: React.FC = () => {
         let filtered: Project[] = enriched;
 
         if (selPack) {
-          // find pack definition
+          // find pack definition by id
           const packDef = manifestPacks.find((pk: any) => String(pk.id) === String(selPack));
-          const packItems: string[] = Array.isArray(packDef?.items)
-            ? packDef.items.map((it: any) => String(it || "").toLowerCase())
-            : [];
-          const packKeywords = (getPackKeywords(selPack) || []).map((k: any) => String(k || "").toLowerCase());
 
-          // If packDef exists and items are present -> map each item to a project (NOT show the pack object)
-          if (packDef && packItems.length > 0) {
+          // --- NEW: if pack has explicit `projects`, use them as the ground truth ---
+          const packProjects: any[] = Array.isArray((packDef as any)?.projects)
+            ? ((packDef as any).projects as any[])
+            : [];
+
+          if (packProjects.length > 0) {
             const matchedProjects: Project[] = [];
             const seenIds = new Set<string>();
 
-            // helper to push project if not already added
-            const tryPush = (proj?: Project, reason?: string) => {
-              if (!proj || !proj.id) return;
-              if (seenIds.has(proj.id)) return;
-              seenIds.add(proj.id);
-              matchedProjects.push(proj);
-              // debug info per match
-              // console.debug(`${selPack}: item matched -> ${proj.id}`, reason);
-            };
+            for (const rawProj of packProjects) {
+              if (!rawProj) continue;
 
-            // iterate items in order — each item should correspond to a project
-            console.groupCollapsed(`[ProjectSelection] pack '${selPack}' items matching debug`);
-            for (const itemRaw of packItems) {
-              const item = String(itemRaw || "").trim().toLowerCase();
-              let found: Project | undefined = undefined;
+              const key = String(rawProj.id ?? rawProj.name ?? "").trim();
+              if (!key) continue;
+              const keyNorm = normalize(key);
 
-              // 1) exact id match
-              found = enriched.find((p) => normalize(p.id) === item);
-              if (found) {
-                console.debug(`item='${item}' → exact id '${found.id}'`);
-                tryPush(found, "exact id");
-                continue;
+              // try to find a corresponding enriched project
+              let proj =
+                enriched.find(
+                  (p) => normalize(p.id) === keyNorm || normalize(p.name) === keyNorm
+                ) || null;
+
+              // if not found, build a minimal project entry from pack data
+              if (!proj) {
+                proj = {
+                  id: key,
+                  name: rawProj.name ?? key,
+                  subtitle: rawProj.subtitle,
+                  category: rawProj.category,
+                  imgsPath: rawProj.imgsPath,
+                  isLock: rawProj.isLock,
+                  lockReason: rawProj.lockReason,
+                  checkpoints: [],
+                } as Project;
               }
 
-              // 2) id contains item
-              found = enriched.find((p) => normalize(p.id).includes(item));
-              if (found) {
-                console.debug(`item='${item}' → id contains '${found.id}'`);
-                tryPush(found, "id contains");
-                continue;
+              if (!seenIds.has(proj.id)) {
+                seenIds.add(proj.id);
+                matchedProjects.push(proj);
               }
+            }
 
-              // 3) name contains item
-              found = enriched.find((p) => normalize(p.name).includes(item));
-              if (found) {
-                console.debug(`item='${item}' → name contains '${found.id}'`);
-                tryPush(found, "name contains");
-                continue;
-              }
+            filtered = matchedProjects;
+          } else {
+            // --- OLD BEHAVIOUR (for packs without `projects`, e.g. scanned packs) ---
+            const packItems: string[] = Array.isArray(packDef?.items)
+              ? packDef.items.map((it: any) => String(it || "").toLowerCase())
+              : [];
+            const packKeywords = (getPackKeywords(selPack) || []).map((k: any) =>
+              String(k || "").toLowerCase()
+            );
 
-              // 4) subtitle contains item
-              found = enriched.find((p) => normalize(p.subtitle).includes(item));
-              if (found) {
-                console.debug(`item='${item}' → subtitle contains '${found.id}'`);
-                tryPush(found, "subtitle contains");
-                continue;
-              }
+            // If packDef exists and items are present -> map each item to a project (NOT show the pack object)
+            if (packDef && packItems.length > 0) {
+              const matchedProjects: Project[] = [];
+              const seenIds = new Set<string>();
 
-              // 5) pack keywords — try to match a project via keywords:
-              //    If any keyword equals item, prefer projects whose id/name/subtitle include that keyword.
-              if (packKeywords.includes(item)) {
-                const byKw = enriched.find((p) => {
-                  const id = normalize(p.id);
-                  const name = normalize(p.name);
-                  const subtitle = normalize(p.subtitle);
-                  return id.includes(item) || name.includes(item) || subtitle.includes(item);
-                });
-                if (byKw) {
-                  console.debug(`item='${item}' → matched by pack keyword to project '${byKw.id}'`);
-                  tryPush(byKw, "pack keyword");
+              const tryPush = (proj?: Project) => {
+                if (!proj || !proj.id) return;
+                if (seenIds.has(proj.id)) return;
+                seenIds.add(proj.id);
+                matchedProjects.push(proj);
+              };
+
+              console.groupCollapsed(
+                `[ProjectSelection] pack '${selPack}' items matching debug`
+              );
+              for (const itemRaw of packItems) {
+                const item = String(itemRaw || "").trim().toLowerCase();
+                let found: Project | undefined = undefined;
+
+                // 1) exact id match
+                found = enriched.find((p) => normalize(p.id) === item);
+                if (found) {
+                  console.debug(`item='${item}' → exact id '${found.id}'`);
+                  tryPush(found);
                   continue;
                 }
-              }
 
-              // 6) broader keyword match: try any pack keyword to match a project, if that keyword maps to a project
-              let broader: Project | undefined = undefined;
-              for (const kw of packKeywords) {
-                const candidate = enriched.find((p) => {
-                  const id = normalize(p.id);
-                  const name = normalize(p.name);
-                  const subtitle = normalize(p.subtitle);
-                  return id.includes(kw) || name.includes(kw) || subtitle.includes(kw);
-                });
-                if (candidate) {
-                  broader = candidate;
-                  console.debug(`item='${item}' → fallback matched by pack keyword '${kw}' → project '${candidate.id}'`);
-                  break;
+                // 2) id contains item
+                found = enriched.find((p) => normalize(p.id).includes(item));
+                if (found) {
+                  console.debug(`item='${item}' → id contains '${found.id}'`);
+                  tryPush(found);
+                  continue;
+                }
+
+                // 3) name contains item
+                found = enriched.find((p) => normalize(p.name).includes(item));
+                if (found) {
+                  console.debug(`item='${item}' → name contains '${found.id}'`);
+                  tryPush(found);
+                  continue;
+                }
+
+                // 4) subtitle contains item
+                found = enriched.find((p) => normalize(p.subtitle).includes(item));
+                if (found) {
+                  console.debug(`item='${item}' → subtitle contains '${found.id}'`);
+                  tryPush(found);
+                  continue;
+                }
+
+                // 5) pack keywords — try to match a project via keywords
+                if (packKeywords.includes(item)) {
+                  const byKw = enriched.find((p) => {
+                    const id = normalize(p.id);
+                    const name = normalize(p.name);
+                    const subtitle = normalize(p.subtitle);
+                    return id.includes(item) || name.includes(item) || subtitle.includes(item);
+                  });
+                  if (byKw) {
+                    console.debug(
+                      `item='${item}' → matched by pack keyword to project '${byKw.id}'`
+                    );
+                    tryPush(byKw);
+                    continue;
+                  }
+                }
+
+                // 6) broader keyword match: try any pack keyword
+                let broader: Project | undefined = undefined;
+                for (const kw of packKeywords) {
+                  const candidate = enriched.find((p) => {
+                    const id = normalize(p.id);
+                    const name = normalize(p.name);
+                    const subtitle = normalize(p.subtitle);
+                    return (
+                      id.includes(kw) || name.includes(kw) || subtitle.includes(kw)
+                    );
+                  });
+                  if (candidate) {
+                    broader = candidate;
+                    console.debug(
+                      `item='${item}' → fallback matched by pack keyword '${kw}' → project '${candidate.id}'`
+                    );
+                    break;
+                  }
+                }
+                if (broader) {
+                  tryPush(broader);
+                  continue;
+                }
+
+                console.debug(`item='${item}' → NO project matched`);
+              }
+              console.groupEnd();
+
+              if (matchedProjects.length > 0) {
+                filtered = matchedProjects;
+              } else {
+                const keywordsFallback =
+                  packKeywords.length > 0
+                    ? packKeywords
+                    : (getPackKeywords(selPack) || []).map((k: any) =>
+                        String(k || "").toLowerCase()
+                      );
+                if (keywordsFallback.length > 0) {
+                  filtered = enriched.filter((proj) => {
+                    const id = normalize(proj.id);
+                    const name = normalize(proj.name);
+                    const subtitle = normalize(proj.subtitle);
+                    return keywordsFallback.some(
+                      (kw) =>
+                        id.includes(kw) || name.includes(kw) || subtitle.includes(kw)
+                    );
+                  });
+                } else {
+                  filtered = enriched.filter(
+                    (proj) => String(proj.id) === String(selPack)
+                  );
                 }
               }
-              if (broader) {
-                tryPush(broader, "fallback pack keyword");
-                continue;
-              }
-
-              // not matched
-              console.debug(`item='${item}' → NO project matched`);
-            }
-            console.groupEnd();
-
-            if (matchedProjects.length > 0) {
-              filtered = matchedProjects;
             } else {
-              // nothing matched from items — fall back to previous behaviour (keywords or project.id === selPack)
-              const keywordsFallback = packKeywords.length > 0 ? packKeywords : (getPackKeywords(selPack) || []).map((k: any) => String(k || "").toLowerCase());
+              // No packDef or no items -> fallback to keyword-based filtering or scanned-pack id fallback
+              const keywordsFallback = (getPackKeywords(selPack) || []).map((k: any) =>
+                String(k || "").toLowerCase()
+              );
               if (keywordsFallback.length > 0) {
                 filtered = enriched.filter((proj) => {
                   const id = normalize(proj.id);
                   const name = normalize(proj.name);
                   const subtitle = normalize(proj.subtitle);
-                  return keywordsFallback.some((kw) => id.includes(kw) || name.includes(kw) || subtitle.includes(kw));
+                  return keywordsFallback.some(
+                    (kw) => id.includes(kw) || name.includes(kw) || subtitle.includes(kw)
+                  );
                 });
               } else {
-                filtered = enriched.filter((proj) => String(proj.id) === String(selPack));
+                filtered = enriched.filter(
+                  (proj) => String(proj.id) === String(selPack)
+                );
               }
-            }
-          } else {
-            // No packDef or no items -> fallback to keyword-based filtering or scanned-pack id fallback
-            const keywordsFallback = (getPackKeywords(selPack) || []).map((k: any) => String(k || "").toLowerCase());
-            if (keywordsFallback.length > 0) {
-              filtered = enriched.filter((proj) => {
-                const id = normalize(proj.id);
-                const name = normalize(proj.name);
-                const subtitle = normalize(proj.subtitle);
-                return keywordsFallback.some((kw) => id.includes(kw) || name.includes(kw) || subtitle.includes(kw));
-              });
-            } else {
-              filtered = enriched.filter((proj) => String(proj.id) === String(selPack));
             }
           }
         }
@@ -337,7 +406,9 @@ const ProjectSelection: React.FC = () => {
         ) : selectedPackId && displayProjects.length === 0 ? (
           <div className="py-12 text-center">
             <h2 className="text-2xl font-semibold">هیچ پروژه‌ای در این پَک یافت نشد</h2>
-            <p className="mt-2 text-neutral-500">ممکن است هنوز پروژه‌ای به این پَک اضافه نشده باشد.</p>
+            <p className="mt-2 text-neutral-500">
+              ممکن است هنوز پروژه‌ای به این پَک اضافه نشده باشد.
+            </p>
           </div>
         ) : view === "list" ? (
           <ProjectListNew projects={displayProjects} onOpen={(p) => setOpenProject(p)} />
@@ -346,7 +417,9 @@ const ProjectSelection: React.FC = () => {
         )}
       </main>
 
-      {openProject && <ProjectActionSheet project={openProject} onClose={() => setOpenProject(null)} />}
+      {openProject && (
+        <ProjectActionSheet project={openProject} onClose={() => setOpenProject(null)} />
+      )}
     </div>
   );
 };

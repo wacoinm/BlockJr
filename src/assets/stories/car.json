@@ -1,0 +1,701 @@
+{
+  "chapter-01": [
+    {
+      "type": "dialogue",
+      "text": "«سلام کوچولوهای کنجکاو! جایی توی دل دشت‌ها، شهری هست که بهش می‌گن لاله؛ شهری آرام و سبز که شاید خیلی بزرگ نباشه.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/1.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«اما توی دلش کلی رویای بزرگ جا شده. بچه‌های این شهر زیاد نیستند، ولی دل‌هاشون اندازهٔ کوه بزرگه!»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/1.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«امروز می‌خوایم با سه تا قهرمان پرانرژی آشنا بشیم؛ سه پسری که تصمیم گرفتن مسئله‌ها را به پروژه تبدیل کنند.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/1.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«سلام! من آرشم. همیشه دوست دارم بدونم؛ مدام می‌پرسم چرا و چطور. چند بار امتحان می‌کنم تا مطمئن بشم همه‌چی درست کار می‌کنه. رنگ مورد علاقه‌ام بنفشه!»",
+      "charecter": "arash",
+      "mode": "1",
+      "typeSpeed": 30,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/2.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«هی رفقا! من سینام. از حرف زدن با آدما و دوست شدن باهاشون کیف می‌کنم. رنگ محبوبم زرده؛ مثل خورشید پرانرژی!»",
+      "charecter": "sina",
+      "mode": "1",
+      "typeSpeed": 30,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/2.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«درود! من محمدم. اهل حساب‌وکتابم و دوست دارم همه‌چیز برام روشن و مرتب باشه. رنگ مورد علاقه‌ام آبی آسمونی و عاشق قورمه‌سبزیم!»",
+      "charecter": "mohammad",
+      "mode": "1",
+      "typeSpeed": 30,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/2.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«بچه‌ها، اگه بزرگ شدیم، دوست دارید چی‌کاره بشید؟ من یه عالمه گزینه تو ذهنمه.»",
+      "charecter": "arash",
+      "mode": "4",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/3.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«خیلی دوست دارم هر وسیله‌ای رو باز کنم ببینم چطور کار می‌کنه؛ شاید مهندس مکانیک بشم.»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/3.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«من عاشق دنیای الکترونیکم؛ سیم‌ها، باتری‌ها و ربات‌ها... می‌خوام مهندس الکترونیک بشم.»",
+      "charecter": "mohammad",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/3.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«من هم عاشق کدنویسی و بازی‌سازی‌ام؛ دوست دارم مغز ربات‌ها رو طراحی کنم.»",
+      "charecter": "arash",
+      "mode": "5",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/3.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«بیایید دانشمند بشیم؛ کسی که سؤال می‌پرسه، آزمایش می‌کنه و چیز جدید اختراع می‌کنه.»",
+      "charecter": "arash",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/3.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«هر شغل مفید می‌تونه به آدم‌ها کمک کنه؛ مهم اینه مسئله‌ای رو حل کنیم.»",
+      "charecter": "sina",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/3.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«پس اول باید مسئله پیدا کنیم؛ یک مشکل واقعی توی خونه‌هامون.»",
+      "charecter": "mohammad",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/4.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«وقتی دارم بازی می‌کنم، اسباب‌بازی‌های کوچیک یا پیچ‌ها می‌افتن روی زمین؛ جمع‌کردنشون برام سخته.»",
+      "charecter": "sina",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/4.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«توی اتاقم موقع جابه‌جایی وسایل زود خسته می‌شم؛ دوست دارم چیزی کمکم کنه بدون خستگی جابه‌جا کنم.»",
+      "charecter": "mohammad",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/4.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«من می‌خوام یک زمین بسکتبال کوچیک توی اتاقم بسازم و توپ‌ها رو توی سبد بندازم.»",
+      "charecter": "arash",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/4.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«وسایل اتاق وقتی شلوغ می‌شن، مرتب‌کردنشون سخته؛ کاش یک چیزی جابه‌جاشون کنه و سر جاشون بذاره.»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/4.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«گاهی باید جامدادی یا جعبه‌های کوچیک رو از این‌طرف اتاق به اون‌طرف ببریم، بدون اینکه با دست بلندش کنیم. چی بسازیم؟»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/4.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«بیایید یک ماشین کنترلی بسازیم که یدک‌کش داشته باشه و وسایل سبک رو بکشه.»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«من کدنویسی و کنترل از داخل اپ رو انجام می‌دم.»",
+      "charecter": "arash",
+      "mode": "5",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«من مدار و باتری رو طوری می‌سازم که ایمن و قابل اعتماد باشه.»",
+      "charecter": "mohammad",
+      "mode": "2",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«من هم شاسی، چرخ‌های نرم و یدک‌کش رو طراحی می‌کنم.»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-1-mission-1",
+        "projectId": "car-project-1",
+        "sceneId": "scene-5",
+        "order": 1,
+        "taskType": "video",
+        "title": "پروژه ۱: ساخت ماشین یدک‌کش",
+        "shortDescription": "ویدیوی معرفی پروژه ماشین یدک‌کش و توضیح مسئله جابه‌جایی جامدادی.",
+        "description": "در این ویدیو، سه قهرمان برای کودک توضیح می‌دهند که چرا ساخت یک ماشین یدک‌کش می‌تواند مشکل جابه‌جایی وسایل سبک در اتاق را حل کند.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "پخش ویدیو معرفی پروژه",
+        "locked": false,
+        "dependsOn": [],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "شروع پروژه با یک ویدیوی داستانی."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«خب حالا که می‌دونیم چرا به یک ماشین یدک‌کش احتیاج داریم، وقتشه قدم‌به‌قدم ساختنش رو شروع کنیم.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/car/chapters/5.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-1-video-1",
+        "projectId": "car-project-1",
+        "sceneId": "scene-6",
+        "order": 2,
+        "taskType": "video",
+        "title": "آموزش مونتاژ ماشین یدک‌کش",
+        "shortDescription": "ویدیو قدم‌به‌قدم بستن موتور، چرخ‌ها و شاسی.",
+        "description": "ویدیویی آموزشی که در آن کودک یاد می‌گیرد چطور موتور، چرخ‌ها، شاسی و یدک‌کش را به هم متصل کند.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای آموزش مونتاژ",
+        "locked": false,
+        "dependsOn": [
+          "car-1-mission-1"
+        ],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "بهتر است کودک همراه با ویدیو، قطعات واقعی را هم روی میز داشته باشد."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«عالی بود! حالا که ماشینت آماده‌ست، می‌تونیم باهاش چند تمرین رانندگی انجام بدیم تا هم تو و هم ماشین آمادهٔ مأموریت‌های سخت‌تر بشید.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«اولین تمرین با بلوک‌نویسیه؛ فقط حرکت رو به جلو رو استفاده می‌کنیم تا از زیر صندلی‌ها رد بشیم.»",
+      "charecter": "arash",
+      "mode": "5",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-1-video-2",
+        "projectId": "car-project-1",
+        "sceneId": "scene-7",
+        "order": 3,
+        "taskType": "video",
+        "title": "بازی ۱: توضیح بلوکنویسی حرکت رو به جلو",
+        "shortDescription": "ویدیو آموزش چیدن بلوک‌ها برای عبور از زیر سه صندلی.",
+        "description": "در این ویدیو، آرش با زبان ساده توضیح می‌دهد چطور فقط با استفاده از بلوک «حرکت به جلو» مسیری طراحی کنیم که ماشین از زیر هر سه صندلی عبور کند.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای توضیح بازی ۱",
+        "locked": false,
+        "dependsOn": [
+          "car-1-video-1"
+        ],
+        "rewardIds": [],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "بعد از دیدن این ویدیو کودک آمادهٔ تمرین بلوک‌نویسی است."
+      }
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-1-challenge-1",
+        "projectId": "car-project-1",
+        "sceneId": "scene-7",
+        "order": 4,
+        "taskType": "video",
+        "title": "تمرین بلوک‌نویسی: حرکت رو به جلو",
+        "shortDescription": "چیدن بلوک‌ها برای عبور از زیر سه صندلی بدون برخورد.",
+        "description": "کودک طبق آنچه در ویدیو دیده، بلوک‌های «پرچم سبز» و «حرکت به جلو» را طوری می‌چیند که ماشین یدک‌کش از زیر سه صندلی رد شود.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "شروع تمرین بلوک‌نویسی",
+        "locked": false,
+        "dependsOn": [
+          "car-1-video-2"
+        ],
+        "rewardIds": [
+          "badge-straight-path"
+        ],
+        "validatorId": "validator-car-1-challenge-1",
+        "minScoreToPass": 1,
+        "maxScore": 3,
+        "notes": "این مرحله با سیستم بلوک‌نویسی اپ بررسی می‌شود."
+      }
+    },
+    {
+      "type": "validator",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "validator-car-1-challenge-1",
+        "taskId": "car-1-challenge-1",
+        "states": [
+          [
+            "green-flag",
+            "forward",
+            "forward"
+          ],
+          [
+            "green-flag",
+            "forward",
+            "forward",
+            "forward"
+          ],
+          [
+            "/^green[- ]?flag$/i",
+            "forward",
+            "forward"
+          ]
+        ],
+        "blockTypes": [
+          "up",
+          "down",
+          "delay",
+          "green-flag",
+          "forward",
+          "backward",
+          "clockwise",
+          "countclockwise",
+          "lamp-on",
+          "lamp-off",
+          "speed-low",
+          "speed-high"
+        ],
+        "notes": "نمونه‌هایی از دنباله بلوک‌های قابل قبول برای عبور از زیر صندلی‌ها."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«آفرین! اگر تونستی بدون برخورد از زیر هر سه صندلی رد بشی، یعنی خیلی خوب برنامه‌ریزی کردی.»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«این یعنی تو در مسیر مستقیم هم رانندهٔ خیلی خوبی هستی!»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-straight-path",
+        "unlockType": "badge",
+        "projectId": "car-project-1",
+        "title": "نشان مسیر مستقیم",
+        "description": "با موفقیت در تمرین حرکت مستقیم، نشان مسیر مستقیم را می‌گیری.",
+        "icon": "badge-straight-path",
+        "dependsOnRewards": []
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«حالا می‌تونیم بریم سراغ مسیرهای سخت‌تر و فرمان‌دادن‌های نرم و دقیق.»",
+      "charecter": "sina",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#fef3c7",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-1-challenge-2",
+        "projectId": "car-project-1",
+        "sceneId": "scene-7",
+        "order": 5,
+        "taskType": "video",
+        "title": "بازی ۲: مسیر ترکیبی و فرمان نرم",
+        "shortDescription": "ویدیو توضیح مسیر دوتایی و دورزدن صندلی دوم.",
+        "description": "در این ویدیو، سینا توضیح می‌دهد چگونه ماشین باید از زیر صندلی اول رد شود، دور صندلی دوم بگردد و دوباره به نقطه شروع برگردد.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای توضیح بازی ۲",
+        "locked": false,
+        "dependsOn": [
+          "car-1-challenge-1"
+        ],
+        "rewardIds": [
+          "badge-soft-steering"
+        ],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "این مرحله روی فرمان نرم و پیچیدن‌های دقیق تمرکز دارد."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«اگر این مسیر ترکیبی رو هم بدون برخورد رفتی، یعنی فرمان‌هات خیلی نرم و حساب‌شده‌ست!»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-soft-steering",
+        "unlockType": "badge",
+        "projectId": "car-project-1",
+        "title": "نشان فرمان نرم",
+        "description": "با عبور از مسیر ترکیبی، نشان فرمان نرم را می‌گیری.",
+        "icon": "badge-soft-steering",
+        "dependsOnRewards": [
+          "badge-straight-path"
+        ]
+      }
+    },
+    {
+      "type": "task",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": null,
+      "meta": {
+        "id": "car-1-challenge-3",
+        "projectId": "car-project-1",
+        "sceneId": "scene-7",
+        "order": 6,
+        "taskType": "video",
+        "title": "بازی ۳: کنترل سرعت و پارک دقیق",
+        "shortDescription": "ویدیو تمرین چرخیدن دور صندلی و پارک نهایی زیر آن.",
+        "description": "در این ویدیو، آرش و محمد نشان می‌دهند چطور با سرعت کم سه دور دور صندلی بچرخیم و در پایان زیر صندلی پارک کنیم.",
+        "mediaUrl": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "mediaText": "تماشای توضیح بازی ۳",
+        "locked": false,
+        "dependsOn": [
+          "car-1-challenge-2"
+        ],
+        "rewardIds": [
+          "badge-precise-parking"
+        ],
+        "validatorId": null,
+        "minScoreToPass": null,
+        "maxScore": null,
+        "notes": "کودک می‌تواند چند بار این تمرین را تکرار کند تا مهارت بیشتری پیدا کند."
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«اگر سه دور آرام دور صندلی چرخیدی و آخرش زیر صندلی پارک کردی، یعنی یک رانندهٔ دقیق واقعی هستی.»",
+      "charecter": "mohammad",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#000000",
+      "bgColor": "#e0f2fe",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-badge-precise-parking",
+        "unlockType": "badge",
+        "projectId": "car-project-1",
+        "title": "نشان پارک دقیق",
+        "description": "با پارک دقیق زیر صندلی، نشان پارک دقیق را می‌گیری.",
+        "icon": "badge-precise-parking",
+        "dependsOnRewards": [
+          "badge-straight-path",
+          "badge-soft-steering"
+        ]
+      }
+    },
+    {
+      "type": "dialogue",
+      "text": "«چون هر سه نشان رانندگی را گرفتی، حالا یک جایزهٔ ویژه برات باز شده!»",
+      "charecter": "ravi",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#0b3b4a",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 14,
+      "meta": null
+    },
+    {
+      "type": "dialogue",
+      "text": "«از این به بعد می‌تونی با دستهٔ کنترل، مثل یک ماشین کنترلی واقعی، ماشینت رو هدایت کنی.»",
+      "charecter": "arash",
+      "mode": "3",
+      "typeSpeed": 26,
+      "textColor": "#ffffff",
+      "bgColor": "#7c3aed",
+      "bgImage": "/scenes/car/chapters/6.png",
+      "fontSize": 15,
+      "meta": null
+    },
+    {
+      "type": "unlock",
+      "text": null,
+      "charecter": null,
+      "typeSpeed": null,
+      "textColor": null,
+      "bgColor": null,
+      "bgImage": null,
+      "fontSize": null,
+      "meta": {
+        "id": "unlock-joystick",
+        "unlockType": "feature",
+        "projectId": "car-project-1",
+        "title": "باز شدن دسته کنترل",
+        "description": "با گرفتن هر سه نشان رانندگی، بخش «دسته کنترل» در اپلیکیشن باز می‌شود.",
+        "icon": "joystick",
+        "dependsOnRewards": [
+          "badge-straight-path",
+          "badge-soft-steering",
+          "badge-precise-parking"
+        ]
+      }
+    }
+  ]
+}

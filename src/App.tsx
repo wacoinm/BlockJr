@@ -247,6 +247,7 @@ const App: React.FC = () => {
     taskId?: string | null;
   } | null>(null);
   const [chapterMessages, setChapterMessages] = useState<any[]>([]);
+  const [lastDialogueBatch, setLastDialogueBatch] = useState<any[] | null>(null);
   const [messageCursor, setMessageCursor] = useState<number>(0);
   const [blockingItem, setBlockingItem] = useState<any | null>(null);
   const [pendingResumeAfterValidation, setPendingResumeAfterValidation] =
@@ -460,6 +461,7 @@ const App: React.FC = () => {
           idx += 1;
         }
         if (dialogBatch.length > 0) {
+          setLastDialogueBatch(dialogBatch);
           await dialogue(dialogBatch as any);
         }
       }
@@ -471,7 +473,7 @@ const App: React.FC = () => {
       setNextButton(true);
       setPendingResumeAfterValidation(false);
     },
-    [dialogue, persistActiveTasks, createTaskFromMessage, setNextButton],
+    [dialogue, persistActiveTasks, createTaskFromMessage, setNextButton, setLastDialogueBatch],
   );
 
   const normalizeMessagesForSides = (raw: any[]) => {
@@ -544,6 +546,7 @@ const App: React.FC = () => {
         setCurrentDialogueChapter(key);
         const normalized = normalizeMessagesForSides(rawMessages);
         setChapterMessages(normalized);
+        setLastDialogueBatch(null);
         setMessageCursor(0);
         setBlockingItem(null);
         setPendingResumeAfterValidation(false);
@@ -628,6 +631,13 @@ const App: React.FC = () => {
 
   const handleReplayTasks = useCallback(() => {
     let tasksToShow = activeTaskList;
+    const buildTaskFromMessage = (msg: any, idx: number) =>
+      createTaskFromMessage(msg, idx);
+
+    if ((!tasksToShow || tasksToShow.length === 0) && blockingItem) {
+      const built = buildTaskFromMessage(blockingItem, messageCursor);
+      tasksToShow = built ? [built] : tasksToShow;
+    }
 
     if (!tasksToShow || tasksToShow.length === 0) {
       try {
@@ -643,15 +653,23 @@ const App: React.FC = () => {
       }
     }
 
-    // If still nothing, derive from last blocking message in current chapter messages
     if ((!tasksToShow || tasksToShow.length === 0) && chapterMessages && chapterMessages.length > 0) {
-      for (let i = chapterMessages.length - 1; i >= 0; i -= 1) {
-        const candidate = chapterMessages[i];
-        if (candidate && candidate.type && candidate.type !== 'dialogue') {
-          const built = createTaskFromMessage(candidate, i);
-          if (built) {
-            tasksToShow = [built];
-            break;
+      const clampedCursor = Math.min(
+        Math.max(messageCursor ?? 0, 0),
+        chapterMessages.length - 1,
+      );
+      const fromCursor = buildTaskFromMessage(chapterMessages[clampedCursor], clampedCursor);
+      if (fromCursor) {
+        tasksToShow = [fromCursor];
+      } else {
+        for (let i = clampedCursor; i >= 0; i -= 1) {
+          const candidate = chapterMessages[i];
+          if (candidate && candidate.type && candidate.type !== 'dialogue') {
+            const built = buildTaskFromMessage(candidate, i);
+            if (built) {
+              tasksToShow = [built];
+              break;
+            }
           }
         }
       }
@@ -664,11 +682,31 @@ const App: React.FC = () => {
     }
   }, [
     activeTaskList,
+    blockingItem,
     chapterMessages,
     currentDialogueChapter,
+    messageCursor,
     persistActiveTasks,
     createTaskFromMessage,
   ]);
+
+  const handleReplayDialogue = useCallback(async () => {
+    try {
+      if (lastDialogueBatch && lastDialogueBatch.length > 0) {
+        await dialogue(lastDialogueBatch as any);
+        return;
+      }
+
+      if (chapterMessages && chapterMessages.length > 0) {
+        const dialoguesOnly = chapterMessages.filter((m) => m && (!m.type || m.type === 'dialogue'));
+        if (dialoguesOnly.length > 0) {
+          await dialogue(dialoguesOnly as any);
+        }
+      }
+    } catch (err) {
+      console.warn('handleReplayDialogue failed', err);
+    }
+  }, [dialogue, lastDialogueBatch, chapterMessages]);
 
   // If route param present, load that project's blocks and select it
   const params = useParams();
@@ -1267,6 +1305,7 @@ const App: React.FC = () => {
           setBlockPaletteBottom={setBlockPaletteBottom}
           setShowTaskList={setShowTaskList}
           setActiveTaskList={setActiveTaskList}
+          onReplayDialogue={handleReplayDialogue}
           onReplayTasks={handleReplayTasks}
           mutedBlockIds={mutedBlockIds}
         />

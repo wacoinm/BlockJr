@@ -190,6 +190,7 @@ export default function AppShell(props: AppShellProps) {
       />
 
       <ReplayPalette
+        onReplayDialogue={props.onReplayDialogue}
         onReplayTasks={props.onReplayTasks ?? (() => {})}
         blockPaletteBottom={blockPaletteBottom}
         setShowTaskList={props.setShowTaskList ?? (() => {})}

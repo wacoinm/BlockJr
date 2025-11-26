@@ -14,9 +14,7 @@
           "category": "آموزشی",
           "description": "آن شب، زمستان انگار تصمیم گرفته بود همهٔ پنجره‌های جهان را منجمد کند. پشت شیشهٔ اتاق اندی، دانه‌های برف آرام آرام بر روی هم می‌نشستند. بخاریِ سالن خاموش شده بود، و اندی آن‌قدر خسته بود که با لباس مدرسه و جوراب‌های راه‌راهش،",
           "imgsPath": "/scenes/car/chapters/",
-          "storyModule": "src/assets/stories/car.json",
-          "isLock": true,
-          "lockReason": "محتوا در دست ساخت است"
+          "storyModule": "src/assets/stories/car.json"
         },
         {
           "name": "جرثقیل",

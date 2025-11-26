@@ -7,6 +7,7 @@ import { getTaskListForProject } from '../utils/manifest';
 import type { TaskItem } from '../utils/manifest';
 
 type ReplayPaletteProps = {
+  onReplayDialogue?: () => void;
   onReplayTasks: () => void;
   blockPaletteBottom?: number;
   setShowTaskList: (show: boolean) => void;
@@ -14,6 +15,7 @@ type ReplayPaletteProps = {
 };
 
 export const ReplayPalette: React.FC<ReplayPaletteProps> = ({
+  onReplayDialogue,
   onReplayTasks,
   blockPaletteBottom,
   setShowTaskList,
@@ -27,6 +29,11 @@ export const ReplayPalette: React.FC<ReplayPaletteProps> = ({
   );
 
   const handleReplayDialogue = useCallback(async () => {
+    if (onReplayDialogue) {
+      onReplayDialogue();
+      return;
+    }
+
     if (dialogueMessages && currentChapter) {
       try {
         await dialogue(dialogueMessages);
@@ -34,7 +41,7 @@ export const ReplayPalette: React.FC<ReplayPaletteProps> = ({
         console.warn('ReplayDialogue failed:', err);
       }
     }
-  }, [dialogue, dialogueMessages, currentChapter]);
+  }, [onReplayDialogue, dialogue, dialogueMessages, currentChapter]);
 
   return (
     <div 

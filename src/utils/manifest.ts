@@ -14,6 +14,8 @@ export type ProjectEntry = {
   storyModule?: string;
   isLock?: boolean;
   lockReason?: string;
+  order?: number;
+  dependsOn?: string[];
   notes?: string;
 };
 
@@ -92,6 +94,8 @@ if (Array.isArray(raw?.packs)) {
         storyModule: proj.storyModule,
         isLock: proj.isLock,
         lockReason: proj.lockReason,
+        order: typeof proj.order === "number" ? proj.order : undefined,
+        dependsOn: Array.isArray(proj.dependsOn) ? proj.dependsOn : undefined,
         notes: proj.notes,
       };
 

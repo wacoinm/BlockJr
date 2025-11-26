@@ -45,7 +45,8 @@ import { useParams, useNavigate, useLocation } from 'react-router';
 import Confetti from 'react-confetti';
 import { useDialogue } from 'dialogue-story';
 import { validateBlocksAgainstRuleSets } from './utils/validator';
-import { advanceSessionStep, getSession } from './utils/sessionStorage';
+import { advanceSessionStep, getSession, setSession } from './utils/sessionStorage';
+import { isProjectUnlocked, unlockNextAfter } from './utils/projectUnlock';
 
 /* Timeline tasklist imports */
 import TimelineTaskList, { TaskItem } from './components/TimelineTaskList';
@@ -67,6 +68,15 @@ function mapProjectToStoryKey(projectId?: string | null): 'car' | 'crane' | 'cat
   if (projectId === 'منجنیق') return 'catapult';
   return 'car';
 }
+
+const scopedKey = (
+  base: string,
+  projectId?: string | null,
+  fallback?: string,
+) => {
+  const pid = projectId ?? fallback ?? 'ماشین';
+  return `${base}:${pid}`;
+};
 
 /** helper: dynamic import JSON story based on storyKey */
 async function loadStoryByKey(
@@ -142,24 +152,46 @@ const App: React.FC = () => {
   const [activeTaskList, setActiveTaskList] = useState<TaskItem[] | null>(null);
   const [currentDialogueChapter, setCurrentDialogueChapter] = useState<string | null>(null);
   const [showNextButton, setShowNextButton] = useState(false);
+
+  const {
+    selectVisible,
+    selectOpen,
+    selectedProject,
+    openSelectPopup,
+    closeSelectPopup,
+    handleProjectSelect,
+    ITEM_STAGGER,
+    BASE_DURATION,
+    ITEM_DURATION,
+  } = useProjects('ماشین');
+
+  const projectStorageKey = useCallback(
+    (base: string, projectId?: string | null) => {
+      const pid = projectId ?? selectedProjectRef.current ?? selectedProject ?? 'ماشین';
+      return scopedKey(base, pid);
+    },
+    [selectedProject],
+  );
+
   const setNextButton = useCallback(
     (flag: boolean, chapter?: string | null) => {
       setShowNextButton(flag);
       try {
         if (typeof window === 'undefined') return;
         if (flag) {
+          const key = projectStorageKey(STORY_NEXT_KEY, null);
           window.localStorage.setItem(
-            STORY_NEXT_KEY,
+            key,
             JSON.stringify({ chapter: chapter ?? currentDialogueChapter, show: true }),
           );
         } else {
-          window.localStorage.removeItem(STORY_NEXT_KEY);
+          window.localStorage.removeItem(projectStorageKey(STORY_NEXT_KEY, null));
         }
       } catch (err) {
         console.warn('Failed to persist next-button state', err);
       }
     },
-    [currentDialogueChapter],
+    [currentDialogueChapter, projectStorageKey],
   );
 
   // derived map for quick lookup
@@ -356,17 +388,6 @@ const App: React.FC = () => {
   });
 
   const { unitLabel, unitValue, cycleUnit } = useUnits();
-  const {
-    selectVisible,
-    selectOpen,
-    selectedProject,
-    openSelectPopup,
-    closeSelectPopup,
-    handleProjectSelect,
-    ITEM_STAGGER,
-    BASE_DURATION,
-    ITEM_DURATION,
-  } = useProjects('ماشین');
 
   useEffect(() => {
     selectedProjectRef.current = selectedProject ?? null;
@@ -410,15 +431,16 @@ const App: React.FC = () => {
       try {
         if (typeof window === 'undefined') return;
         if (!tasks || tasks.length === 0) return;
+        const key = projectStorageKey(STORY_TASKS_KEY, null);
         window.localStorage.setItem(
-          STORY_TASKS_KEY,
+          key,
           JSON.stringify({ chapter: currentDialogueChapter, tasks }),
         );
       } catch (err) {
         console.warn('persistActiveTasks failed', err);
       }
     },
-    [currentDialogueChapter],
+    [currentDialogueChapter, projectStorageKey],
   );
 
   const playUntilBlocking = useCallback(
@@ -558,8 +580,9 @@ const App: React.FC = () => {
         // Persist last chapter/messages so replay buttons stay enabled after refresh
         try {
           if (typeof window !== 'undefined') {
+            const stateKey = projectStorageKey(STORY_STATE_KEY, projectId);
             window.localStorage.setItem(
-              STORY_STATE_KEY,
+              stateKey,
               JSON.stringify({ chapter: key, messages: normalized }),
             );
           }
@@ -572,7 +595,7 @@ const App: React.FC = () => {
         console.warn('startDialogueForChapter failed', err);
       }
     },
-    [selectedProject, dispatch, playUntilBlocking, setNextButton],
+    [selectedProject, dispatch, playUntilBlocking, setNextButton, projectStorageKey],
   );
 
   const { theme, cycleTheme } = useTheme('system');
@@ -581,7 +604,8 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return;
-      const raw = window.localStorage.getItem(STORY_STATE_KEY);
+      const projectIdForState = selectedProjectRef.current ?? selectedProject ?? 'ماشین';
+      const raw = window.localStorage.getItem(projectStorageKey(STORY_STATE_KEY, projectIdForState));
       if (!raw) return;
       const parsed = JSON.parse(raw);
       const chapterFromStorage = parsed?.chapter;
@@ -599,7 +623,7 @@ const App: React.FC = () => {
       dispatch(setMessages({ chapter: chapterFromStorage, messages: messagesFromStorage }));
 
       try {
-        const rawNext = window.localStorage.getItem(STORY_NEXT_KEY);
+        const rawNext = window.localStorage.getItem(projectStorageKey(STORY_NEXT_KEY, projectIdForState));
         if (rawNext) {
           const parsedNext = JSON.parse(rawNext);
           if (parsedNext?.chapter === chapterFromStorage && parsedNext?.show) {
@@ -614,7 +638,7 @@ const App: React.FC = () => {
       }
 
       try {
-        const rawTasks = window.localStorage.getItem(STORY_TASKS_KEY);
+        const rawTasks = window.localStorage.getItem(projectStorageKey(STORY_TASKS_KEY, projectIdForState));
         if (rawTasks) {
           const parsedTasks = JSON.parse(rawTasks);
           if (parsedTasks?.chapter === chapterFromStorage && Array.isArray(parsedTasks?.tasks)) {
@@ -627,7 +651,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.warn('Failed to rehydrate story state', err);
     }
-  }, [dispatch, setNextButton]);
+  }, [dispatch, setNextButton, projectStorageKey, selectedProject]);
 
   const handleReplayTasks = useCallback(() => {
     let tasksToShow = activeTaskList;
@@ -642,7 +666,7 @@ const App: React.FC = () => {
     if (!tasksToShow || tasksToShow.length === 0) {
       try {
         if (typeof window !== 'undefined') {
-          const raw = window.localStorage.getItem(STORY_TASKS_KEY);
+          const raw = window.localStorage.getItem(projectStorageKey(STORY_TASKS_KEY, null));
           const parsed = raw ? JSON.parse(raw) : null;
           if (parsed?.chapter === currentDialogueChapter && Array.isArray(parsed?.tasks)) {
             tasksToShow = parsed.tasks;
@@ -688,6 +712,7 @@ const App: React.FC = () => {
     messageCursor,
     persistActiveTasks,
     createTaskFromMessage,
+    projectStorageKey,
   ]);
 
   const handleReplayDialogue = useCallback(async () => {
@@ -714,6 +739,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
     (async () => {
+      // respect unlock order: block locked projects from opening directly
+      if (params?.id) {
+        const requestedId = decodeURIComponent(params.id);
+        if (!isProjectUnlocked(requestedId) && !isProjectUnlocked(selectedProjectRef.current)) {
+          toast.warn('این پروژه هنوز باز نشده است. ابتدا پروژه قبلی را کامل کنید.');
+          navigate('/project', { replace: true });
+          return;
+        }
+      }
+
       // 1) Load projects index first
       let projectsIndex: any = [];
       try {
@@ -1097,7 +1132,23 @@ const App: React.FC = () => {
     if (nextKey) {
       await startDialogueForChapter(nextKey);
     } else {
-      toast.info('فصل بعدی موجود نیست.');
+      try {
+        const totalChapters = keys.length;
+        await setSession(projectId, {
+          step: totalChapters,
+          progress: 100,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Failed to mark project session complete', err);
+      }
+
+      const unlockedNext = unlockNextAfter(projectId);
+      if (unlockedNext) {
+        toast.success(`پروژه ${unlockedNext} باز شد!`);
+      } else {
+        toast.info('فصل بعدی موجود نیست.');
+      }
     }
   }, [
     blockingItem,

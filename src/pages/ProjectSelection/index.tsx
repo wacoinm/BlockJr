@@ -10,6 +10,7 @@ import { initSession } from "../../utils/sessionStorage";
 import { getSelectedPack } from "../../utils/packStorage";
 import { getAllProjects, getAllPacks, getPackKeywords, getAllStories } from "../../utils/manifest";
 import { loadProjects } from "../../utils/projectStorage";
+import { getUnlockedProjects, isProjectUnlocked, getProjectOrder } from "../../utils/projectUnlock";
 
 /**
  * ProjectSelection — improved matching that treats pack.items as project selectors.
@@ -29,6 +30,8 @@ type Project = {
   checkpoints?: { id: string; title?: string }[];
   isLock?: boolean;
   lockReason?: string;
+  order?: number;
+  dependsOn?: string[];
   [key: string]: any;
 };
 
@@ -208,6 +211,8 @@ const ProjectSelection: React.FC = () => {
                   imgsPath: rawProj.imgsPath,
                   isLock: rawProj.isLock,
                   lockReason: rawProj.lockReason,
+                  order: rawProj.order,
+                  dependsOn: rawProj.dependsOn,
                   checkpoints: [],
                 } as Project;
               }
@@ -372,7 +377,32 @@ const ProjectSelection: React.FC = () => {
           }
         }
 
-        setDisplayProjects(filtered);
+        const unlockedList = getUnlockedProjects();
+        const order = getProjectOrder();
+        const orderIndex = (p: Project) => {
+          if (typeof p.order === "number") return p.order;
+          const idx = order.findIndex(
+            (o) => normalize(o) === normalize(p.id) || normalize(o) === normalize(p.name)
+          );
+          return idx === -1 ? Number.MAX_SAFE_INTEGER : idx + 1;
+        };
+
+        const ordered = [...filtered].sort((a, b) => orderIndex(a) - orderIndex(b));
+
+        const withLocks = ordered.map((p) => {
+          const unlocked =
+            unlockedList.some((u) => normalize(u) === normalize(p.id)) ||
+            unlockedList.some((u) => normalize(u) === normalize(p.name));
+          return {
+            ...p,
+            isLock: !unlocked,
+            lockReason: !unlocked
+              ? p.lockReason ?? "برای باز کردن این پروژه باید مورد قبلی را کامل کنید."
+              : p.lockReason,
+          };
+        });
+
+        setDisplayProjects(withLocks);
       } catch (err) {
         console.warn("ProjectSelection error:", err);
         setDisplayProjects((getAllProjects() || []) as Project[]);

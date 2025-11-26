@@ -99,7 +99,7 @@ const PacksPage: React.FC = () => {
     const qrRaw = p?.qrRaw ?? "";
     const qrBase64 = p?.qrBase64 ?? (qrRaw ? encodeBase64(qrRaw) : p?.qr ?? "");
     const id = p?.id ?? (p?.name ? toPackId(p.name, "آموزشی") : `pack-unknown-${Math.random().toString(36).slice(2, 9)}`);
-    const items = Array.isArray(p?.items) ? p.items : Array.isArray(p?.files) ? p.files : [];
+    const items = p.projects.map((data: any) => data.name);
     return {
       ...p,
       id,

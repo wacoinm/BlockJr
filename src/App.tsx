@@ -1130,15 +1130,15 @@ const App: React.FC = () => {
         ),
       title: 'حالت شب/روز',
     },
-    {
-      key: 'selectProject',
-      onClick: () => {
-        if (!selectVisible) openSelectPopup();
-        else closeSelectPopup();
-      },
-      content: <FolderOpenDot className="w-6 h-6" />,
-      title: 'پروژه',
-    },
+    // {
+    //   key: 'selectProject',
+    //   onClick: () => {
+    //     if (!selectVisible) openSelectPopup();
+    //     else closeSelectPopup();
+    //   },
+    //   content: <FolderOpenDot className="w-6 h-6" />,
+    //   title: 'پروژه',
+    // },
     {
       key: 'unit',
       onClick: cycleUnit,
